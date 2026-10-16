@@ -22,7 +22,7 @@ py -3.12 -m venv .venv
 .venv/Scripts/python src/compare_paper.py
 ```
 
-`run_upstream.py` seeds numpy's global RNG (the upstream scripts set no seed) and copies
-the replay accuracies to `results/upstream/seed<N>/`. `make_baseline.py` builds
+`run_upstream.py` seeds numpy's global RNG (the upstream scripts set no seed) and redirects
+the replay accuracies to `results/upstream/seed<N>/` (results here use seeds 0, 1, 2). `make_baseline.py` builds
 `results/baseline.csv`, `results/baseline_by_position.csv`, `results/baseline_demo.csv`
 and `results/baseline_blocks.png`.
