@@ -1,0 +1,17 @@
+Accuracy of LDA in 10 testing blocks
+[0.62       0.8        0.66666667 0.54333333 0.56666667 0.47
+ 0.40333333 0.35       0.49       0.61666667]
+Accuracy of RF in 10 testing blocks
+[0.81       0.89333333 0.81       0.56666667 0.71666667 0.70333333
+ 0.60666667 0.57       0.62666667 0.68666667]
+Accuracy of pre-trained RF in 10 testing blocks
+[0.77333333 0.73333333 0.63       0.69666667 0.68       0.83
+ 0.77333333 0.68666667 0.67666667 0.63666667]
+Accuracy of pre-trained and fine-tuned RF in 10 testing blocks
+[0.89666667 0.87666667 0.83666667 0.79       0.81666667 0.86333333
+ 0.79333333 0.68333333 0.74666667 0.75      ]
+Accuracy of self-calibrating RF in 10 testing blocks
+[0.89666667 0.91333333 0.86666667 0.81333333 0.85666667 0.86
+ 0.98666667 0.91333333 0.95666667 0.96666667]
+Competed.
+[run_upstream] demo_replay.py seed=1 took 167.1 s

@@ -1,0 +1,13 @@
+extracting features of subject0 in calibration
+extracting features of subject0 in testing_block0
+extracting features of subject0 in testing_block1
+extracting features of subject0 in testing_block2
+extracting features of subject0 in testing_block3
+extracting features of subject0 in testing_block4
+extracting features of subject0 in testing_block5
+extracting features of subject0 in testing_block6
+extracting features of subject0 in testing_block7
+extracting features of subject0 in testing_block8
+extracting features of subject0 in testing_block9
+feature extraction completed
+[run_upstream] demo_feature_extract.py seed=0 took 99.4 s

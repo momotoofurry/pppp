@@ -1,0 +1,21 @@
+metric (%),paper,ours (seed-avg),ours min over seeds,ours max over seeds,diff (ours-paper)
+LDA @P5 (mean),76.00,75.99,75.99,75.99,-0.01
+LDA @P5 (SD),9.30,9.26,9.26,9.26,-0.04
+RF @P5 (mean),77.60,77.37,77.27,77.57,-0.23
+RF @P5 (SD),9.60,10.05,9.92,10.36,0.45
+LDA drop P5->P2,6.40,6.40,6.40,6.40,0.00
+LDA drop P5->P4,5.80,5.84,5.84,5.84,0.04
+LDA drop P5->P6,4.50,4.52,4.52,4.52,0.02
+LDA drop P5->P8,2.90,2.94,2.94,2.94,0.04
+one-shot gain over RF @P2,2.50,2.42,2.18,2.60,-0.08
+one-shot gain over RF @P4,3.50,3.20,2.64,3.64,-0.30
+one-shot gain over RF @P5,4.20,3.80,3.42,4.27,-0.40
+one-shot gain over RF @P6,2.60,2.38,2.09,2.83,-0.22
+one-shot gain over RF @P8,3.10,2.97,2.46,3.50,-0.13
+self-cal gain over one-shot @P2,3.30,4.14,3.77,4.70,0.84
+self-cal gain over one-shot @P4,4.20,4.55,4.07,5.08,0.35
+self-cal gain over one-shot @P5,3.70,3.77,3.38,4.22,0.07
+self-cal gain over one-shot @P6,5.00,5.25,4.66,5.61,0.25
+self-cal gain over one-shot @P8,4.10,4.69,3.98,5.48,0.59
+"self-cal, all blocks (mean)",84.60,84.63,84.38,84.80,0.03
+"self-cal, all blocks (SD)",8.50,8.58,8.53,8.79,0.08

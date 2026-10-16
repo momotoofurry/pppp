@@ -1,0 +1,151 @@
+seed,subject,block,method,accuracy
+0,0,0,LDA (calib only),0.6200
+0,0,1,LDA (calib only),0.8000
+0,0,2,LDA (calib only),0.6667
+0,0,3,LDA (calib only),0.5433
+0,0,4,LDA (calib only),0.5667
+0,0,5,LDA (calib only),0.4700
+0,0,6,LDA (calib only),0.4033
+0,0,7,LDA (calib only),0.3500
+0,0,8,LDA (calib only),0.4900
+0,0,9,LDA (calib only),0.6167
+0,0,0,RF (calib only),0.8000
+0,0,1,RF (calib only),0.8733
+0,0,2,RF (calib only),0.7967
+0,0,3,RF (calib only),0.5633
+0,0,4,RF (calib only),0.7233
+0,0,5,RF (calib only),0.6867
+0,0,6,RF (calib only),0.6067
+0,0,7,RF (calib only),0.5467
+0,0,8,RF (calib only),0.6133
+0,0,9,RF (calib only),0.6100
+0,0,0,pretrained RF (no calib),0.7733
+0,0,1,pretrained RF (no calib),0.7333
+0,0,2,pretrained RF (no calib),0.6300
+0,0,3,pretrained RF (no calib),0.6967
+0,0,4,pretrained RF (no calib),0.6800
+0,0,5,pretrained RF (no calib),0.8300
+0,0,6,pretrained RF (no calib),0.7733
+0,0,7,pretrained RF (no calib),0.6867
+0,0,8,pretrained RF (no calib),0.6767
+0,0,9,pretrained RF (no calib),0.6367
+0,0,0,fixed: one-shot RF,0.9100
+0,0,1,fixed: one-shot RF,0.9067
+0,0,2,fixed: one-shot RF,0.8667
+0,0,3,fixed: one-shot RF,0.8100
+0,0,4,fixed: one-shot RF,0.8367
+0,0,5,fixed: one-shot RF,0.8800
+0,0,6,fixed: one-shot RF,0.8333
+0,0,7,fixed: one-shot RF,0.7300
+0,0,8,fixed: one-shot RF,0.7833
+0,0,9,fixed: one-shot RF,0.7733
+0,0,0,self-calibrating RF,0.9100
+0,0,1,self-calibrating RF,0.9100
+0,0,2,self-calibrating RF,0.8767
+0,0,3,self-calibrating RF,0.8367
+0,0,4,self-calibrating RF,0.8933
+0,0,5,self-calibrating RF,0.9733
+0,0,6,self-calibrating RF,0.9467
+0,0,7,self-calibrating RF,0.9133
+0,0,8,self-calibrating RF,0.8500
+0,0,9,self-calibrating RF,0.9800
+1,0,0,LDA (calib only),0.6200
+1,0,1,LDA (calib only),0.8000
+1,0,2,LDA (calib only),0.6667
+1,0,3,LDA (calib only),0.5433
+1,0,4,LDA (calib only),0.5667
+1,0,5,LDA (calib only),0.4700
+1,0,6,LDA (calib only),0.4033
+1,0,7,LDA (calib only),0.3500
+1,0,8,LDA (calib only),0.4900
+1,0,9,LDA (calib only),0.6167
+1,0,0,RF (calib only),0.8100
+1,0,1,RF (calib only),0.8933
+1,0,2,RF (calib only),0.8100
+1,0,3,RF (calib only),0.5667
+1,0,4,RF (calib only),0.7167
+1,0,5,RF (calib only),0.7033
+1,0,6,RF (calib only),0.6067
+1,0,7,RF (calib only),0.5700
+1,0,8,RF (calib only),0.6267
+1,0,9,RF (calib only),0.6867
+1,0,0,pretrained RF (no calib),0.7733
+1,0,1,pretrained RF (no calib),0.7333
+1,0,2,pretrained RF (no calib),0.6300
+1,0,3,pretrained RF (no calib),0.6967
+1,0,4,pretrained RF (no calib),0.6800
+1,0,5,pretrained RF (no calib),0.8300
+1,0,6,pretrained RF (no calib),0.7733
+1,0,7,pretrained RF (no calib),0.6867
+1,0,8,pretrained RF (no calib),0.6767
+1,0,9,pretrained RF (no calib),0.6367
+1,0,0,fixed: one-shot RF,0.8967
+1,0,1,fixed: one-shot RF,0.8767
+1,0,2,fixed: one-shot RF,0.8367
+1,0,3,fixed: one-shot RF,0.7900
+1,0,4,fixed: one-shot RF,0.8167
+1,0,5,fixed: one-shot RF,0.8633
+1,0,6,fixed: one-shot RF,0.7933
+1,0,7,fixed: one-shot RF,0.6833
+1,0,8,fixed: one-shot RF,0.7467
+1,0,9,fixed: one-shot RF,0.7500
+1,0,0,self-calibrating RF,0.8967
+1,0,1,self-calibrating RF,0.9133
+1,0,2,self-calibrating RF,0.8667
+1,0,3,self-calibrating RF,0.8133
+1,0,4,self-calibrating RF,0.8567
+1,0,5,self-calibrating RF,0.8600
+1,0,6,self-calibrating RF,0.9867
+1,0,7,self-calibrating RF,0.9133
+1,0,8,self-calibrating RF,0.9567
+1,0,9,self-calibrating RF,0.9667
+2,0,0,LDA (calib only),0.6200
+2,0,1,LDA (calib only),0.8000
+2,0,2,LDA (calib only),0.6667
+2,0,3,LDA (calib only),0.5433
+2,0,4,LDA (calib only),0.5667
+2,0,5,LDA (calib only),0.4700
+2,0,6,LDA (calib only),0.4033
+2,0,7,LDA (calib only),0.3500
+2,0,8,LDA (calib only),0.4900
+2,0,9,LDA (calib only),0.6167
+2,0,0,RF (calib only),0.7800
+2,0,1,RF (calib only),0.9033
+2,0,2,RF (calib only),0.7767
+2,0,3,RF (calib only),0.5600
+2,0,4,RF (calib only),0.7200
+2,0,5,RF (calib only),0.6933
+2,0,6,RF (calib only),0.6033
+2,0,7,RF (calib only),0.5533
+2,0,8,RF (calib only),0.6300
+2,0,9,RF (calib only),0.6900
+2,0,0,pretrained RF (no calib),0.7733
+2,0,1,pretrained RF (no calib),0.7333
+2,0,2,pretrained RF (no calib),0.6300
+2,0,3,pretrained RF (no calib),0.6967
+2,0,4,pretrained RF (no calib),0.6800
+2,0,5,pretrained RF (no calib),0.8300
+2,0,6,pretrained RF (no calib),0.7733
+2,0,7,pretrained RF (no calib),0.6867
+2,0,8,pretrained RF (no calib),0.6767
+2,0,9,pretrained RF (no calib),0.6367
+2,0,0,fixed: one-shot RF,0.9000
+2,0,1,fixed: one-shot RF,0.8867
+2,0,2,fixed: one-shot RF,0.8633
+2,0,3,fixed: one-shot RF,0.8067
+2,0,4,fixed: one-shot RF,0.8433
+2,0,5,fixed: one-shot RF,0.8800
+2,0,6,fixed: one-shot RF,0.8467
+2,0,7,fixed: one-shot RF,0.7333
+2,0,8,fixed: one-shot RF,0.7500
+2,0,9,fixed: one-shot RF,0.6733
+2,0,0,self-calibrating RF,0.9000
+2,0,1,self-calibrating RF,0.9100
+2,0,2,self-calibrating RF,0.8767
+2,0,3,self-calibrating RF,0.8200
+2,0,4,self-calibrating RF,0.8567
+2,0,5,self-calibrating RF,0.8800
+2,0,6,self-calibrating RF,0.8933
+2,0,7,self-calibrating RF,0.9500
+2,0,8,self-calibrating RF,0.8667
+2,0,9,self-calibrating RF,0.9333
