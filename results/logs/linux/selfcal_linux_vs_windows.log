@@ -1,0 +1,6 @@
+rows 660 | one-shot identical rows: 660 | self-cal identical rows: 157
+acc_oneshot per seed (win, linux): [[80.0, 80.0], [80.15, 80.15], [79.94, 79.94]]
+acc_selfcal per seed (win, linux): [[84.38, 84.68], [84.08, 84.5], [84.83, 84.81]]
+self-cal linux - win, per (seed, subject): mean +0.23 pp, SD 0.85, min -1.30, max +3.76, n=60
+seed-to-seed spread within Windows (max-min): 0.75 within Linux: 0.31
+Wilcoxon over 20 subjects (seed-averaged): WilcoxonResult(statistic=np.float64(50.0), pvalue=np.float64(0.039989471435546875))

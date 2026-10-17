@@ -1,0 +1,6 @@
+drwxrwxrwx  2 1000 1000 4096 10-16_18:19 .
+drwxrwxrwx 14 1000 1000 4096 10-16_18:20 ..
+arm_position: 1720/2400 files bit-identical, max abs diff 4.37e-11, max rel diff 5.66e-15
+   max rel diff per feature: {'mav': 0.0, 'mdf': 0.0, 'mnf': 7.3e-16, 'pkf': 0.0, 'rms': 0.0, 'skw': 3.8e-16, 'ssc': 0.0, 'vcf': 5.7e-15, 'wl': 0.0, 'zc': 0.0}
+demo: 79/110 files bit-identical, max abs diff 3.64e-11, max rel diff 7.03e-15
+   max rel diff per feature: {'mav': 0.0, 'mdf': 0.0, 'mnf': 6.4e-16, 'pkf': 0.0, 'rms': 0.0, 'skw': 3.5e-16, 'ssc': 0.0, 'vcf': 7e-15, 'wl': 0.0, 'zc': 0.0}

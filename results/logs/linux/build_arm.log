@@ -1,0 +1,14 @@
+arm-none-eabi-gcc (15:10.3-2021.07-4) 10.3.1 20210621 (release)
+{'config': 'full_f32', 'impl': 'table', 'status': 'ok', 'text': 710480, 'data': 4, 'bss': 4420, 'flash_bytes': 710484, 'flash_KB': 693.83203125, 'static_ram_bytes': 328, 'worst_stack_bytes': 72, 'stack_path': 'Reset_Handler(8) -> main(16) -> rf_predict(48)', 'stack_unknown': ''}
+{'config': 'full_f32', 'impl': 'emlearn', 'status': 'ok', 'text': 2024756, 'data': 4, 'bss': 4420, 'flash_bytes': 2024760, 'flash_KB': 1977.3046875, 'static_ram_bytes': 328, 'worst_stack_bytes': 192, 'stack_path': 'Reset_Handler(8) -> main(16) -> rfmodel_predict(168) -> /work/src/c/main.c:rfmodel_tree_137.constprop.0(0)', 'stack_unknown': ''}
+{'config': 'd10_n400_i16', 'impl': 'table', 'status': 'ok', 'text': 353796, 'data': 4, 'bss': 4580, 'flash_bytes': 353800, 'flash_KB': 345.5078125, 'static_ram_bytes': 488, 'worst_stack_bytes': 64, 'stack_path': 'Reset_Handler(8) -> main(8) -> rf_predict(48)', 'stack_unknown': ''}
+{'config': 'd10_n400_i16', 'impl': 'emlearn', 'status': 'ok', 'text': 404180, 'data': 32, 'bss': 4584, 'flash_bytes': 404212, 'flash_KB': 394.73828125, 'static_ram_bytes': 520, 'worst_stack_bytes': 212, 'stack_path': 'Reset_Handler(8) -> main(8) -> rfmodel_predict(0) -> eml_trees_predict(152) -> eml_trees_predict_proba(32) -> /work/src/c/main.c:eml_trees_predict_tree.constprop.0(12)', 'stack_unknown': ''}
+{'config': 'd10_n100_i16', 'impl': 'table', 'status': 'ok', 'text': 90204, 'data': 4, 'bss': 4580, 'flash_bytes': 90208, 'flash_KB': 88.09375, 'static_ram_bytes': 488, 'worst_stack_bytes': 64, 'stack_path': 'Reset_Handler(8) -> main(8) -> rf_predict(48)', 'stack_unknown': ''}
+{'config': 'd10_n100_i16', 'impl': 'emlearn', 'status': 'ok', 'text': 103108, 'data': 32, 'bss': 4584, 'flash_bytes': 103140, 'flash_KB': 100.72265625, 'static_ram_bytes': 520, 'worst_stack_bytes': 212, 'stack_path': 'Reset_Handler(8) -> main(8) -> rfmodel_predict(0) -> eml_trees_predict(152) -> eml_trees_predict_proba(32) -> /work/src/c/main.c:eml_trees_predict_tree.constprop.0(12)', 'stack_unknown': ''}
+      config    impl status    text  data  bss  flash_bytes    flash_KB  static_ram_bytes  worst_stack_bytes stack_unknown
+    full_f32   table     ok  710480     4 4420       710484  693.832031               328                 72              
+    full_f32 emlearn     ok 2024756     4 4420      2024760 1977.304688               328                192              
+d10_n400_i16   table     ok  353796     4 4580       353800  345.507812               488                 64              
+d10_n400_i16 emlearn     ok  404180    32 4584       404212  394.738281               520                212              
+d10_n100_i16   table     ok   90204     4 4580        90208   88.093750               488                 64              
+d10_n100_i16 emlearn     ok  103108    32 4584       103140  100.722656               520                212              

@@ -1,0 +1,11 @@
+platform,check,column,rows,missing_in_ref,exact_match_pct,max_abs_diff
+Linux py3.12.3,compression_sweep s0 seed0,accuracy,660,0,100,3.33333e-05
+Linux py3.12.3,compression_sweep s0 seed0,compact_B,660,0,100,0
+Linux py3.12.3,selfcal N100_d10_int16 s0 seed0,acc_oneshot,11,0,100,3.33333e-05
+Linux py3.12.3,selfcal N100_d10_int16 s0 seed0,acc_selfcal,11,0,45.4545,0.0499667
+Linux py3.12.3,selfcal trees N100_d10_int16 s0 seed0,app_nodes_mean,1,0,0,4.28
+Linux py3.12.3,selfcal trees N100_d10_int16 s0 seed0,compact_B,1,0,0,749
+Linux py3.12.3,selfcal N400_dnone_float64 s0 seed0,acc_oneshot,11,0,100,3.33333e-05
+Linux py3.12.3,selfcal N400_dnone_float64 s0 seed0,acc_selfcal,11,0,27.2727,0.0300333
+Linux py3.12.3,selfcal trees N400_dnone_float64 s0 seed0,app_nodes_mean,1,0,0,0.51
+Linux py3.12.3,selfcal trees N400_dnone_float64 s0 seed0,compact_B,1,0,0,459

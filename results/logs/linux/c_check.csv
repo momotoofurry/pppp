@@ -1,0 +1,7 @@
+config,impl,build,build_s,warnings,n,match_python_pct,n_mismatch,acc_c_pct,acc_python_pct,match_python_float64_pct,python_lt_vs_le_match_pct
+full_f32,table,ok,1.500,0,3300,100.000,0,87.515,87.515,99.970,99.879
+full_f32,emlearn,ok,32.000,0,3300,100.000,0,87.515,87.515,99.970,99.879
+d10_n400_i16,table,ok,0.600,0,3300,100.000,0,88.242,88.242,99.970,99.788
+d10_n400_i16,emlearn,ok,0.600,1,3300,100.000,0,88.242,88.242,99.970,99.788
+d10_n100_i16,table,ok,0.200,0,3300,100.000,0,88.364,88.364,99.818,99.697
+d10_n100_i16,emlearn,ok,0.300,1,3300,100.000,0,88.364,88.364,99.818,99.697

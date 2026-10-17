@@ -1,0 +1,41 @@
+platform: Linux-5.15.167.4-microsoft-standard-WSL2-x86_64-with-glibc2.35 | python 3.12.4 | numpy 2.1.2 | scipy 1.14.1 | sklearn 1.5.2
+
+[1] vectorised predict vs upstream get_predictions
+pretrained: 600 samples, identical = True
+  float32 vs float64 agreement: 100.00%
+  int16 vs float64 agreement: 100.00%
+  "<=" vs "<" agreement: 100.00%
+pruned+appended: 600 samples, identical = True
+  float32 vs float64 agreement: 100.00%
+  int16 vs float64 agreement: 99.83%
+  "<=" vs "<" agreement: 100.00%
+
+[2] compression sweep, subject 0, seed 0
+{'check': 'compression_sweep s0 seed0', 'column': 'accuracy', 'rows': 660, 'missing_in_ref': 0, 'exact_match_pct': 100.0, 'max_abs_diff': 3.3333333333440684e-05}
+{'check': 'compression_sweep s0 seed0', 'column': 'compact_B', 'rows': 660, 'missing_in_ref': 0, 'exact_match_pct': 100.0, 'max_abs_diff': 0.0}
+  (19 s)
+
+[3] self-calibration, subject 0, seed 0
+{'check': 'selfcal N100_d10_int16 s0 seed0', 'column': 'acc_oneshot', 'rows': 11, 'missing_in_ref': 0, 'exact_match_pct': 100.0, 'max_abs_diff': 3.333333333332966e-05}
+{'check': 'selfcal N100_d10_int16 s0 seed0', 'column': 'acc_selfcal', 'rows': 11, 'missing_in_ref': 0, 'exact_match_pct': 45.45454545454545, 'max_abs_diff': 0.06003333333333338}
+{'check': 'selfcal trees N100_d10_int16 s0 seed0', 'column': 'app_nodes_mean', 'rows': 1, 'missing_in_ref': 0, 'exact_match_pct': 0.0, 'max_abs_diff': 7.0}
+{'check': 'selfcal trees N100_d10_int16 s0 seed0', 'column': 'compact_B', 'rows': 1, 'missing_in_ref': 0, 'exact_match_pct': 0.0, 'max_abs_diff': 1225.0}
+  (62 s)
+{'check': 'selfcal N400_dnone_float64 s0 seed0', 'column': 'acc_oneshot', 'rows': 11, 'missing_in_ref': 0, 'exact_match_pct': 100.0, 'max_abs_diff': 3.333333333332966e-05}
+{'check': 'selfcal N400_dnone_float64 s0 seed0', 'column': 'acc_selfcal', 'rows': 11, 'missing_in_ref': 0, 'exact_match_pct': 27.27272727272727, 'max_abs_diff': 0.030033333333333356}
+{'check': 'selfcal trees N400_dnone_float64 s0 seed0', 'column': 'app_nodes_mean', 'rows': 1, 'missing_in_ref': 0, 'exact_match_pct': 100.0, 'max_abs_diff': 0.0}
+{'check': 'selfcal trees N400_dnone_float64 s0 seed0', 'column': 'compact_B', 'rows': 1, 'missing_in_ref': 0, 'exact_match_pct': 100.0, 'max_abs_diff': 0.0}
+  (61 s)
+
+RESULT: DIFFERS from committed results (see table)
+      platform                                     check         column  rows  missing_in_ref  exact_match_pct  max_abs_diff
+Linux py3.12.4                compression_sweep s0 seed0       accuracy   660               0       100.000000      0.000033
+Linux py3.12.4                compression_sweep s0 seed0      compact_B   660               0       100.000000      0.000000
+Linux py3.12.4           selfcal N100_d10_int16 s0 seed0    acc_oneshot    11               0       100.000000      0.000033
+Linux py3.12.4           selfcal N100_d10_int16 s0 seed0    acc_selfcal    11               0        45.454545      0.060033
+Linux py3.12.4     selfcal trees N100_d10_int16 s0 seed0 app_nodes_mean     1               0         0.000000      7.000000
+Linux py3.12.4     selfcal trees N100_d10_int16 s0 seed0      compact_B     1               0         0.000000   1225.000000
+Linux py3.12.4       selfcal N400_dnone_float64 s0 seed0    acc_oneshot    11               0       100.000000      0.000033
+Linux py3.12.4       selfcal N400_dnone_float64 s0 seed0    acc_selfcal    11               0        27.272727      0.030033
+Linux py3.12.4 selfcal trees N400_dnone_float64 s0 seed0 app_nodes_mean     1               0       100.000000      0.000000
+Linux py3.12.4 selfcal trees N400_dnone_float64 s0 seed0      compact_B     1               0       100.000000      0.000000

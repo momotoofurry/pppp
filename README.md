@@ -13,7 +13,7 @@ bind-mounted, so keep the clone on the Linux filesystem (not `/mnt/c`).
 docker/run.sh build     # build the image (once)
 docker/run.sh setup     # clone the upstream repo + data into external/ (1.7 GB)
 docker/run.sh stage1    # features + upstream replays (~1.5 h); then stage2, stage3, selfcal, or: all
-docker/run.sh verify    # rerun a slice and compare with the committed results (~5 min)
+docker/run.sh verify    # rerun a slice and compare with the committed results (~5 min), see results/platform_check.md
 docker/run.sh shell     # shell inside the container
 ```
 
