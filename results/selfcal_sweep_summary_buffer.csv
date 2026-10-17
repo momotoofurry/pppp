@@ -1,0 +1,5 @@
+config,n_trees,max_depth,precision,new_max_leaf_nodes,new_min_samples_leaf,pseudo_label,buffer,buffer_int16,acc_oneshot,acc_selfcal,gain,oneshot_seed_min,oneshot_seed_max,selfcal_seed_min,selfcal_seed_max,gain_seed_min,gain_seed_max,n_seeds,app_nodes_mean,oneshot_app_nodes_mean,app_internal_mean,app_nodes_max,app_internal_max,app_depth_max,compact_KB,compact_KB_max,oneshot_compact_KB
+N100_d10_int16_bq16,100,10,int16,none,1,tsne,1500,True,79.680,83.999,4.319,79.558,79.774,83.950,84.042,4.268,4.392,3,134.446,12.997,66.723,327,163,10,106.197,122.275,85.441
+N100_d10_int16_buf1000_bq16,100,10,int16,none,1,tsne,1000,True,79.680,84.051,4.370,79.558,79.774,83.795,84.395,4.086,4.621,3,102.491,12.997,50.746,229,114,10,100.736,112.274,85.441
+N100_d10_int16_buf750_bq16,100,10,int16,none,1,tsne,750,True,79.680,83.828,4.147,79.558,79.774,83.618,84.182,3.909,4.473,3,81.083,12.997,40.042,193,96,10,97.077,106.956,85.441
+N100_d10_int16_buf500_bq16,100,10,int16,none,1,tsne,500,True,79.680,83.457,3.777,79.558,79.774,83.402,83.553,3.627,3.859,3,57.135,12.997,28.068,153,76,10,92.984,100.852,85.441
