@@ -13,7 +13,7 @@
 |---|---|
 | PC 基準重現得出來嗎？ | 可以。自我校正 RF 在 arm_position 資料（20 人、11 個 block）的平均準確率是 **84.63 ± 8.58%**，論文是 84.6 ± 8.5%；所有和論文對得上的指標差距都 < 1 個百分點。 |
 | 原始模型放得進 H743 嗎？ | 推論模型可以。論文的完整設定（剪枝後的 200 棵 + 附加的 200 棵，深度不限）用 compact float32 格式，編譯後 Flash 是 **693.8 KB**；照題目設定的 naive 格式要 1519 KB，也放得進 2 MB Flash。 |
-| 推薦的壓縮設定 | **100 棵、深度 10、int16 門檻值**：Flash 88.1 KB，one-shot 準確率 79.75%（完整模型是 80.12%，差 −0.37 個百分點）。Flash 夠用的話，400 棵、深度 10、int16 只差 −0.04 個百分點，要 345.5 KB。 |
+| 推薦的壓縮設定 | **100 棵、深度 10、int16 門檻值**：Flash 88.1 KB，one-shot 準確率 79.75%（完整模型是 80.12%，差 −0.37 個百分點）。Flash 夠用的話，400 棵、深度 10、int16 只差 −0.04 個百分點，要 345.5 KB。**自我校正之後**（3.1 節）：100 棵是 83.96%，完整模型 84.43%，差 −0.47 個百分點，差距沒有明顯擴大。 |
 | 推論需要多少 RAM？ | 實測 **552 B**（特徵緩衝區 + 最壞情況的 stack）。 |
 | 自我校正放得進 MCU 嗎？（估算） | 照論文原樣做（float32 buffer + t-SNE）約需 1086 KB，**放不下**。改用 int16 buffer、100 棵樹、不做 t-SNE，約 332 KB，放得進 AXI 512 KB。但「不做 t-SNE」在論文的 ablation 裡準確率比較低，這是論文要解決的核心問題。 |
 
@@ -133,7 +133,52 @@ one-shot 準確率（%，int16；和 float32 的差距在所有設定下都 ≤ 
 理由：Flash 只要 88 KB（佔 2 MB 的 4%），one-shot 準確率只差 0.37 個百分點；而且只有 50 棵附加樹會被自我校正替換，放在 RAM 的部分比較小（見第 5 節）。
 備選：400 棵、深度 10、int16（345.5 KB，−0.04 個百分點），適合 Flash 很充裕、想最接近原始模型的情況。
 
-**要注意：上面的準確率都是 one-shot，沒有做自我校正。** 壓縮後的模型做自我校正之後準確率是多少，還沒量（見第 5 節「下一步」）。
+上面的準確率都是 one-shot（固定模型）。自我校正之後的結果在 3.1 節。
+
+### 3.1 壓縮後模型的自我校正準確率（`src/selfcal_sweep.py` → `results/selfcal_sweep*.csv`）
+
+做法：照上游 `main_replay_arm_position.py` 的迴圈重寫（buffer_update / manifold_clustering / replace 直接呼叫上游函式，沒有改）。
+設定 (N, d, 精度)：預訓練樹截到深度 d → 剪枝 → 保留 N/2 棵 → 附加 N − N/2 棵；每個 block 之後用
+buffer（1500 筆）+ t-SNE（3 維、perplexity 10）+ K-Means（min_sample_class 10）產生偽標籤，
+訓練 round(0.4 × 附加樹數) 棵新樹（同樣 max_depth；N = 400 時是 80 棵）替換隨機選的附加樹。
+所有預測（包含 manifold_clustering 內部的預測）都用該設定的精度；新樹用 float64 訓練。
+照上游行為，K-Means 初始中心用的偽標籤一律由**最初的 one-shot 模型**產生，不是當下自我校正過的模型。
+亂數照上游走 numpy 全域 RNG，每個 (seed, 受試者) 呼叫 `np.random.seed`。20 人 × 11 block × 3 個 seed（0/1/2）。
+
+**驗證**：(400, 不限, float64) 得到 **84.43%**（seed 0/1/2 = 84.38 / 84.08 / 84.83），
+上游 3 個 seed 是 84.38–84.80（平均 84.63），平均值落在範圍內。one-shot 80.03%（上游 80.21%）。
+
+| 設定 (N, 深度, 精度) | one-shot | 自我校正（seed 範圍） | 增益 | 自我校正 vs 完整模型 | one-shot vs 完整模型 |
+|---|---|---|---|---|---|
+| 400, 不限, float64（上游） | 80.03 | **84.43**（84.08–84.83） | +4.40 | — | — |
+| 400, 不限, float32 | 80.03 | 84.46（84.25–84.67） | +4.43 | +0.03 | 0.00 |
+| 400, 10, int16 | 79.84 | 84.37（84.17–84.54） | +4.53 | −0.06 | −0.19 |
+| **100, 10, int16（推薦）** | 79.68 | **83.96**（83.89–84.07） | +4.28 | **−0.47** | −0.35 |
+| 50, 8, int16 | 78.77 | 83.19（82.94–83.40） | +4.42 | −1.24 | −1.26 |
+| 20, 10, int16 | 77.17 | 81.93（81.69–82.14） | +4.76 | −2.50 | −2.86 |
+
+（%，20 人平均；增益的 seed 範圍在 `results/selfcal_sweep_summary.csv`。受試者間標準差 8.7–9.5。
+這裡的 one-shot 是 3 個 seed、全域 RNG，和上面 5 個 seed 的掃描差 ≤ 0.1 個百分點。）
+
+觀察：
+1. **自我校正的增益在所有壓縮設定下都差不多（+4.3 到 +4.8 個百分點）**，所以 one-shot 的差距大致原樣保留：
+   推薦設定從 −0.35 變成 −0.47（差 0.12，和 seed 範圍同等級），N = 20 反而從 −2.86 縮小到 −2.50。
+2. **int16 和深度 10 在自我校正後仍然沒有損失**：400 棵、深度 10、int16 只差 −0.06。
+3. **自我校正後的樹比 one-shot 的附加樹大很多**（實測，`results/selfcal_sweep_trees.csv`）：
+   one-shot 附加樹只用 60 筆 calibration 資料訓練，平均 13 個節點；自我校正後的附加樹是用 buffer + calibration 訓練的，
+
+   | 設定 | 自我校正後附加樹節點數：平均 / 最大 | 整個模型 compact 大小：one-shot → 自我校正後平均（最大） |
+   |---|---|---|
+   | 400, 不限, float32 | 149 / 443（深度最深 26） | 682.4 → 802.3 KB（942.1） |
+   | 400, 10, int16 | 133 / 343 | 338.2 → 420.5 KB（494.8） |
+   | 100, 10, int16 | 135 / 331 | 85.4 → 106.3 KB（122.6） |
+   | 50, 8, int16 | 105 / 223 | 23.2 → 31.1 KB（36.3） |
+   | 20, 10, int16 | 141 / 309 | 17.1 → 21.5 KB（24.9） |
+
+   深度 10 的單棵樹最大 331–343 個節點（165–171 個內部節點），比 5.2 節用的近似值（每棵最多 107 個內部節點，
+   來自 `compression_sweep.py` 不做 t-SNE/K-Means 的近似訓練集）大約 1.6 倍。用 5.2 節同樣的算法（內部節點 × 7 B），
+   可替換附加樹的 RAM 上限變成 50 棵 × 165 × 7 B ≈ **56.4 KB**（原估 36.6 KB）、200 棵 × 171 × 7 B ≈ 233.8 KB（原估 146.2 KB）。
+   情境 C 因此從約 332 KB 增加到約 352 KB（估算），仍然放得進 AXI 512 KB；5.2 節的表格還沒照這個重算。
 
 ---
 
@@ -201,7 +246,10 @@ PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 
 也就是說，直接拿掉 t-SNE 會掉 3.6 個百分點。在記憶體預算內找到 t-SNE 的替代方案，就是論文的主要貢獻。
 
 ### 5.3 具體待辦（依優先順序）
-1. **量壓縮後模型的自我校正準確率**：把上游的自我校正迴圈套用到推薦設定（100 棵、深度 10、int16），以及另外 2–3 個候選，確認 one-shot 階段 −0.37 個百分點的差距在自我校正後會不會擴大。
+0. ~~量壓縮後模型的自我校正準確率~~（已完成，3.1 節）：推薦設定（100 棵、深度 10、int16）自我校正後 83.96%（seed 範圍 83.89–84.07），
+   比完整模型（84.43%）低 0.47 個百分點；one-shot 階段的差距是 −0.35，自我校正後沒有明顯擴大。
+   另外發現自我校正後的附加樹比估算大約 1.6 倍（深度 10 最大 165 個內部節點），5.2 節的 RAM 表格要用實測樹大小重算。
+1. **限制自我校正新樹的大小**：用 `max_leaf_nodes` 或 `min_samples_leaf` 限制新樹，讓可替換附加樹的 RAM 有固定上限，量準確率的代價；並用實測樹大小更新 `ram_estimate.py`。
 2. **低記憶體的偽標籤方法**：在 PC 上比較下面幾種，看準確率和 RAM 的取捨：
    - K-Means 直接在 80 維做
    - 先投影到低維（PCA 或用 calibration 資料訓練的 LDA）再做 K-Means
@@ -217,5 +265,5 @@ PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`src/c/*` |
-| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`*.png`、`stage*_summary.md`、`logs/` |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`src/c/*` |
+| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`*.png`、`stage*_summary.md`、`logs/` |

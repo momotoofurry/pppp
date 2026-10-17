@@ -55,5 +55,9 @@ wsl -d Ubuntu-22.04 -- sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-n
 
 ```bash
 .venv/Scripts/python src/ram_estimate.py   # design-level RAM estimate for on-MCU self-calibration
+# self-calibration accuracy of compressed configs (~25 min + ~90 min on 20 cores)
+.venv/Scripts/python src/selfcal_sweep.py --configs 0 --suffix _validation      # upstream model, float64
+.venv/Scripts/python src/selfcal_sweep.py --configs 1 2 3 4 5 --suffix _compressed
+.venv/Scripts/python src/selfcal_sweep.py --merge _validation _compressed       # -> selfcal_sweep*.csv
 ```
 Report: `report.md`.

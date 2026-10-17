@@ -1,0 +1,2 @@
+config,n_trees,max_depth,precision,acc_oneshot,acc_selfcal,gain,oneshot_seed_min,oneshot_seed_max,selfcal_seed_min,selfcal_seed_max,gain_seed_min,gain_seed_max,n_seeds,app_nodes_mean,oneshot_app_nodes_mean,app_internal_mean,app_nodes_max,app_depth_max,compact_KB,compact_KB_max,oneshot_compact_KB
+N400_dnone_float64,400,none,float64,80.030,84.430,4.400,79.938,80.150,84.082,84.832,3.932,4.894,3,149.155,12.987,74.077,441,24,802.081,943.680,682.402
