@@ -18,7 +18,7 @@ docker/run.sh shell     # shell inside the container
 ```
 
 `docker/run_all.sh` lists the exact commands of every step. The sections below are the original
-Windows instructions that produced the first committed results; `results/platform_check.csv`
+Windows instructions that produced the first committed results; `results/platform_check.md`
 records how the Docker run compares with them.
 
 ## Setup (Windows, Git Bash)
