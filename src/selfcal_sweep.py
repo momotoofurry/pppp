@@ -29,6 +29,11 @@ manifold_clustering, using branches it already has:
           (paper ablation "without K-Means and t-SNE")
 As upstream, the model that labels the buffer is the original one-shot model (mdl_prune_append).
 
+--buffer sets the buffer size (default 1500, upstream) and --buffer-int16 stores the buffer and the
+calibration set used for self-calibration training as Q5.10 int16 (as they would be kept in MCU RAM):
+features are quantised and dequantised before t-SNE / K-Means / tree training. Names get _buf<n>
+(when n != 1500) and _bq16. The one-shot model is unchanged, so one-shot accuracy stays identical.
+
 Randomness follows upstream: RandomForestClassifier / TSNE / permutation all draw from numpy's
 global RNG, seeded per (seed, subject) with np.random.seed.
 
@@ -37,6 +42,7 @@ results/selfcal_sweep_trees.csv (node counts of the appended trees after the las
 Usage: .venv/Scripts/python src/selfcal_sweep.py [--seeds 0 1 2] [--jobs 20] [--configs 0 1 2 ...] [--suffix _x]
        .venv/Scripts/python src/selfcal_sweep.py --configs 3 --max-leaf-nodes 32 64 128 --min-samples-leaf 5 10 --suffix _leaf
        python src/selfcal_sweep.py --configs 0 3 --pseudo tsne kmeans none --suffix _pseudo
+       python src/selfcal_sweep.py --configs 3 --buffer 1500 1000 750 500 --buffer-int16 --suffix _buffer
        .venv/Scripts/python src/selfcal_sweep.py --merge _validation _compressed   (summary only)
 """
 import argparse
@@ -66,12 +72,17 @@ REPLACE_FRAC = 0.4          # upstream: 80 of 200 appended trees
 PSEUDO = {'tsne': ('tsne', MIN_SAMPLE_CLASS), 'kmeans': (None, MIN_SAMPLE_CLASS), 'none': (None, np.inf)}
 
 
-def cfg_name(N, d, prec, mln=None, msl=1, pl='tsne'):
+def cfg_name(N, d, prec, mln=None, msl=1, pl='tsne', buf=BUFFER, bq16=False):
     return (f'N{N}_d{d if d else "none"}_{prec}' + (f'_mln{mln}' if mln else '') + (f'_msl{msl}' if msl > 1 else '')
-            + (f'_pl{pl}' if pl != 'tsne' else ''))
+            + (f'_pl{pl}' if pl != 'tsne' else '') + (f'_buf{buf}' if buf != BUFFER else '') + ('_bq16' if bq16 else ''))
 
 
-def run_subject(subject, N, d, prec, seed, mln=None, msl=1, pl='tsne'):
+def q16(x):
+    """store as Q5.10 int16 and read back (what an int16 RAM buffer keeps)"""
+    return P.quantize(x).astype(np.float64) / (1 << P.Q_SHIFT)
+
+
+def run_subject(subject, N, d, prec, seed, mln=None, msl=1, pl='tsne', buf=BUFFER, bq16=False):
     # manifold_clustering calls emg_functions.get_predictions internally; replace it (in this worker
     # process only, upstream file untouched) with the vectorised version at this config's precision.
     # manifold_clustering only uses the label, so no score is returned.
@@ -92,12 +103,12 @@ def run_subject(subject, N, d, prec, seed, mln=None, msl=1, pl='tsne'):
     for b, (X, y) in enumerate(blocks):
         lab_os = P.predict(mdl_prune_append, X, prec)
         lab_sc = P.predict(mdl_sc, X, prec)
-        rows.append(dict(config=cfg_name(N, d, prec, mln, msl, pl), n_trees=N, max_depth=d if d else 'none',
+        rows.append(dict(config=cfg_name(N, d, prec, mln, msl, pl, buf, bq16), n_trees=N, max_depth=d if d else 'none',
                          precision=prec, new_max_leaf_nodes=mln if mln else 'none', new_min_samples_leaf=msl,
-                         pseudo_label=pl,
+                         pseudo_label=pl, buffer=buf, buffer_int16=bq16,
                          seed=seed, subject=subject, block=b, acc_oneshot=np.mean(lab_os == y),
                          acc_selfcal=np.mean(lab_sc == y)))
-        feat_buf, lab_buf = emg_functions.buffer_update(BUFFER, feat_buf, lab_buf, X, lab_sc)
+        feat_buf, lab_buf = emg_functions.buffer_update(buf, feat_buf, lab_buf, q16(X) if bq16 else X, lab_sc)
         # Upstream behaviour (kept on purpose): the pseudo-labels that seed the K-Means centres come
         # from the ORIGINAL one-shot model mdl_prune_append, not from the current self-calibrated
         # model. The buffer itself holds the self-calibrated model's predictions, but
@@ -105,7 +116,8 @@ def run_subject(subject, N, d, prec, seed, mln=None, msl=1, pl='tsne'):
         embedding, min_class = PSEUDO[pl]
         feat_sel, lab_pseudo, lab_buf = emg_functions.manifold_clustering(
             feat_buf, list(LABELS), min_class, mdl_prune_append, 'kmeans', embedding=embedding)
-        new = P.train_rf(np.concatenate([feat_sel, Xc]), np.concatenate([lab_pseudo, yc]), n_upd, d, None, mln, msl)
+        Xc_train = q16(Xc) if bq16 else Xc
+        new = P.train_rf(np.concatenate([feat_sel, Xc_train]), np.concatenate([lab_pseudo, yc]), n_upd, d, None, mln, msl)
         idx_remain = np.concatenate([np.arange(n_pre), np.random.permutation(range(n_pre, N))[:n_app - n_upd]])
         mdl_sc = emg_functions.replace(mdl_sc, new, idx_remain)
 
@@ -113,7 +125,7 @@ def run_subject(subject, N, d, prec, seed, mln=None, msl=1, pl='tsne'):
     st_all = rf_size.forest_stats(mdl_sc)
     st_os = rf_size.forest_stats(P.subset(mdl_prune_append, range(n_pre, N)))
     thr = 'int16' if prec == 'int16' else 'float32'
-    tree = dict(config=cfg_name(N, d, prec, mln, msl, pl), seed=seed, subject=subject,
+    tree = dict(config=cfg_name(N, d, prec, mln, msl, pl, buf, bq16), seed=seed, subject=subject,
                 app_nodes_mean=np.mean([s['nodes'] for s in st_app]),
                 app_nodes_max=max(s['nodes'] for s in st_app),
                 app_internal_mean=np.mean([s['internal'] for s in st_app]),
@@ -138,6 +150,8 @@ def main():
                     help='one variant per value: min_samples_leaf of self-calibration trees')
     ap.add_argument('--pseudo', nargs='+', default=['tsne'], choices=list(PSEUDO),
                     help='one variant per value: pseudo-labelling method (default: upstream t-SNE + K-Means)')
+    ap.add_argument('--buffer', type=int, nargs='+', default=[BUFFER], help='one variant per value: buffer size')
+    ap.add_argument('--buffer-int16', action='store_true', help='keep buffer + calibration set as Q5.10 int16')
     ap.add_argument('--suffix', default='')
     ap.add_argument('--merge', nargs='+', default=None,
                     help='no run: concatenate selfcal_sweep<suffix>.csv files with these suffixes, write --suffix')
@@ -151,17 +165,19 @@ def main():
         acc, trees = rd('selfcal_sweep'), rd('selfcal_sweep_trees')
     else:
         variants = [(m, 1) for m in args.max_leaf_nodes] + [(None, k) for k in args.min_samples_leaf] or [(None, 1)]
-        tasks = [(s, *CONFIGS[c], seed, *v, pl) for c in args.configs for pl in args.pseudo for v in variants
-                 for seed in args.seeds for s in args.subjects]
+        tasks = [(s, *CONFIGS[c], seed, *v, pl, b, args.buffer_int16) for c in args.configs for pl in args.pseudo
+                 for b in args.buffer for v in variants for seed in args.seeds for s in args.subjects]
         res = Parallel(n_jobs=args.jobs, verbose=5)(delayed(run_subject)(*t) for t in tasks)
         acc = pd.DataFrame([r for rows, _ in res for r in rows])
         trees = pd.DataFrame([t for _, t in res])
     acc.to_csv(os.path.join(OUT, f'selfcal_sweep{sfx}.csv'), index=False, float_format='%.4f')
     trees.to_csv(os.path.join(OUT, f'selfcal_sweep_trees{sfx}.csv'), index=False, float_format='%.2f')
 
-    for c, v in [('new_max_leaf_nodes', 'none'), ('new_min_samples_leaf', 1), ('pseudo_label', 'tsne')]:
+    for c, v in [('new_max_leaf_nodes', 'none'), ('new_min_samples_leaf', 1), ('pseudo_label', 'tsne'),
+                 ('buffer', BUFFER), ('buffer_int16', False)]:
         acc[c] = acc[c].fillna(v).replace('', v) if c in acc else v   # files from before the option
-    key = ['config', 'n_trees', 'max_depth', 'precision', 'new_max_leaf_nodes', 'new_min_samples_leaf', 'pseudo_label']
+    key = ['config', 'n_trees', 'max_depth', 'precision', 'new_max_leaf_nodes', 'new_min_samples_leaf', 'pseudo_label',
+           'buffer', 'buffer_int16']
     per_seed = acc.groupby(key + ['seed'], sort=False)[['acc_oneshot', 'acc_selfcal']].mean().reset_index()
     per_seed['gain'] = per_seed.acc_selfcal - per_seed.acc_oneshot
     g = per_seed.groupby(key, sort=False)
