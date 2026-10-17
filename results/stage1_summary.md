@@ -1,7 +1,7 @@
 # 階段 1：環境與重現 — 摘要
 
 ## 環境
-- Python 3.12.4（Windows 11），venv：numpy 2.1.2、scipy 1.14.1、scikit-learn 1.5.2、joblib 1.6.0
+- Python 3.12.3（conda-forge 版，Windows 11），venv：numpy 2.1.2、scipy 1.14.1、scikit-learn 1.5.2、joblib 1.6.0
 - 上游 repo commit `48ea4d1fd22a525c88ffa5462b14dc7ccfa998ea`（2024-12-05）
 - 上游程式完全沒設亂數種子；`src/run_upstream.py` 在執行前呼叫 `np.random.seed(N)`。
   同一個 seed 重跑兩次，demo 的結果逐位元相同（已驗證）。arm_position 跑了 seed 0/1/2。

@@ -1,6 +1,6 @@
 """Cross-platform check: rerun a small slice of the experiments and compare with the committed results.
 
-The committed results were produced on Windows (Python 3.12.4, same package versions). On another
+The committed results were produced on Windows (Python 3.12.3, same package versions). On another
 platform (e.g. the Docker image) the RNG streams are identical, but BLAS / compiler differences can
 change floating-point results, which t-SNE and RF training may amplify. This script measures that
 instead of assuming it:
@@ -48,6 +48,10 @@ def main():
     ap.add_argument('--full', action='store_true')
     ap.add_argument('--features-ref', default=None)
     args = ap.parse_args()
+    # The sweeps ran inside joblib workers, which limit BLAS/OpenMP to 1 thread each. Self-calibration
+    # (t-SNE -> K-Means -> retrained trees) changes with the thread count, so match it here.
+    from threadpoolctl import threadpool_limits
+    threadpool_limits(1)
     import scipy
     import sklearn
     print(f'platform: {platform.platform()} | python {platform.python_version()} | numpy {np.__version__} '

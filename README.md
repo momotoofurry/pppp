@@ -5,7 +5,7 @@ Upstream code/data: https://github.com/MoveR-Digital-Health-and-Care-Hub/self-ca
 
 ## Quick start with Docker (Linux / WSL2)
 
-The image (`docker/Dockerfile`) pins Python 3.12.4, the package versions in
+The image (`docker/Dockerfile`) pins Python 3.12.3, the package versions in
 `docker/requirements.txt`, gcc 11.4 and arm-none-eabi-gcc 10.3.1. Code, data and results are
 bind-mounted, so keep the clone on the Linux filesystem (not `/mnt/c`).
 

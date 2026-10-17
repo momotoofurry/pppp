@@ -2,7 +2,7 @@
 #
 # Ubuntu 22.04 gives the same toolchains as the WSL2 distro used for the first ARM build:
 #   gcc 11.4 (PC C check), arm-none-eabi-gcc 10.3.1 + newlib-nano (Cortex-M7 build).
-# Python 3.12.4 (same patch release as the Windows venv) is installed by uv into /opt/venv.
+# Python 3.12.3 (same release as the Windows venv, conda-forge build) is installed by uv into /opt/venv.
 #
 # Build from the repo root:  docker/run.sh build
 # The image holds only tools; code, upstream data and results are bind-mounted at /work.
@@ -21,7 +21,7 @@ ENV UV_PYTHON_INSTALL_DIR=/opt/python \
     PATH=/opt/venv/bin:$PATH \
     MPLCONFIGDIR=/tmp/matplotlib \
     PYTHONDONTWRITEBYTECODE=1
-RUN uv venv --python 3.12.4 /opt/venv \
+RUN uv venv --python 3.12.3 /opt/venv \
  && chmod -R a+rX /opt/python /opt/venv
 COPY docker/requirements.txt /tmp/requirements.txt
 RUN uv pip install --python /opt/venv/bin/python --no-cache -r /tmp/requirements.txt

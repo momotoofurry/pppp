@@ -22,7 +22,7 @@
 ## 1. 重現結果（vs. 論文）
 
 ### 1.1 環境與作法
-- Python 3.12.4，numpy 2.1.2 / scipy 1.14.1 / scikit-learn 1.5.2（版本和 requirements 一樣，joblib 模型才能正確載入）。
+- Python 3.12.3（conda-forge 版），numpy 2.1.2 / scipy 1.14.1 / scikit-learn 1.5.2（版本和 requirements 一樣，joblib 模型才能正確載入）。
 - 上游程式沒有設亂數種子，所以用 `src/run_upstream.py` 先固定 numpy 的全域種子再執行，上游程式碼不做任何修改。同一個 seed 重跑兩次，結果逐位元相同。
 - arm_position 跑了 3 個 seed（0/1/2），每個 seed 約 57 分鐘；demo 也跑了 3 個 seed。
 
