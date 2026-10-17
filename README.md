@@ -26,3 +26,17 @@ py -3.12 -m venv .venv
 the replay accuracies to `results/upstream/seed<N>/` (results here use seeds 0, 1, 2). `make_baseline.py` builds
 `results/baseline.csv`, `results/baseline_by_position.csv`, `results/baseline_demo.csv`
 and `results/baseline_blocks.png`.
+
+## Stage 2 — model size and compression sweep
+
+```bash
+.venv/Scripts/python src/model_stats.py
+.venv/Scripts/python src/pipeline.py
+.venv/Scripts/python src/compression_sweep.py --seeds 0 1 2 3 4
+.venv/Scripts/python src/compression_sweep.py --seeds 0 1 2 3 4 --n-app 200
+.venv/Scripts/python src/plot_sweep.py
+```
+
+`pipeline.py` alone checks the vectorised predictor against upstream `get_predictions`.
+The sweep needs the features from stage 1 and takes ~2.5 min per run on 20 cores.
+Summary: `results/stage2_summary.md`.
