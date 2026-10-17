@@ -6,6 +6,7 @@
 
 報告中的數字，除了明確標示為「估算」的部分，都來自實際執行的結果。每個數字都可以用 `README.md` 裡的指令重新產生。
 各階段的詳細說明在 `results/stage1_summary.md`、`stage2_summary.md`、`stage3_summary.md`。
+本報告的數字都是在 Windows 11 上跑出來的；之後的實驗改在 WSL2 + Docker（`docker/`）進行，兩個平台的差異見 1.6 節。
 
 ## 摘要
 
@@ -16,6 +17,7 @@
 | 推薦的壓縮設定 | **100 棵、深度 10、int16 門檻值**：Flash 88.1 KB，one-shot 準確率 79.75%（完整模型是 80.12%，差 −0.37 個百分點）。Flash 夠用的話，400 棵、深度 10、int16 只差 −0.04 個百分點，要 345.5 KB。**自我校正之後**（3.1 節）：100 棵是 83.96%，完整模型 84.43%，差 −0.47 個百分點，差距沒有明顯擴大。 |
 | 推論需要多少 RAM？ | 實測 **552 B**（特徵緩衝區 + 最壞情況的 stack）。 |
 | 自我校正放得進 MCU 嗎？（估算） | 照論文原樣做（float32 buffer + t-SNE）約需 1208 KB，**放不下**。改用 int16 buffer、100 棵樹、不做 t-SNE，約 334 KB，放得進 AXI 512 KB。但「不做 t-SNE」在論文的 ablation 裡準確率比較低，這是論文要解決的核心問題。 |
+| 換平台結果會變嗎？ | 特徵、預測、one-shot、C/ARM 編譯在 Docker（Linux）和 Windows 上都相同。**自我校正不會逐位元相同**：Linux 84.66% vs Windows 84.43%（差 0.23 個百分點，和 seed 之間的變動同一個等級）。同一個比較只用同一個平台的數字（1.6 節）。 |
 
 ---
 
@@ -75,6 +77,24 @@
 ### 1.5 Demo（JNE 2025 的 1 位受試者、10 個 block、跨兩天）
 3 個 seed 平均：固定 one-shot 81.89% → 自我校正 90.02%。到了第 2 天後段（block 7–9），固定模型降到 71.6–76.0%，自我校正則是 89.1–96.0%。
 JNE 論文報告的是 28 人平均（固定模型 84.3% → 78.6%，自我校正最後 86.5%），不是這位受試者的數字，所以只能比較趨勢：趨勢一致。
+
+### 1.6 實驗環境與跨平台可重現性（`results/platform_check.md`）
+原本的結果在 Windows 11 上產生（conda-forge Python 3.12.3、MinGW gcc 8.1、WSL2 裡的 arm-none-eabi-gcc 10.3.1）。
+之後的實驗在 WSL2 + Docker 執行（Ubuntu 22.04、Python 3.12.3、同樣的套件版本、gcc 11.4、arm-none-eabi-gcc 10.3.1），
+專案放在 WSL 的 `~/model`。兩個平台的比較（實測）：
+
+| 部分 | Docker（Linux）vs. Windows |
+|---|---|
+| 特徵擷取 | 10 種特徵中 7 種逐位元相同；MNF、偏度、VCF 只差最後一位（相對誤差 ≤ 7e-15） |
+| 預測、壓縮掃描（subject 0，660 列）、one-shot（20 人 × 3 seed，660 列） | 完全相同 |
+| C 匯出、PC 檢查、Cortex-M7 編譯 | text/data/bss/stack 和預測完全相同 |
+| 自我校正（400 棵、深度不限、float64，20 人 × 3 seed） | Linux **84.66%**（84.50–84.81）vs Windows **84.43%**（84.08–84.83）；只有 157/660 個 block 相同 |
+
+- 每個 (seed, 受試者) 的差（Linux − Windows）：平均 +0.23 個百分點，SD 0.85；20 人的 Wilcoxon 檢定 p = 0.040。
+  差異小於 Windows 自己 seed 之間的差距（0.75 個百分點），只有 3 個 seed，不足以判斷是系統性的還是偶然。
+- 原因：t-SNE → K-Means → 重新訓練樹 這條鏈對極小的浮點差異很敏感；連 Linux 單執行緒和多執行緒的結果都不一樣。
+  **Windows 單執行緒**（和原本 joblib worker 的條件一樣）可以逐位元重現原本的結果，所以差異來自平台，不是程式錯誤。
+- **規則**：同一張表、同一個比較的數字只用同一個平台的結果；新的實驗都在 Docker 裡跑，對照組也一起在 Docker 裡重跑。
 
 ---
 
@@ -187,6 +207,7 @@ buffer（1500 筆）+ t-SNE（3 維、perplexity 10）+ K-Means（min_sample_cla
 ## 4. 編譯後的 Flash/RAM 用量
 
 PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 種實作，C 和 Python 的預測**100% 一致**（`results/c_check.csv`）。
+在 Docker 裡用 gcc 11.4 重跑，結果也相同（`results/logs/linux/c_check.csv`）。
 
 交叉編譯（WSL2，arm-none-eabi-gcc 10.3.1；`-mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -Os -ffunction-sections -fdata-sections -Wl,--gc-sections --specs=nano.specs --specs=nosys.specs`；`results/arm_size.csv`）：
 
@@ -252,6 +273,8 @@ PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 
    比完整模型（84.43%）低 0.47 個百分點；one-shot 階段的差距是 −0.35，自我校正後沒有明顯擴大。
    另外發現自我校正後的單棵附加樹比原本的近似值大約 1.6 倍（深度 10 最大 165 個內部節點）；5.2 節已改用實測的附加樹區塊大小重算。
 1. **限制自我校正新樹的大小**：用 `max_leaf_nodes` 或 `min_samples_leaf` 限制新樹，讓可替換附加樹的 RAM 有固定上限（目前實測最大 38.8 KB，但沒有保證），量準確率的代價。
+   程式已完成（`selfcal_sweep.py --max-leaf-nodes / --min-samples-leaf`；已確認 `max_leaf_nodes=32` 時新樹最多 31 個內部節點，預設值和原本的結果相同），**實驗還沒跑**。
+   要在 Docker 裡跑，並且在 Docker 裡重跑不限制的對照組。
 2. **低記憶體的偽標籤方法**：在 PC 上比較下面幾種，看準確率和 RAM 的取捨：
    - K-Means 直接在 80 維做
    - 先投影到低維（PCA 或用 calibration 資料訓練的 LDA）再做 K-Means
@@ -267,5 +290,6 @@ PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`src/c/*` |
-| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`*.png`、`stage*_summary.md`、`logs/` |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`src/c/*` |
+| 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
+| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
