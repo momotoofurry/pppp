@@ -40,3 +40,12 @@ and `results/baseline_blocks.png`.
 `pipeline.py` alone checks the vectorised predictor against upstream `get_predictions`.
 The sweep needs the features from stage 1 and takes ~2.5 min per run on 20 cores.
 Summary: `results/stage2_summary.md`.
+
+## Stage 3 — C export, PC correctness check, Cortex-M7 build
+
+```bash
+.venv/Scripts/python -m pip install emlearn setuptools   # setuptools: emlearn imports distutils
+.venv/Scripts/python src/export_c.py                     # -> build/<cfg>/ (git-ignored, regenerable)
+.venv/Scripts/python src/check_c.py --cc "/c/Program Files/mingw64/bin/gcc.exe"
+.venv/Scripts/python src/build_arm.py --wsl              # needs arm-none-eabi-gcc (here: inside WSL)
+```

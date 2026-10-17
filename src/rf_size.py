@@ -56,6 +56,30 @@ def forest_bytes(stats, thr='float32'):
                 compact=internal * (FEAT_B + t + 2 * CHILD_B) + hdr)
 
 
+def compact_tree(left, right, feature, threshold, value):
+    """Drop unreachable (pruned) nodes and renumber the rest in DFS pre-order, so every child
+    index is larger than its parent's. Returns (left, right, feature, threshold, value)."""
+    order, _ = reachable(left, right)
+    new = -np.ones(len(left), dtype=np.int64)
+    new[order] = np.arange(len(order))
+    l, r = left[order], right[order]
+    leaf = l < 0
+    l = np.where(leaf, -1, new[np.maximum(l, 0)])
+    r = np.where(leaf, -1, new[np.maximum(r, 0)])
+    f = np.where(leaf, -2, feature[order])
+    t = np.where(leaf, -2.0, threshold[order])
+    return l, r, f, t, value[order]
+
+
+def compact_forest(mdl):
+    out = {k: [] for k in ['left', 'right', 'feature', 'threshold', 'value']}
+    for parts in zip(*(mdl[k] for k in out)):
+        for k, a in zip(out, compact_tree(*parts)):
+            out[k].append(a)
+    out['classes'] = mdl['classes']
+    return out
+
+
 def truncate_depth(mdl, max_depth):
     """Turn every node at depth == max_depth into a leaf (in place). sklearn stores the class
     distribution of every node in 'value', so the new leaf predicts its majority class."""
