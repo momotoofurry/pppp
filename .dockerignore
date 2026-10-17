@@ -1,0 +1,3 @@
+# The build only needs docker/requirements.txt; keep the context tiny (external/ alone is 1.7 GB).
+*
+!docker/requirements.txt

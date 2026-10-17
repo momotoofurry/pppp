@@ -3,6 +3,24 @@
 Upstream code/data: https://github.com/MoveR-Digital-Health-and-Care-Hub/self-calibrating-rf
 (commit `48ea4d1fd22a525c88ffa5462b14dc7ccfa998ea`), cloned into `external/` (git-ignored, 1.7 GB).
 
+## Quick start with Docker (Linux / WSL2)
+
+The image (`docker/Dockerfile`) pins Python 3.12.4, the package versions in
+`docker/requirements.txt`, gcc 11.4 and arm-none-eabi-gcc 10.3.1. Code, data and results are
+bind-mounted, so keep the clone on the Linux filesystem (not `/mnt/c`).
+
+```bash
+docker/run.sh build     # build the image (once)
+docker/run.sh setup     # clone the upstream repo + data into external/ (1.7 GB)
+docker/run.sh stage1    # features + upstream replays (~1.5 h); then stage2, stage3, selfcal, or: all
+docker/run.sh verify    # rerun a slice and compare with the committed results (~5 min)
+docker/run.sh shell     # shell inside the container
+```
+
+`docker/run_all.sh` lists the exact commands of every step. The sections below are the original
+Windows instructions that produced the first committed results; `results/platform_check.csv`
+records how the Docker run compares with them.
+
 ## Setup (Windows, Git Bash)
 
 ```bash
