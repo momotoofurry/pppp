@@ -88,9 +88,10 @@ def subset(mdl, idx):
     return out
 
 
-def train_rf(X, y, n_trees, max_depth, seed):
+def train_rf(X, y, n_trees, max_depth, seed, max_leaf_nodes=None, min_samples_leaf=1):
     from sklearn.ensemble import RandomForestClassifier
-    rf = RandomForestClassifier(n_estimators=n_trees, max_depth=max_depth, random_state=seed)
+    rf = RandomForestClassifier(n_estimators=n_trees, max_depth=max_depth, random_state=seed,
+                                max_leaf_nodes=max_leaf_nodes, min_samples_leaf=min_samples_leaf)
     rf.fit(X, y)
     return emg_functions.get_sklearn_rf_parameters(rf)
 
