@@ -1,6 +1,6 @@
 """Stage 4: RAM estimate for on-MCU feature extraction and self-calibration (a design calculation).
 
-Only the 'measured' rows come from runs (results/arm_size.csv, results/sweep_selfcal_trees.csv);
+Only the 'measured' rows come from runs (results/arm_size.csv, results/selfcal_sweep_trees.csv);
 everything else is bytes = count x element size for a planned C implementation, and is labelled
 'estimate'. Writes results/ram_estimate.csv and prints the scenario totals.
 Usage: .venv/Scripts/python src/ram_estimate.py
@@ -20,8 +20,6 @@ NODE_B = 1 + 2 + 2 + 2                     # compact int16 node: feat u8 + thr i
 
 def main():
     arm = pd.read_csv(os.path.join(OUT, 'arm_size.csv')).set_index(['config', 'impl'])
-    sc = pd.read_csv(os.path.join(OUT, 'sweep_selfcal_trees.csv'), dtype={'max_depth': str})
-    sc10 = sc[sc.max_depth == '10'].selfcal_tree_internal
     a = arm.loc[('d10_n100_i16', 'table')]
     infer = int(a.static_ram_bytes + a.worst_stack_bytes)
 
@@ -43,11 +41,19 @@ def main():
         add(f'self-cal buffer ({prec})', 'buffered feature vectors', BUF * N_FEAT * b, f'{BUF} x {N_FEAT} x {prec}')
         add(f'self-cal buffer ({prec})', 'calibration set', N_CALIB * N_FEAT * b, f'{N_CALIB} x {N_FEAT} x {prec}')
     add('self-cal', 'buffer pseudo-labels', BUF, f'{BUF} x uint8')
-    for n_app in [50, 200]:
-        add('self-cal', f'replaceable trees, {n_app} appended, depth 10 (mean size)', n_app * sc10.mean() * NODE_B,
-            f'{n_app} x {sc10.mean():.1f} internal nodes (sweep_selfcal_trees.csv) x {NODE_B} B', 'from measured tree size')
-        add('self-cal', f'replaceable trees, {n_app} appended, depth 10 (largest tree)', n_app * sc10.max() * NODE_B,
-            f'{n_app} x {sc10.max():.0f} internal nodes x {NODE_B} B', 'from measured tree size')
+    # appended-tree region after self-calibration, measured by src/selfcal_sweep.py:
+    # internal nodes of a binary tree = (nodes - 1) / 2, so region = n_app * (mean nodes - 1) / 2 * 7 B,
+    # and the RAM pool must hold the largest region seen over all subjects and seeds
+    tr = pd.read_csv(os.path.join(OUT, 'selfcal_sweep_trees.csv'))
+    for cfg, n_app, label, node_b in [('N100_d10_int16', 50, 'depth 10 int16', NODE_B),
+                                      ('N400_d10_int16', 200, 'depth 10 int16', NODE_B),
+                                      ('N400_dnone_float32', 200, 'no depth limit float32', NODE_B + 2)]:
+        m = tr[tr.config == cfg]
+        reg = n_app * (m.app_nodes_mean - 1) / 2 * node_b
+        add('self-cal', f'replaceable trees, {n_app} appended, {label} (mean)', reg.mean(),
+            f'{cfg}: mean over {len(m)} subject x seed runs (selfcal_sweep_trees.csv)', 'from measured tree size')
+        add('self-cal', f'replaceable trees, {n_app} appended, {label} (largest run)', reg.max(),
+            f'{cfg}: largest of {len(m)} subject x seed runs (selfcal_sweep_trees.csv)', 'from measured tree size')
     n_train = BUF + N_CALIB
     add('self-cal', 'RF training scratch (one tree at a time)',
         n_train * 2 + n_train * 4 + n_train * 2 + (2 ** 11) * NODE_B,
@@ -71,14 +77,14 @@ def main():
     common = infer + fe + it['buffer pseudo-labels'] + it['RF training scratch (one tree at a time)']
     tsne = g['pseudo-label: Barnes-Hut t-SNE 3-D']
     scen = {
-        'A paper-faithful: float32 buffer, 400 trees (200 appended), t-SNE + K-Means':
-            common + g['self-cal buffer (float32)'] + it['replaceable trees, 200 appended, depth 10 (largest tree)'] + tsne
+        'A paper-faithful: float32 buffer, 400 trees (200 appended, no depth limit), t-SNE + K-Means':
+            common + g['self-cal buffer (float32)'] + it['replaceable trees, 200 appended, no depth limit float32 (largest run)'] + tsne
             + g['pseudo-label: K-Means 80-D'],
         'B int16 buffer, 100 trees (50 appended), t-SNE + K-Means':
-            common + g['self-cal buffer (int16)'] + it['replaceable trees, 50 appended, depth 10 (largest tree)'] + tsne
+            common + g['self-cal buffer (int16)'] + it['replaceable trees, 50 appended, depth 10 int16 (largest run)'] + tsne
             + g['pseudo-label: K-Means 80-D'],
         'C int16 buffer, 100 trees (50 appended), K-Means only (no t-SNE)':
-            common + g['self-cal buffer (int16)'] + it['replaceable trees, 50 appended, depth 10 (largest tree)']
+            common + g['self-cal buffer (int16)'] + it['replaceable trees, 50 appended, depth 10 int16 (largest run)']
             + g['pseudo-label: K-Means 80-D'],
     }
     s = pd.DataFrame({'bytes': scen}).assign(KB=lambda x: x.bytes / 1024)

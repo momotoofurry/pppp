@@ -9,10 +9,12 @@ self-cal buffer (float32),calibration set,19200,estimate,60 x 80 x float32,18.8
 self-cal buffer (int16),buffered feature vectors,240000,estimate,1500 x 80 x int16,234.4
 self-cal buffer (int16),calibration set,9600,estimate,60 x 80 x int16,9.4
 self-cal,buffer pseudo-labels,1500,estimate,1500 x uint8,1.5
-self-cal,"replaceable trees, 50 appended, depth 10 (mean size)",26361,from measured tree size,50 x 75.3 internal nodes (sweep_selfcal_trees.csv) x 7 B,25.7
-self-cal,"replaceable trees, 50 appended, depth 10 (largest tree)",37439,from measured tree size,50 x 107 internal nodes x 7 B,36.6
-self-cal,"replaceable trees, 200 appended, depth 10 (mean size)",105445,from measured tree size,200 x 75.3 internal nodes (sweep_selfcal_trees.csv) x 7 B,103.0
-self-cal,"replaceable trees, 200 appended, depth 10 (largest tree)",149758,from measured tree size,200 x 107 internal nodes x 7 B,146.2
+self-cal,"replaceable trees, 50 appended, depth 10 int16 (mean)",23414,from measured tree size,N100_d10_int16: mean over 60 subject x seed runs (selfcal_sweep_trees.csv),22.9
+self-cal,"replaceable trees, 50 appended, depth 10 int16 (largest run)",39697,from measured tree size,N100_d10_int16: largest of 60 subject x seed runs (selfcal_sweep_trees.csv),38.8
+self-cal,"replaceable trees, 200 appended, depth 10 int16 (mean)",92660,from measured tree size,N400_d10_int16: mean over 60 subject x seed runs (selfcal_sweep_trees.csv),90.5
+self-cal,"replaceable trees, 200 appended, depth 10 int16 (largest run)",167433,from measured tree size,N400_d10_int16: largest of 60 subject x seed runs (selfcal_sweep_trees.csv),163.5
+self-cal,"replaceable trees, 200 appended, no depth limit float32 (mean)",133528,from measured tree size,N400_dnone_float32: mean over 60 subject x seed runs (selfcal_sweep_trees.csv),130.4
+self-cal,"replaceable trees, 200 appended, no depth limit float32 (largest run)",274221,from measured tree size,N400_dnone_float32: largest of 60 subject x seed runs (selfcal_sweep_trees.csv),267.8
 self-cal,RF training scratch (one tree at a time),26816,estimate,bootstrap idx u16 + sorted values f32 + sort idx u16 over 1560 samples + 2^11-node tree build buffer,26.2
 pseudo-label: K-Means 80-D,assignments + centroids (+ new),5340,estimate,1500 x u8 + 2 x 6 x 80 x float32,5.2
 pseudo-label: Barnes-Hut t-SNE 3-D,sparse P (neighbour idx u16 + p f32),279000,estimate,1500 x 31 neighbours x 6 B,272.5

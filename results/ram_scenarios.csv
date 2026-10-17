@@ -1,4 +1,4 @@
 ,bytes,KB,fits AXI 512 KB,fits all SRAM ~1 MB
-"A paper-faithful: float32 buffer, 400 trees (200 appended), t-SNE + K-Means",1112346,1086.3,False,False
-"B int16 buffer, 100 trees (50 appended), t-SNE + K-Means",750427,732.8,False,True
-"C int16 buffer, 100 trees (50 appended), K-Means only (no t-SNE)",339427,331.5,True,True
+"A paper-faithful: float32 buffer, 400 trees (200 appended, no depth limit), t-SNE + K-Means",1236809,1207.8,False,False
+"B int16 buffer, 100 trees (50 appended), t-SNE + K-Means",752685,735.0,False,True
+"C int16 buffer, 100 trees (50 appended), K-Means only (no t-SNE)",341685,333.7,True,True
