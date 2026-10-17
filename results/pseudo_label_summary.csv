@@ -1,0 +1,7 @@
+config,pseudo_label,method,n_seeds,acc_oneshot,acc_selfcal,selfcal_seed_min,selfcal_seed_max,gain,sd_subjects,app_nodes_mean,app_nodes_max,paper_ablation,diff_vs_tsne,diff_sd,n_subjects_better,wilcoxon_p
+100_10_int16,tsne,t-SNE + K-Means,3,79.6803,83.9758,83.9031,84.0320,4.2955,9.1729,134.3447,329,,,,,
+100_10_int16,kmeans,K-Means only,3,79.6803,81.0308,80.9347,81.2091,1.3505,9.5504,123.0813,393,,-2.9450,3.5853,2.0000,0.0000
+100_10_int16,none,no clustering,3,79.6803,81.6435,81.6045,81.6635,1.9632,9.8374,139.1393,283,,-2.3324,2.8780,3.0000,0.0009
+400_none_float64,tsne,t-SNE + K-Means,3,80.0303,84.6627,84.4955,84.8078,4.6324,8.5505,149.0257,449,84.6000,,,,
+400_none_float64,kmeans,K-Means only,3,80.0303,80.8918,80.7730,81.0642,0.8615,9.5081,138.3370,597,81.0000,-3.7709,4.1493,3.0000,0.0001
+400_none_float64,none,no clustering,3,80.0303,82.1639,82.0184,82.2928,2.1336,9.4231,148.5653,343,82.7000,-2.4988,3.0410,4.0000,0.0007

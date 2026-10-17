@@ -17,6 +17,7 @@
 | 推薦的壓縮設定 | **100 棵、深度 10、int16 門檻值**：Flash 88.1 KB，one-shot 準確率 79.75%（完整模型是 80.12%，差 −0.37 個百分點）。Flash 夠用的話，400 棵、深度 10、int16 只差 −0.04 個百分點，要 345.5 KB。**自我校正之後**（3.1 節）：100 棵是 83.96%，完整模型 84.43%，差 −0.47 個百分點，差距沒有明顯擴大。 |
 | 推論需要多少 RAM？ | 實測 **552 B**（特徵緩衝區 + 最壞情況的 stack）。 |
 | 自我校正放得進 MCU 嗎？（估算） | 照論文原樣做（float32 buffer + t-SNE）約需 1208 KB，**放不下**。改用 int16 buffer、100 棵樹、不做 t-SNE，約 334 KB，放得進 AXI 512 KB。但「不做 t-SNE」在論文的 ablation 裡準確率比較低，這是論文要解決的核心問題。 |
+| 不做 t-SNE 會掉多少？（實測，3.2 節） | 推薦設定上，只用 K-Means 81.03%、不分群 81.64%，t-SNE 版 83.98%；自我校正增益從 +4.30 掉到 +1.35 / +1.96 個百分點（20 人配對 p < 0.001）。完整模型的結果重現了論文的 ablation（84.66 / 80.89 / 82.16 vs 論文 84.6 / 81.0 / 82.7）。 |
 | 換平台結果會變嗎？ | 特徵、預測、one-shot、C/ARM 編譯在 Docker（Linux）和 Windows 上都相同。**自我校正不會逐位元相同**：Linux 84.66% vs Windows 84.43%（差 0.23 個百分點，和 seed 之間的變動同一個等級）。同一個比較只用同一個平台的數字（1.6 節）。 |
 
 ---
@@ -202,6 +203,31 @@ buffer（1500 筆）+ t-SNE（3 維、perplexity 10）+ K-Means（min_sample_cla
    推薦設定（50 棵附加樹）：平均 22.9 KB、最大 **38.8 KB**；400 棵、深度 10、int16：平均 90.5 KB、最大 163.5 KB；
    400 棵、深度不限、float32：平均 130.4 KB、最大 267.8 KB。
 
+### 3.2 低記憶體的偽標籤方法（實測，Docker；`src/analyze_pseudo.py` → `results/pseudo_label_summary.csv`）
+
+`selfcal_sweep.py --pseudo` 用上游 `manifold_clustering` 原有的分支比較三種偽標籤做法（上游程式不改）：
+t-SNE + K-Means（上游預設）、只用 K-Means（80 維，`embedding=None`）、不分群（`min_sample_class = ∞`，
+直接用 one-shot 模型的預測、只做類別平衡）。20 人 × 11 block × 3 seed，全部在 Docker 上跑，彼此可以直接比較
+（但不要和上面 Windows 的數字混著比，見 1.6 節）。RAM 是 5.2 節的估算方式，但可替換附加樹用**各方法自己實測**的樹大小。
+
+| 模型 | 偽標籤方法 | 自我校正後（seed 範圍） | 增益 | 和 t-SNE 版比（20 人配對） | 論文 ablation | RAM（估算） |
+|---|---|---|---|---|---|---|
+| 400 棵、深度不限、float64 | t-SNE + K-Means | **84.66**（84.50–84.81） | +4.63 | — | 84.6 | 1206 KB |
+| | 只用 K-Means | 80.89（80.77–81.06） | +0.86 | −3.77，3/20 人較好，p < 0.001 | 81.0 | 879 KB |
+| | 不分群 | 82.16（82.02–82.29） | +2.13 | −2.50，4/20 人較好，p < 0.001 | 82.7 | 758 KB |
+| 100 棵、深度 10、int16 | t-SNE + K-Means | **83.98**（83.90–84.03） | +4.30 | — | — | 737 KB |
+| | 只用 K-Means | 81.03（80.94–81.21） | +1.35 | −2.94，2/20 人較好，p < 0.001 | — | **341 KB** |
+| | 不分群 | 81.64（81.60–81.66） | +1.96 | −2.33，3/20 人較好，p < 0.001 | — | **327 KB** |
+
+（one-shot 都是 80.03%（400 棵）和 79.68%（100 棵）；配對差異是 seed 平均後的 20 人 Wilcoxon 檢定。）
+
+觀察：
+1. **重現了論文的 ablation**：完整模型的三個數字和論文高低順序相同，差距 ≤ 0.6 個百分點，所以這裡的實作和論文作者的做法一致。
+   「不分群」比「只用 K-Means」好，和論文一樣。
+2. **壓縮後研究問題仍然成立**：放得進 AXI 512 KB 的兩種做法（只用 K-Means、不分群），自我校正增益從 +4.30 掉到 +1.35 / +1.96，
+   少了一半以上；20 人中只有 2–3 人比 t-SNE 版好。t-SNE 本身（估算 401 KB）是放不進去的主因。
+3. 只用 K-Means 的附加樹長得比較大（完整模型最大 597 個節點，t-SNE 版 449），偽標籤比較雜時樹會變複雜，RAM 也跟著變大。
+
 ---
 
 ## 4. 編譯後的 Flash/RAM 用量
@@ -276,7 +302,7 @@ PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 
    程式已完成（`selfcal_sweep.py --max-leaf-nodes / --min-samples-leaf`；已確認 `max_leaf_nodes=32` 時新樹最多 31 個內部節點，預設值和原本的結果相同），**實驗還沒跑**。
    要在 Docker 裡跑，並且在 Docker 裡重跑不限制的對照組。
 2. **低記憶體的偽標籤方法**：在 PC 上比較下面幾種，看準確率和 RAM 的取捨：
-   - K-Means 直接在 80 維做
+   - ~~K-Means 直接在 80 維做~~、~~不分群~~（已完成，3.2 節：增益只剩 +1.35 / +1.96 個百分點，t-SNE 版是 +4.30）
    - 先投影到低維（PCA 或用 calibration 資料訓練的 LDA）再做 K-Means
    - t-SNE 縮小 buffer（例如 500 筆）
    - 依信心門檻篩選樣本
@@ -290,6 +316,6 @@ PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`src/c/*` |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`src/c/*` |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
-| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
+| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |

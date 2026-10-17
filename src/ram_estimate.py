@@ -93,6 +93,29 @@ def main():
     s.to_csv(os.path.join(OUT, 'ram_scenarios.csv'), float_format='%.1f')
     print('\n' + s.round(1).to_string())
 
+    # Per pseudo-labelling method (Docker runs of selfcal_sweep.py --pseudo): the replaceable-tree region
+    # uses the trees each method actually grew; the buffer is int16 for the 100-tree model and float32
+    # for the 400-tree model, as in scenarios B/C and A.
+    files = {'_pseudo_c3': 'selfcal_sweep_trees_pseudo_c3.csv', '_pseudo_full': 'selfcal_sweep_trees_pseudo_full.csv',
+             '_validation_linux': 'selfcal_sweep_trees_validation_linux.csv'}
+    if all(os.path.exists(os.path.join(OUT, f)) for f in files.values()):
+        tp = pd.concat([pd.read_csv(os.path.join(OUT, f)) for f in files.values()], ignore_index=True)
+        cost = {'tsne': tsne + g['pseudo-label: K-Means 80-D'], 'kmeans': g['pseudo-label: K-Means 80-D'], 'none': 0}
+        out = []
+        for base, n_app, node_b, buf, label in [('N100_d10_int16', 50, NODE_B, 'int16', '100 trees, depth 10, int16'),
+                                                ('N400_dnone_float64', 200, NODE_B + 2, 'float32',
+                                                 '400 trees, no depth limit, float32 thresholds')]:
+            for pl in ['tsne', 'kmeans', 'none']:
+                m = tp[tp.config == base + ('' if pl == 'tsne' else f'_pl{pl}')]
+                trees = (n_app * (m.app_nodes_mean - 1) / 2 * node_b).max()
+                total = common + g[f'self-cal buffer ({buf})'] + trees + cost[pl]
+                out.append(dict(model=label, pseudo_label=pl, buffer=buf, runs=len(m), trees_KB=trees / 1024,
+                                pseudo_label_KB=cost[pl] / 1024, total_KB=total / 1024,
+                                fits_AXI_512KB=total / 1024 <= 512))
+        o = pd.DataFrame(out)
+        o.to_csv(os.path.join(OUT, 'ram_scenarios_pseudo.csv'), index=False, float_format='%.1f')
+        print('\nper pseudo-labelling method (trees measured in the Docker runs):\n' + o.round(1).to_string(index=False))
+
 
 if __name__ == '__main__':
     main()

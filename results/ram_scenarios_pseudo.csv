@@ -1,0 +1,7 @@
+model,pseudo_label,buffer,runs,trees_KB,pseudo_label_KB,total_KB,fits_AXI_512KB
+"100 trees, depth 10, int16",tsne,int16,60,40.3,406.6,736.5,False
+"100 trees, depth 10, int16",kmeans,int16,60,46.2,5.2,341.1,True
+"100 trees, depth 10, int16",none,int16,60,37.0,0.0,326.7,True
+"400 trees, no depth limit, float32 thresholds",tsne,float32,60,265.4,406.6,1205.5,False
+"400 trees, no depth limit, float32 thresholds",kmeans,float32,60,340.4,5.2,879.1,False
+"400 trees, no depth limit, float32 thresholds",none,float32,60,224.2,0.0,757.7,False

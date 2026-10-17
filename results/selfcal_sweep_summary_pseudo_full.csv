@@ -1,0 +1,3 @@
+config,n_trees,max_depth,precision,new_max_leaf_nodes,new_min_samples_leaf,pseudo_label,acc_oneshot,acc_selfcal,gain,oneshot_seed_min,oneshot_seed_max,selfcal_seed_min,selfcal_seed_max,gain_seed_min,gain_seed_max,n_seeds,app_nodes_mean,oneshot_app_nodes_mean,app_internal_mean,app_nodes_max,app_internal_max,app_depth_max,compact_KB,compact_KB_max,oneshot_compact_KB
+N400_dnone_float64_plkmeans,400,none,float64,none,1,kmeans,80.030,80.891,0.861,79.938,80.150,80.773,81.064,0.770,0.914,3,138.337,12.987,68.668,597,298,32,792.573,1014.739,682.402
+N400_dnone_float64_plnone,400,none,float64,none,1,none,80.030,82.164,2.133,79.938,80.150,82.018,82.292,2.015,2.242,3,148.565,12.987,73.783,343,171,25,801.563,891.024,682.402
