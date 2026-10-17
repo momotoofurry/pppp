@@ -50,3 +50,10 @@ Summary: `results/stage2_summary.md`.
 wsl -d Ubuntu-22.04 -- sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi
 .venv/Scripts/python src/build_arm.py --wsl              # arm-none-eabi-gcc 10.3.1 inside WSL2
 ```
+
+## Stage 4 — report
+
+```bash
+.venv/Scripts/python src/ram_estimate.py   # design-level RAM estimate for on-MCU self-calibration
+```
+Report: `report.md`.

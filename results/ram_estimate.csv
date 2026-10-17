@@ -1,0 +1,20 @@
+group,item,bytes,kind,basis,KB
+inference,"feature buffers + stack (d10_n100_i16, table)",552,measured,arm_size.csv: static RAM + worst-case stack,0.5
+feature extraction,filtered sample ring buffer,12800,estimate,400 samples x 8 ch x float32,12.5
+feature extraction,band-pass IIR state,256,estimate,4th-order band-pass = 4 biquads x 2 states x 8 ch x float32,0.2
+feature extraction,FFT in/out buffers,4096,estimate,2 x 512 float32 (CMSIS arm_rfft_fast_f32),4.0
+feature extraction,Welch PSD,1028,estimate,257 bins x float32,1.0
+self-cal buffer (float32),buffered feature vectors,480000,estimate,1500 x 80 x float32,468.8
+self-cal buffer (float32),calibration set,19200,estimate,60 x 80 x float32,18.8
+self-cal buffer (int16),buffered feature vectors,240000,estimate,1500 x 80 x int16,234.4
+self-cal buffer (int16),calibration set,9600,estimate,60 x 80 x int16,9.4
+self-cal,buffer pseudo-labels,1500,estimate,1500 x uint8,1.5
+self-cal,"replaceable trees, 50 appended, depth 10 (mean size)",26361,from measured tree size,50 x 75.3 internal nodes (sweep_selfcal_trees.csv) x 7 B,25.7
+self-cal,"replaceable trees, 50 appended, depth 10 (largest tree)",37439,from measured tree size,50 x 107 internal nodes x 7 B,36.6
+self-cal,"replaceable trees, 200 appended, depth 10 (mean size)",105445,from measured tree size,200 x 75.3 internal nodes (sweep_selfcal_trees.csv) x 7 B,103.0
+self-cal,"replaceable trees, 200 appended, depth 10 (largest tree)",149758,from measured tree size,200 x 107 internal nodes x 7 B,146.2
+self-cal,RF training scratch (one tree at a time),26816,estimate,bootstrap idx u16 + sorted values f32 + sort idx u16 over 1560 samples + 2^11-node tree build buffer,26.2
+pseudo-label: K-Means 80-D,assignments + centroids (+ new),5340,estimate,1500 x u8 + 2 x 6 x 80 x float32,5.2
+pseudo-label: Barnes-Hut t-SNE 3-D,sparse P (neighbour idx u16 + p f32),279000,estimate,1500 x 31 neighbours x 6 B,272.5
+pseudo-label: Barnes-Hut t-SNE 3-D,"embedding, gradient, update, gains",72000,estimate,4 x 1500 x 3 x float32,70.3
+pseudo-label: Barnes-Hut t-SNE 3-D,octree,60000,estimate,"~1500 cells x 40 B (centre, mass, children)",58.6

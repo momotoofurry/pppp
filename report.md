@@ -1,0 +1,221 @@
+# 自我校正隨機森林肌電控制：PC 基準重現與 STM32H743 記憶體分析
+
+> 論文題目：在 STM32H7 上實現有記憶體預算、不需要標籤的自我校正隨機森林（RF）肌電手勢控制
+> 日期：2026-10-17　｜　目標硬體：NUCLEO-H743ZI2（Cortex-M7，2 MB Flash，AXI SRAM 512 KB + SRAM1–4 + DTCM 128 KB）
+> 上游程式碼與資料：MoveR-Digital-Health-and-Care-Hub/self-calibrating-rf（commit `48ea4d1`）
+
+報告中的數字，除了明確標示為「估算」的部分，都來自實際執行的結果。每個數字都可以用 `README.md` 裡的指令重新產生。
+各階段的詳細說明在 `results/stage1_summary.md`、`stage2_summary.md`、`stage3_summary.md`。
+
+## 摘要
+
+| 問題 | 答案 |
+|---|---|
+| PC 基準重現得出來嗎？ | 可以。自我校正 RF 在 arm_position 資料（20 人、11 個 block）的平均準確率是 **84.63 ± 8.58%**，論文是 84.6 ± 8.5%；所有和論文對得上的指標差距都 < 1 個百分點。 |
+| 原始模型放得進 H743 嗎？ | 推論模型可以。論文的完整設定（剪枝後的 200 棵 + 附加的 200 棵，深度不限）用 compact float32 格式，編譯後 Flash 是 **693.8 KB**；照題目設定的 naive 格式要 1519 KB，也放得進 2 MB Flash。 |
+| 推薦的壓縮設定 | **100 棵、深度 10、int16 門檻值**：Flash 88.1 KB，one-shot 準確率 79.75%（完整模型是 80.12%，差 −0.37 個百分點）。Flash 夠用的話，400 棵、深度 10、int16 只差 −0.04 個百分點，要 345.5 KB。 |
+| 推論需要多少 RAM？ | 實測 **552 B**（特徵緩衝區 + 最壞情況的 stack）。 |
+| 自我校正放得進 MCU 嗎？（估算） | 照論文原樣做（float32 buffer + t-SNE）約需 1086 KB，**放不下**。改用 int16 buffer、100 棵樹、不做 t-SNE，約 332 KB，放得進 AXI 512 KB。但「不做 t-SNE」在論文的 ablation 裡準確率比較低，這是論文要解決的核心問題。 |
+
+---
+
+## 1. 重現結果（vs. 論文）
+
+### 1.1 環境與作法
+- Python 3.12.4，numpy 2.1.2 / scipy 1.14.1 / scikit-learn 1.5.2（版本和 requirements 一樣，joblib 模型才能正確載入）。
+- 上游程式沒有設亂數種子，所以用 `src/run_upstream.py` 先固定 numpy 的全域種子再執行，上游程式碼不做任何修改。同一個 seed 重跑兩次，結果逐位元相同。
+- arm_position 跑了 3 個 seed（0/1/2），每個 seed 約 57 分鐘；demo 也跑了 3 個 seed。
+
+### 1.2 方法重點（讀程式碼得到）
+| 項目 | 實際做法 |
+|---|---|
+| 濾波 | 每個 channel 用 4 階 Butterworth 帶通 10–500 Hz，`lfilter`（單向、因果） |
+| 視窗 | 200 ms（400 點），步長 100 ms；每個 2 秒的 trial 只取後 1 秒 → 10 個視窗 |
+| 特徵（10 種 × 8 ch = 80 維） | RMS、WL、SSC、ZC、MAV、偏度、VCF、MDF、MNF、PKF（Welch：Hamming、nperseg 400、nfft 512）；用該受試者 calibration 資料的 mean/std 做 z-score |
+| One-shot 校正 | 6 個手勢各 1 個 trial（共 60 個視窗）。預訓練的 200 棵樹由下往上剪枝（calibration 準確率**嚴格提高**才剪），再附加 200 棵只用這 60 筆訓練的新樹 → 400 棵 |
+| 自我校正 | 每個 block 結束後，把資料放進最多 1500 筆的 buffer（滿了就刪掉數量最多的偽標籤類別中最舊的一筆）。每類都 ≥ 10 筆時，先做類別平衡 → t-SNE 3 維 → 用 RF 預測的各類中心初始化 K-Means，得到偽標籤。用「偽標籤 + 60 筆真標籤」訓練 80 棵樹，取代 200 棵附加樹中的 80 棵 |
+| 偽標籤篩選 | **沒有信心門檻**。buffer 裡的樣本全部會用到（只做類別平衡） |
+
+程式和論文描述不一樣的地方：
+- 剪枝條件：論文寫 `≤`，程式是嚴格 `>`。
+- 偽標籤初始化：論文寫用「current model」，程式其實一直用最初的 one-shot 模型。
+- 比較方向：預測用 `x < thr`，剪枝和 sklearn 用 `x <= thr`。
+- bootstrap 比例：JNE 寫 7%，實際模型是 1%–2%。
+
+### 1.3 arm_position 結果（20 人 × 11 block，3 個 seed 平均；`results/baseline.csv`、`baseline_by_position.csv`）
+
+| 方法 | P2 | P4 | P5 | P6 | P8 | 全部 |
+|---|---|---|---|---|---|---|
+| LDA（只用 calibration） | 69.59 | 70.15 | 75.99 | 71.47 | 73.06 | 72.41 |
+| RF（只用 calibration） | 75.67 | 77.84 | 77.37 | 76.25 | 78.66 | 77.18 |
+| 預訓練 RF（不校正） | 68.09 | 70.35 | 71.46 | 70.36 | 73.62 | 70.84 |
+| **固定模型：one-shot RF** | 78.09 | 81.04 | 81.17 | 78.63 | 81.63 | **80.21** |
+| **自我校正 RF** | 82.24 | 85.59 | 84.95 | 83.88 | 86.33 | **84.63** |
+
+20 人中有 18 人的自我校正準確率高於固定模型。
+
+![accuracy vs block](results/baseline_blocks.png)
+
+### 1.4 和論文比較（Front. Neurorobot. 2024，只用論文文字和 Table 1 裡的數字；`results/paper_comparison.csv`）
+
+| 指標 | 論文 | 我們（3 個 seed 平均） | 差距 |
+|---|---|---|---|
+| 自我校正 RF，全部 block | 84.6 ± 8.5 | 84.63 ± 8.58 | +0.03 |
+| LDA @P5 | 76.0 ± 9.3 | 75.99 ± 9.26 | −0.01 |
+| RF @P5 | 77.6 ± 9.6 | 77.37 ± 10.05 | −0.23 |
+| LDA 換到 P2/P4/P6/P8 的下降 | 6.4 / 5.8 / 4.5 / 2.9 | 6.40 / 5.84 / 4.52 / 2.94 | ≤ 0.04 |
+| one-shot 比 RF 多的增益 P2/P4/P5/P6/P8 | 2.5 / 3.5 / 4.2 / 2.6 / 3.1 | 2.42 / 3.20 / 3.80 / 2.38 / 2.97 | −0.08 ~ −0.40 |
+| 自我校正比 one-shot 多的增益 P2/P4/P5/P6/P8 | 3.3 / 4.2 / 3.7 / 5.0 / 4.1 | 4.14 / 4.55 / 3.77 / 5.25 / 4.69 | +0.07 ~ +0.84 |
+
+**差距都很小，沒有需要特別解釋的大差異。** 可能的小差異來源：
+1. RF 訓練和 t-SNE 本身有隨機性：3 個 seed 之間，自我校正的全部平均在 84.38–84.80% 之間變動。
+2. 論文本身沒寫 seed 數量和重複次數。
+3. 自我校正增益在 P2、P8 的論文值落在我們 seed 的範圍外（+0.8、+0.6），可能來自論文作者用的程式版本或亂數。我們無法再細分原因。
+
+### 1.5 Demo（JNE 2025 的 1 位受試者、10 個 block、跨兩天）
+3 個 seed 平均：固定 one-shot 81.89% → 自我校正 90.02%。到了第 2 天後段（block 7–9），固定模型降到 71.6–76.0%，自我校正則是 89.1–96.0%。
+JNE 論文報告的是 28 人平均（固定模型 84.3% → 78.6%，自我校正最後 86.5%），不是這位受試者的數字，所以只能比較趨勢：趨勢一致。
+
+---
+
+## 2. 原始模型大小，以及能不能放進 H743
+
+### 2.1 預訓練模型結構（`results/model_stats.csv`）
+| | 38 人模型 | 66 人模型 |
+|---|---|---|
+| 樹數 / 特徵 / 類別 | 200 / 80 / 6 | 200 / 80 / 6 |
+| 每棵樹節點數 平均（最大） | 778.6（855） | 821.4（895） |
+| 深度 平均（最大） | 18.6（31） | 18.5（24） |
+| 平均葉節點深度 | 10.8 | 10.7 |
+| 總節點數 | 155,730 | 164,284 |
+
+### 2.2 原始大小（只算走得到的節點，外加每棵樹 4 B 的 offset 表）
+| 66 人預訓練模型 | float32 | int16 |
+|---|---|---|
+| naive（每個節點都存 feature u8 + thr + L/R u16 + class u8） | 1605 KB | 1284 KB |
+| compact（只存內部節點，葉節點編在 child index 裡） | 722 KB | 562 KB |
+
+實際部署的是「剪枝後的 200 棵 + 附加的 200 棵」。剪枝只讓每棵預訓練樹從 821 個節點降到約 764 個；
+附加樹只用 60 筆資料訓練，每棵約 13 個節點。實測：compact float32 是 682 KB、naive float32 是 1519 KB。
+**結論：放得進 2 MB Flash（naive 格式佔約 74%），但不論哪種格式都超過 512 KB 的參考線。**
+
+---
+
+## 3. 壓縮取捨曲線與推薦設定
+
+掃描做法（`src/compression_sweep.py`，20 人 × 11 block × 5 個 seed，**one-shot 固定模型**）：
+把預訓練樹截到深度 d → 剪枝 → 保留 N/2 棵 → 附加 N/2 棵新樹（max_depth = d）。
+int16 用 Q5.10 定點（z-score 後的門檻值範圍是 −9.9 到 20.8，放得進 ±32）。
+
+![size vs accuracy](results/sweep_size_vs_acc.png)
+
+one-shot 準確率（%，int16；和 float32 的差距在所有設定下都 ≤ 0.023 個百分點）：
+
+| depth \ N | 5 | 10 | 20 | 50 | 100 | 400 |
+|---|---|---|---|---|---|---|
+| 6 | 68.06 | 73.32 | 75.87 | 77.44 | 78.38 | 78.88 |
+| 8 | 68.97 | 73.75 | 76.84 | 78.76 | 79.31 | 79.62 |
+| 10 | 68.16 | 73.21 | 76.82 | 79.01 | 79.75 | 80.08 |
+| 12 | 67.89 | 73.25 | 77.04 | 79.13 | 79.72 | 80.06 |
+| 不限 | 67.61 | 73.39 | 76.75 | 78.83 | 79.74 | 80.11 |
+
+大小（KB，compact int16）：深度 10 時，N = 5/10/20/50/100/400 分別是 3.0 / 7.9 / 17.1 / 42.8 / 85.4 / 338.2。
+完整表格在 `results/sweep_summary.csv`，Pareto 前緣在 `results/sweep_pareto.csv`。
+
+觀察：
+1. **int16 量化完全沒有準確率損失**，大小少 22%。
+2. **深度 10 就夠了**：和不限深度的差距 ≤ 0.1 個百分點，大小少 36%。
+3. **準確率主要看樹的數量**：N = 100 時差 −0.37 個百分點，N = 20 時差 −3.3，N = 10 時差 −6.9。
+   題目舉的「20 棵、深度 10」只要 17 KB，但要付出 3.3 個百分點的代價。
+4. 變體 B（固定保留 200 棵附加樹，只減少預訓練樹）只有在深度 6 時有幾個點落在 Pareto 前緣上，在深度 10 都比一半一半的組合差。
+
+**推薦設定：100 棵（50 棵剪枝後的預訓練樹 + 50 棵附加樹）、深度 10、int16 Q5.10。**
+理由：Flash 只要 88 KB（佔 2 MB 的 4%），one-shot 準確率只差 0.37 個百分點；而且只有 50 棵附加樹會被自我校正替換，放在 RAM 的部分比較小（見第 5 節）。
+備選：400 棵、深度 10、int16（345.5 KB，−0.04 個百分點），適合 Flash 很充裕、想最接近原始模型的情況。
+
+**要注意：上面的準確率都是 one-shot，沒有做自我校正。** 壓縮後的模型做自我校正之後準確率是多少，還沒量（見第 5 節「下一步」）。
+
+---
+
+## 4. 編譯後的 Flash/RAM 用量
+
+PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 種實作，C 和 Python 的預測**100% 一致**（`results/c_check.csv`）。
+
+交叉編譯（WSL2，arm-none-eabi-gcc 10.3.1；`-mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -Os -ffunction-sections -fdata-sections -Wl,--gc-sections --specs=nano.specs --specs=nosys.specs`；`results/arm_size.csv`）：
+
+| 設定 | 實作 | text | data | bss† | Flash | 靜態 RAM | 最壞 stack | 推論 RAM |
+|---|---|---|---|---|---|---|---|---|
+| 400 棵 / 不限 / float32 | 自寫 table | 710,480 | 4 | 324 | **693.8 KB** | 328 B | 72 B | **400 B** |
+| 400 棵 / 不限 / float32 | emlearn inline | 2,024,756 | 4 | 324 | 1977.3 KB | 328 B | 192 B | 520 B |
+| 400 棵 / 深度 10 / int16 | 自寫 table | 353,796 | 4 | 484 | **345.5 KB** | 488 B | 64 B | **552 B** |
+| 400 棵 / 深度 10 / int16 | emlearn loadable | 404,180 | 32 | 488 | 394.7 KB | 520 B | 212 B | 732 B |
+| **100 棵 / 深度 10 / int16** | **自寫 table** | 90,204 | 4 | 484 | **88.1 KB** | 488 B | 64 B | **552 B** |
+| 100 棵 / 深度 10 / int16 | emlearn loadable | 103,108 | 32 | 488 | 100.7 KB | 520 B | 212 B | 732 B |
+
+† 已經扣掉 linker script 為 stack 保留的 4096 B。最壞 stack 是用 `-fcallgraph-info=su` 沿最深的呼叫路徑加總。
+
+重點：
+- 自寫 table 格式的實際大小和階段 2 的估算完全相同，每種設定都比 emlearn 小 12.5%–65%。
+  emlearn 的 int16 節點因為 padding 是 8 B（我們是 7 B）；emlearn 的 float inline 把每個節點都編成程式碼。
+- emlearn 的 float inline 用 `%.6f` 印門檻值，93% 的門檻值有最多 9.5e-7 的誤差。這次測試沒有任何預測因此改變，但仍然有風險。**建議用自寫的 table runtime。**
+- C 端一定要用 `x < thr`。在 int16 下換成 `<=`，預測只有 99.70% 相同。
+- **Cycle 數沒有量。** QEMU 和 Renode 都不模擬 Cortex-M7 的 pipeline、cache 和 Flash wait state，它們的 cycle 數其實是用指令數推算的，所以不報。
+  要拿到真正的推論時間，就燒到 NUCLEO 板上讀 `g_cycles`（main.c 已經用 DWT CYCCNT 量好）。ARM 上的預測正確性也要在板子上確認。
+
+---
+
+## 5. 下一步
+
+### 5.1 特徵擷取移植到 C
+- **濾波**：把 4 階 Butterworth 帶通改成 4 個 biquad（SOS 形式），每個 channel 串流處理。
+  上游用的是 `lfilter` 的 b/a 形式，每個 trial 都從 0 初始狀態開始；串流處理的初始狀態不同，所以要先在 PC 上確認 SOS 串流版和上游的特徵差多少（暫態大約在前 1 秒內衰減，而上游本來就只用後 1 秒）。
+- **時域特徵**（RMS/WL/SSC/ZC/MAV/偏度）：單次掃過視窗就能算完。
+- **頻域特徵**：Hamming（400 點，常數表放 Flash）+ CMSIS-DSP 的 `arm_rfft_fast_f32`（512 點）→ Welch PSD（257 個 bin）→ MNF/MDF/PKF/VCF。要逐項和 scipy 對照。
+- **驗收方式**：用 dataset 的原始 EMG 在 PC 上跑 C 版特徵，和 `features_arm_position/` 比對誤差，再把 C 版特徵丟進 RF，確認準確率不變。
+- **RAM 估算**：濾波後的 ring buffer 12.5 KB + IIR 狀態 0.25 KB + FFT 4 KB + PSD 1 KB ≈ **18 KB**（依設計計算，`results/ram_estimate.csv`）。
+
+### 5.2 MCU 上自我校正需要的 RAM（估算，`src/ram_estimate.py` → `results/ram_scenarios.csv`）
+
+| 項目 | 大小 | 依據 |
+|---|---|---|
+| Buffer 1500 × 80，float32 / int16 | 468.8 / 234.4 KB | 上游參數（論文寫「~500 KB」） |
+| Calibration 資料 60 × 80，float32 / int16 | 18.8 / 9.4 KB | |
+| 可替換的附加樹（深度 10，用最大的樹計算）：50 棵 / 200 棵 | 36.6 / 146.2 KB | 實測的自我校正樹大小（每棵最多 107 個內部節點）× 7 B |
+| RF 訓練暫存（一次訓練一棵樹） | 26.2 KB | 索引陣列、排序後的特徵值、2^11 個節點的建樹緩衝區 |
+| K-Means（80 維） | 5.2 KB | |
+| Barnes-Hut t-SNE（3 維，31 個鄰居） | 401 KB | 稀疏 P 矩陣 272.5 KB + 嵌入/梯度 70.3 KB + octree 58.6 KB |
+
+| 情境 | 合計 | 放進 AXI 512 KB？ |
+|---|---|---|
+| A 照論文原樣：float32 buffer、400 棵、t-SNE + K-Means | **1086 KB** | 否（連全部 SRAM 都放不下） |
+| B int16 buffer、100 棵、t-SNE + K-Means | 733 KB | 否（要拆到好幾塊 SRAM，沒有這麼大的連續區塊） |
+| C int16 buffer、100 棵、只用 K-Means | **332 KB** | 是 |
+
+（合計已包含推論 552 B、特徵擷取約 18 KB、偽標籤 1.5 KB、RF 訓練暫存 26 KB。）
+
+**論文的核心問題就在這裡**：t-SNE 是最大的記憶體負擔，但論文的 ablation（Frontiers Table 1）顯示：
+- 拿掉 t-SNE、只做 K-Means：81.0%
+- t-SNE 和 K-Means 都拿掉：82.7%
+- 完整模型：84.6%
+
+也就是說，直接拿掉 t-SNE 會掉 3.6 個百分點。在記憶體預算內找到 t-SNE 的替代方案，就是論文的主要貢獻。
+
+### 5.3 具體待辦（依優先順序）
+1. **量壓縮後模型的自我校正準確率**：把上游的自我校正迴圈套用到推薦設定（100 棵、深度 10、int16），以及另外 2–3 個候選，確認 one-shot 階段 −0.37 個百分點的差距在自我校正後會不會擴大。
+2. **低記憶體的偽標籤方法**：在 PC 上比較下面幾種，看準確率和 RAM 的取捨：
+   - K-Means 直接在 80 維做
+   - 先投影到低維（PCA 或用 calibration 資料訓練的 LDA）再做 K-Means
+   - t-SNE 縮小 buffer（例如 500 筆）
+   - 依信心門檻篩選樣本
+3. **Buffer 精度和大小**：buffer 改存 int16（推論已確認沒損失），並掃描 buffer 大小 1500 / 1000 / 750 / 500，看它對自我校正準確率的影響。
+4. **特徵擷取移植到 C**（5.1），在 PC 上逐項比對。
+5. **上板**：設定好時脈（480 MHz）和 I/D-cache，量 `rf_predict` 和特徵擷取的 cycle 數，並在板上確認 `g_pred`。
+6. **MCU 上的 RF 訓練**：先在 PC 用 C 實作 CART，限制深度 10、max_features = 9，和 sklearn 比準確率、建樹時間和暫存記憶體。
+
+---
+
+## 附錄：檔案
+| 類別 | 檔案 |
+|---|---|
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`src/c/*` |
+| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`*.png`、`stage*_summary.md`、`logs/` |
