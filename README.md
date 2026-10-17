@@ -47,5 +47,6 @@ Summary: `results/stage2_summary.md`.
 .venv/Scripts/python -m pip install emlearn setuptools   # setuptools: emlearn imports distutils
 .venv/Scripts/python src/export_c.py                     # -> build/<cfg>/ (git-ignored, regenerable)
 .venv/Scripts/python src/check_c.py --cc "/c/Program Files/mingw64/bin/gcc.exe"
-.venv/Scripts/python src/build_arm.py --wsl              # needs arm-none-eabi-gcc (here: inside WSL)
+wsl -d Ubuntu-22.04 -- sudo apt-get install -y gcc-arm-none-eabi libnewlib-arm-none-eabi
+.venv/Scripts/python src/build_arm.py --wsl              # arm-none-eabi-gcc 10.3.1 inside WSL2
 ```
