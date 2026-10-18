@@ -8,7 +8,10 @@ actually run (n_iter_), the final KL divergence, and the number of neighbours us
 the sklearn Barnes-Hut algorithm, a rough work model per iteration (n x neighbours attractive terms +
 n x log2(n) octree interactions), which scales the PC number to other buffer sizes; it is NOT an MCU
 cycle count — that has to be measured on the board.
-Writes results/tsne_cost.csv. Usage (in the container): python src/tsne_cost.py [--subjects 0 1 2]
+--iters times each buffer with these t-SNE iteration counts (sklearn max_iter, default 1000 = upstream; the
+same TSNE input and seed for every count). --sizes picks the buffer sizes.
+Writes results/tsne_cost<suffix>.csv. Usage (in the container): python src/tsne_cost.py [--subjects 0 1 2]
+       python src/tsne_cost.py --sizes 375 --iters 250 500 1000 --suffix _iter
 """
 import argparse
 import os
@@ -53,28 +56,35 @@ def buffer_for(subject, buf, seed=0):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--subjects', type=int, nargs='+', default=[0, 1, 2])
+    ap.add_argument('--sizes', type=int, nargs='+', default=SIZES)
+    ap.add_argument('--iters', type=int, nargs='+', default=[S.TSNE_ITER])
+    ap.add_argument('--suffix', default='')
     args = ap.parse_args()
     threadpool_limits(1)
     rows = []
     for s in args.subjects:
-        for buf in SIZES:
+        for buf in args.sizes:
             X = buffer_for(s, buf)
             n = len(X)
-            np.random.seed(0)
-            ts = TSNE(n_components=3, learning_rate='auto', init='random', perplexity=10, n_jobs=1)
-            t0 = time.process_time()
-            ts.fit_transform(X)
-            cpu = time.process_time() - t0
-            k = min(n - 1, int(3.0 * 10 + 1))
-            work = ts.n_iter_ * (n * k + n * np.log2(n))
-            rows.append(dict(subject=s, buffer=buf, n_tsne=n, neighbours=k, n_iter=ts.n_iter_, kl=ts.kl_divergence_,
-                             cpu_s=cpu, work_units=work))
-            print(rows[-1], flush=True)
+            for it in args.iters:
+                np.random.seed(0)
+                ts = TSNE(n_components=3, learning_rate='auto', init='random', perplexity=10, n_jobs=1, max_iter=it)
+                t0 = time.process_time()
+                ts.fit_transform(X)
+                cpu = time.process_time() - t0
+                k = min(n - 1, int(3.0 * 10 + 1))
+                work = ts.n_iter_ * (n * k + n * np.log2(n))
+                rows.append(dict(subject=s, buffer=buf, max_iter=it, n_tsne=n, neighbours=k, n_iter=ts.n_iter_,
+                                 kl=ts.kl_divergence_, cpu_s=cpu, work_units=work))
+                print(rows[-1], flush=True)
     df = pd.DataFrame(rows)
-    df.to_csv(os.path.join(OUT, 'tsne_cost.csv'), index=False, float_format='%.5g')
-    g = df.groupby('buffer', sort=False).agg(n_tsne=('n_tsne', 'mean'), n_iter=('n_iter', 'mean'), cpu_s=('cpu_s', 'mean'),
-                                             work_units=('work_units', 'mean'))
-    g['cpu_s_rel_1500'] = g.cpu_s / g.cpu_s.iloc[0]
+    if args.iters == [S.TSNE_ITER]:
+        df = df.drop(columns='max_iter')   # same columns as before the option
+    df.to_csv(os.path.join(OUT, f'tsne_cost{args.suffix}.csv'), index=False, float_format='%.5g')
+    key = ['buffer'] + (['max_iter'] if 'max_iter' in df else [])
+    g = df.groupby(key, sort=False).agg(n_tsne=('n_tsne', 'mean'), n_iter=('n_iter', 'mean'), kl=('kl', 'mean'),
+                                        cpu_s=('cpu_s', 'mean'), work_units=('work_units', 'mean'))
+    g['cpu_s_rel_first'] = g.cpu_s / g.cpu_s.iloc[0]
     print(g.round(3).to_string())
 
 

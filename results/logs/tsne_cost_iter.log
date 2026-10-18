@@ -1,0 +1,30 @@
+{'subject': 0, 'buffer': 375, 'max_iter': 250, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 250, 'kl': np.float64(1.7976931348623157e+308), 'cpu_s': 0.46056099999999933, 'work_units': np.float64(3677141.7694330467)}
+{'subject': 0, 'buffer': 375, 'max_iter': 300, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 299, 'kl': 0.7540300488471985, 'cpu_s': 0.6180176999999993, 'work_units': np.float64(4397861.556241924)}
+{'subject': 0, 'buffer': 375, 'max_iter': 350, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 349, 'kl': 0.6310060620307922, 'cpu_s': 0.7503430999999985, 'work_units': np.float64(5133289.910128533)}
+{'subject': 0, 'buffer': 375, 'max_iter': 400, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 399, 'kl': 0.5900744795799255, 'cpu_s': 0.7331368999999999, 'work_units': np.float64(5868718.264015143)}
+{'subject': 0, 'buffer': 375, 'max_iter': 500, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 499, 'kl': 0.5677844882011414, 'cpu_s': 0.9437280000000001, 'work_units': np.float64(7339574.971788361)}
+{'subject': 0, 'buffer': 375, 'max_iter': 750, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 749, 'kl': 0.5557195544242859, 'cpu_s': 1.4251127000000015, 'work_units': np.float64(11016716.741221407)}
+{'subject': 0, 'buffer': 375, 'max_iter': 1000, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 999, 'kl': 0.5523161888122559, 'cpu_s': 1.990399, 'work_units': np.float64(14693858.510654455)}
+{'subject': 1, 'buffer': 375, 'max_iter': 250, 'n_tsne': 342, 'neighbours': 31, 'n_iter': 250, 'kl': np.float64(1.7976931348623157e+308), 'cpu_s': 0.4482783999999995, 'work_units': np.float64(3370226.3900227444)}
+{'subject': 1, 'buffer': 375, 'max_iter': 300, 'n_tsne': 342, 'neighbours': 31, 'n_iter': 299, 'kl': 0.8907800316810608, 'cpu_s': 0.5476093000000013, 'work_units': np.float64(4030790.7624672023)}
+{'subject': 1, 'buffer': 375, 'max_iter': 350, 'n_tsne': 342, 'neighbours': 31, 'n_iter': 349, 'kl': 0.7970949411392212, 'cpu_s': 0.742844299999998, 'work_units': np.float64(4704836.040471751)}
+{'subject': 1, 'buffer': 375, 'max_iter': 400, 'n_tsne': 342, 'neighbours': 31, 'n_iter': 399, 'kl': 0.761987030506134, 'cpu_s': 0.7504999999999988, 'work_units': np.float64(5378881.3184763)}
+{'subject': 1, 'buffer': 375, 'max_iter': 500, 'n_tsne': 342, 'neighbours': 31, 'n_iter': 499, 'kl': 0.7368966937065125, 'cpu_s': 1.062736600000001, 'work_units': np.float64(6726971.874485398)}
+{'subject': 1, 'buffer': 375, 'max_iter': 750, 'n_tsne': 342, 'neighbours': 31, 'n_iter': 749, 'kl': 0.6830779910087585, 'cpu_s': 1.717134399999999, 'work_units': np.float64(10097198.264508143)}
+{'subject': 1, 'buffer': 375, 'max_iter': 1000, 'n_tsne': 342, 'neighbours': 31, 'n_iter': 999, 'kl': 0.6707442998886108, 'cpu_s': 1.9530349999999999, 'work_units': np.float64(13467424.654530887)}
+{'subject': 2, 'buffer': 375, 'max_iter': 250, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 250, 'kl': np.float64(1.7976931348623157e+308), 'cpu_s': 0.4687878000000012, 'work_units': np.float64(3677141.7694330467)}
+{'subject': 2, 'buffer': 375, 'max_iter': 300, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 299, 'kl': 0.9454352259635925, 'cpu_s': 0.6916621000000021, 'work_units': np.float64(4397861.556241924)}
+{'subject': 2, 'buffer': 375, 'max_iter': 350, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 349, 'kl': 0.8196251392364502, 'cpu_s': 0.8354138000000013, 'work_units': np.float64(5133289.910128533)}
+{'subject': 2, 'buffer': 375, 'max_iter': 400, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 399, 'kl': 0.7782348990440369, 'cpu_s': 0.9419596999999982, 'work_units': np.float64(5868718.264015143)}
+{'subject': 2, 'buffer': 375, 'max_iter': 500, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 499, 'kl': 0.7560885548591614, 'cpu_s': 1.0240776999999994, 'work_units': np.float64(7339574.971788361)}
+{'subject': 2, 'buffer': 375, 'max_iter': 750, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 749, 'kl': 0.7392529249191284, 'cpu_s': 1.7381253, 'work_units': np.float64(11016716.741221407)}
+{'subject': 2, 'buffer': 375, 'max_iter': 1000, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 999, 'kl': 0.7309079766273499, 'cpu_s': 1.9419205999999996, 'work_units': np.float64(14693858.510654455)}
+                 n_tsne  n_iter     kl  cpu_s    work_units  cpu_s_rel_first
+buffer max_iter                                                             
+375    250        362.0   250.0    NaN  0.459  3.574837e+06            1.000
+       300        362.0   299.0  0.863  0.619  4.275505e+06            1.348
+       350        362.0   349.0  0.749  0.776  4.990472e+06            1.690
+       400        362.0   399.0  0.710  0.809  5.705439e+06            1.761
+       500        362.0   499.0  0.687  1.010  7.135374e+06            2.200
+       750        362.0   749.0  0.659  1.627  1.071021e+07            3.543
+       1000       362.0   999.0  0.651  1.962  1.428505e+07            4.272
