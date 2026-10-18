@@ -9,4 +9,4 @@ try {
   foreach ($s in $p.Slides) { $i++; $s.Export((Join-Path $OutDir ("s{0:D2}.png" -f $i)), 'PNG', 1600, 900) }
   "slides: $i  size: $($p.PageSetup.SlideWidth) x $($p.PageSetup.SlideHeight) pt"
   $p.Close()
-} finally { $app.Quit() }
+} finally { if ($app.Presentations.Count -eq 0) { $app.Quit() } }   # keep the user's open decks

@@ -4,6 +4,7 @@
   nums2.json  build3.py  (v3: pseudo-label methods, per-method RAM)
   nums3.json  build5.py  (int16 buffer, buffer size, 32-leaf trees)
   nums4.json  build5.py  (nums3 + small buffer x 32 leaves, t-SNE cost)
+  nums5.json  build7.py  (nums4 + t-SNE iteration count)
 Usage (repo root, in the Docker image): python slides/make_nums.py
 """
 import json
@@ -97,3 +98,12 @@ n4['tsne_cost'] = [dict(buffer=int(buf), n=float(g_.n_tsne.mean()), iters=float(
                         cpu=float(g_.cpu_s.mean()), subjects=int(len(g_)))
                    for buf, g_ in tc.groupby('buffer', sort=False)]
 dump('nums4.json', n4)
+
+# ---------------------------------------------------------------- nums5.json (build7.py)
+ti = csv('tsne_iter_summary.csv')
+n5 = dict(n4)
+n5['tsne_iter'] = [dict(it=int(r_.tsne_iter), acc=float(r_.acc_selfcal), gain=float(r_.gain), diff=float(r_.diff_vs_1000),
+                        p=float(r_.wilcoxon_p), worse=int(r_.n_subjects_worse), cpu=float(r_.tsne_cpu_s),
+                        rel=float(r_.tsne_cpu_rel_1000), subjects=int(r_.cost_subjects))
+                   for _, r_ in ti.iterrows()]
+dump('nums5.json', n5)
