@@ -19,6 +19,7 @@
 | 自我校正放得進 MCU 嗎？（估算） | 照論文原樣做（float32 buffer + t-SNE）約需 1208 KB，**放不下**。改用 int16 buffer、100 棵樹、不做 t-SNE，約 334 KB，放得進 AXI 512 KB。但「不做 t-SNE」在論文的 ablation 裡準確率比較低，這是論文要解決的核心問題。 |
 | 能壓到 256 KB 以下嗎？（實測，3.5–3.6 節） | 可以：buffer 375 筆（int16）＋ 新樹 32 葉 ＋ t-SNE，自我校正 83.44%、增益 +3.76，RAM 估算 219 KB，和基準無顯著差異（p = 0.17）。250 筆開始明顯變差。t-SNE 在 PC 上每次 2.1 s（1500 筆 9.3 s），MCU 上的時間還沒量。 |
 | t-SNE 迭代可以減少嗎？（實測，3.7 節） | 可以減半：同一設定下 500 次迭代自我校正 83.27%、增益 +3.59，和 1000 次（83.44%、+3.76）差 −0.17 個百分點，不顯著（p = 0.14）；PC 上 t-SNE 時間 1.96 → 1.01 s。400 次開始顯著變差（−0.41，p = 0.017），250 次增益只剩 +0.48。 |
+| 降低 t-SNE perplexity 有用嗎？（實測，3.8 節） | 不太有用：perplexity 3／5／7 在 PC 上**不省時間**（時間由 octree 排斥力決定，和近鄰數無關），只省 t-SNE 的近鄰表 RAM（估算 100 → 54–81 KB），準確率全都比 perplexity 10 低（−0.07 到 −0.69，部分顯著）。維持 perplexity 10、500 次迭代。 |
 | 怎樣才放得進 512 KB？（實測，3.3–3.4 節） | **不必拿掉 t-SNE**：buffer 存成 int16（無損失）並縮到 750 筆，自我校正 83.83%、增益 +4.15，RAM 估算 394 KB；500 筆 280 KB、增益 +3.78。新樹限制 32 葉讓附加樹保證 ≤ 10.6 KB、準確率無顯著差異。兩者合併使用還沒實測。 |
 | 不做 t-SNE 會掉多少？（實測，3.2 節） | 推薦設定上，只用 K-Means 81.03%、不分群 81.64%，t-SNE 版 83.98%；自我校正增益從 +4.30 掉到 +1.35 / +1.96 個百分點（20 人配對 p < 0.001）。完整模型的結果重現了論文的 ablation（84.66 / 80.89 / 82.16 vs 論文 84.6 / 81.0 / 82.7）。 |
 | 換平台結果會變嗎？ | 特徵、預測、one-shot、C/ARM 編譯在 Docker（Linux）和 Windows 上都相同。**自我校正不會逐位元相同**：Linux 84.66% vs Windows 84.43%（差 0.23 個百分點，和 seed 之間的變動同一個等級）。同一個比較只用同一個平台的數字（1.6 節）。 |
@@ -337,6 +338,33 @@ RF 訓練暫存都依 buffer 大小重算，附加樹用各組實測的最大區
 
 ---
 
+### 3.8 降低 t-SNE perplexity（實測，Docker；`src/analyze_tsne_px.py` → `results/tsne_px_summary.csv`）
+
+同 3.7 節的設定，perplexity 改成 3／5／7（每個點的近鄰數 3 × perplexity + 1 = 10／16／22，上游 10 → 31），各配 500 和 1000 次迭代
+（`src/selfcal_sweep.py --tsne-perplexity`；上游呼叫時自己傳了 `perplexity=10`，所以替換的 TSNE 會強制覆寫這個參數）。
+perplexity 10 的兩列來自 3.7 節那次執行。比較對象：上游設定（perplexity 10、1000 次）。時間：`src/tsne_cost.py --perplexities`，CPU 空閒時單執行緒、3 人平均。
+RAM 是估算（t-SNE 近鄰表依近鄰數縮放，其他項同 3.5 節）。
+
+| perplexity | 迭代 | 近鄰數 | 自我校正 | 增益 | vs 上游（20 人配對） | 較好／較差 | p | PC t-SNE 時間 | t-SNE RAM（估算） | 總 RAM（估算） |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 3 | 500 | 10 | 82.75 | +3.07 | −0.69 | 4 / 16 | 0.004 | 1.15 s | 54 KB | 173 KB |
+| 3 | 1000 | 10 | 83.01 | +3.33 | −0.42 | 8 / 12 | 0.19 | 2.06 s | 54 KB | 173 KB |
+| 5 | 500 | 16 | 83.19 | +3.51 | −0.25 | 8 / 12 | 0.13 | 1.08 s | 67 KB | 186 KB |
+| 5 | 1000 | 16 | 83.21 | +3.53 | −0.23 | 8 / 12 | 0.23 | 2.12 s | 67 KB | 186 KB |
+| 7 | 500 | 22 | 83.05 | +3.37 | −0.38 | 4 / 16 | 0.012 | 1.05 s | 81 KB | 199 KB |
+| 7 | 1000 | 22 | 83.36 | +3.68 | −0.07 | 9 / 11 | 0.65 | 2.01 s | 81 KB | 199 KB |
+| **10** | **500** | 31 | **83.27** | **+3.59** | −0.17 | 8 / 12 | 0.14 | **0.99 s** | 100 KB | 219 KB |
+| 10（上游） | 1000 | 31 | 83.44 | +3.76 | — | — | — | 1.99 s | 100 KB | 219 KB |
+
+觀察：
+1. **降低 perplexity 在 PC 上不省時間**：同樣迭代次數下，perplexity 3–10 的時間差不到 ±0.1 s（perplexity 小的甚至略慢）。
+   3.6 節的工作量模型（近鄰吸引力 n × k ＋ octree n log n）認為近鄰項是大宗，**這個假設不成立**：sklearn 的時間主要在
+   Barnes-Hut 排斥力（octree），和近鄰數無關。C 版 t-SNE 要優化的應該是排斥力那一段（例如 angle、octree 的實作）。
+2. **只省 RAM**：近鄰表從 100 KB 降到 54–81 KB（估算），總 RAM 219 → 173–199 KB。但 219 KB 已經在 256 KB 以內，這不是目前的瓶頸。
+3. **準確率都比較低**，而且不是單調的（perplexity 7、500 次比 5、500 次差），看起來是 seed 層級的雜訊加上真實的小損失；
+   3／500 和 7／500 顯著變差。沒有一個設定同時比 perplexity 10、500 次更快又更準。
+4. 結論：**維持 perplexity 10、500 次迭代**。如果之後 RAM 預算要降到 200 KB 以下，perplexity 5 是可以考慮的備案（−0.25，不顯著）。
+
 ## 4. 編譯後的 Flash/RAM 用量
 
 PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 種實作，C 和 Python 的預測**100% 一致**（`results/c_check.csv`）。
@@ -418,7 +446,7 @@ PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 
    ~~(a) 小 buffer ＋ 32 葉一起跑~~、~~(b) 往 256 KB 以下推~~（已完成，3.5 節：375 筆 219 KB、增益 +3.76）。
    接著要做：(c) 用 C 實作 Barnes-Hut t-SNE，在 Cortex-M7 上量運算時間（PC 上 375 筆每次 2.1 s，3.6 節）；
    ~~(d) 減少 t-SNE 迭代次數~~（已完成，3.7 節：500 次時間減半、−0.17 個百分點不顯著；400 次以下顯著變差）。
-   還沒做：降低 perplexity（會減少每次迭代的近鄰數 3 × perplexity + 1）。
+   ~~降低 perplexity~~（已完成，3.8 節：PC 上不省時間，只省近鄰表 RAM，準確率較低；維持 perplexity 10）。
 4. **特徵擷取移植到 C**（5.1），在 PC 上逐項比對。
 5. **上板**：設定好時脈（480 MHz）和 I/D-cache，量 `rf_predict` 和特徵擷取的 cycle 數，並在板上確認 `g_pred`。
 6. **MCU 上的 RF 訓練**：先在 PC 用 C 實作 CART，限制深度 10、max_features = 9，和 sklearn 比準確率、建樹時間和暫存記憶體。
@@ -428,6 +456,6 @@ PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`src/c/*` |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`src/c/*` |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
-| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
+| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |

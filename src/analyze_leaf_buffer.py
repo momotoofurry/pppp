@@ -24,7 +24,7 @@ INFER = 552                                   # arm_size.csv: d10_n100_i16 table
 FEAT = 400 * 8 * 4 + 4 * 2 * 8 * 4 + 2 * 512 * 4 + 257 * 4   # feature extraction (ram_estimate.py)
 
 
-def ram(buf, int16_buffer, trees_B):
+def ram(buf, int16_buffer, trees_B, neighbours=31):
     b = 2 if int16_buffer else 4
     n_train = buf + N_CALIB
     parts = dict(
@@ -33,7 +33,7 @@ def ram(buf, int16_buffer, trees_B):
         pseudo_labels=buf,
         training=n_train * 2 + n_train * 4 + n_train * 2 + (2 ** 11) * NODE_B,
         kmeans=buf + 2 * N_CLS * N_FEAT * 4,
-        tsne=buf * 31 * 6 + 4 * buf * 3 * 4 + buf * 40,
+        tsne=buf * neighbours * 6 + 4 * buf * 3 * 4 + buf * 40,   # neighbours = 3 x perplexity + 1
         trees=trees_B)
     return sum(parts.values()), parts
 

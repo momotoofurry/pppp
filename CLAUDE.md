@@ -28,8 +28,9 @@
 - 不必拿掉 t-SNE：int16 buffer 無損失；buffer 375 筆 ＋ 新樹 max_leaf_nodes 32 → 83.44%、增益 +3.76、RAM 估算 219 KB（< 256 KB），和基準無顯著差異；250 筆開始明顯變差。
 - 下一個瓶頸：t-SNE 運算時間（PC 單執行緒 375 筆 2.1 s，每次都跑滿 1000 次迭代），MCU 上未量。
 - t-SNE 迭代減到 500 次（`--tsne-iter`）：83.27%、增益 +3.59，vs 1000 次 −0.17 不顯著（p = 0.14），PC 時間 1.96 → 1.01 s；400 次以下顯著變差（report 3.7）。
+- 降低 perplexity（`--tsne-perplexity` 3/5/7）：PC 上不省時間（時間在 octree 排斥力，不在近鄰項），只省近鄰表 RAM，準確率較低 → 維持 perplexity 10（report 3.8）。
 
 ## 建議的下一步
-1. ~~減少 t-SNE 迭代次數~~（完成，report 3.7）；可再試降低 perplexity。
-2. 用 C 實作 Barnes-Hut t-SNE，先在 PC 上和 sklearn 對照，等 NUCLEO-H743ZI2 到了再量 MCU 時間。
+1. ~~減少 t-SNE 迭代次數~~（完成，report 3.7）、~~降低 perplexity~~（完成，沒用，report 3.8）。
+2. 用 C 實作 Barnes-Hut t-SNE（500 次迭代；要優化的是排斥力／octree），先在 PC 上和 sklearn 對照，等 NUCLEO-H743ZI2 到了再量 MCU 時間。
 3. 特徵擷取移植到 C（report 5.1）。
