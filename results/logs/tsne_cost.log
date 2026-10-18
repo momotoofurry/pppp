@@ -1,0 +1,26 @@
+{'subject': 0, 'buffer': 1500, 'n_tsne': 882, 'neighbours': 31, 'n_iter': 999, 'kl': 0.9903019070625305, 'cpu_s': 7.464237299999999, 'work_units': np.float64(35936075.885847956)}
+{'subject': 0, 'buffer': 1000, 'n_tsne': 690, 'neighbours': 31, 'n_iter': 999, 'kl': 0.8733031153678894, 'cpu_s': 5.112626200000001, 'work_units': np.float64(27869115.248388566)}
+{'subject': 0, 'buffer': 750, 'n_tsne': 690, 'neighbours': 31, 'n_iter': 999, 'kl': 0.8585741519927979, 'cpu_s': 4.982243500000003, 'work_units': np.float64(27869115.248388566)}
+{'subject': 0, 'buffer': 500, 'n_tsne': 492, 'neighbours': 31, 'n_iter': 999, 'kl': 0.6935206055641174, 'cpu_s': 2.983335699999998, 'work_units': np.float64(19632065.41949028)}
+{'subject': 0, 'buffer': 375, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 999, 'kl': 0.5523161888122559, 'cpu_s': 2.062942800000002, 'work_units': np.float64(14693858.510654455)}
+{'subject': 0, 'buffer': 250, 'n_tsne': 246, 'neighbours': 31, 'n_iter': 999, 'kl': 0.40752989053726196, 'cpu_s': 1.1742516999999992, 'work_units': np.float64(9570278.70974514)}
+{'subject': 1, 'buffer': 1500, 'n_tsne': 906, 'neighbours': 31, 'n_iter': 999, 'kl': 0.8407959938049316, 'cpu_s': 7.9236808, 'work_units': np.float64(36948984.74876241)}
+{'subject': 1, 'buffer': 1000, 'n_tsne': 642, 'neighbours': 31, 'n_iter': 999, 'kl': 0.8094485402107239, 'cpu_s': 5.203535600000002, 'work_units': np.float64(25863678.163001783)}
+{'subject': 1, 'buffer': 750, 'n_tsne': 516, 'neighbours': 31, 'n_iter': 999, 'kl': 0.7070958018302917, 'cpu_s': 3.654658699999999, 'work_units': np.float64(20625147.4705346)}
+{'subject': 1, 'buffer': 500, 'n_tsne': 342, 'neighbours': 31, 'n_iter': 999, 'kl': 0.5358672738075256, 'cpu_s': 1.9641633999999968, 'work_units': np.float64(13467424.654530887)}
+{'subject': 1, 'buffer': 375, 'n_tsne': 342, 'neighbours': 31, 'n_iter': 999, 'kl': 0.6707442998886108, 'cpu_s': 1.9982502999999951, 'work_units': np.float64(13467424.654530887)}
+{'subject': 1, 'buffer': 250, 'n_tsne': 162, 'neighbours': 31, 'n_iter': 999, 'kl': 0.5693424940109253, 'cpu_s': 0.8123997000000003, 'work_units': np.float64(6204844.644766842)}
+{'subject': 2, 'buffer': 1500, 'n_tsne': 1392, 'neighbours': 31, 'n_iter': 999, 'kl': 1.203269600868225, 'cpu_s': 12.617173699999995, 'work_units': np.float64(57630888.768875204)}
+{'subject': 2, 'buffer': 1000, 'n_tsne': 996, 'neighbours': 31, 'n_iter': 999, 'kl': 1.0017305612564087, 'cpu_s': 7.686122999999995, 'work_units': np.float64(40755365.76241547)}
+{'subject': 2, 'buffer': 750, 'n_tsne': 744, 'neighbours': 31, 'n_iter': 999, 'kl': 0.9218108057975769, 'cpu_s': 5.362769, 'work_units': np.float64(30130973.02130891)}
+{'subject': 2, 'buffer': 500, 'n_tsne': 498, 'neighbours': 31, 'n_iter': 999, 'kl': 0.7953903675079346, 'cpu_s': 3.5946308999999985, 'work_units': np.float64(19880180.881207734)}
+{'subject': 2, 'buffer': 375, 'n_tsne': 372, 'neighbours': 31, 'n_iter': 999, 'kl': 0.7309079766273499, 'cpu_s': 2.1353770999999995, 'work_units': np.float64(14693858.510654455)}
+{'subject': 2, 'buffer': 250, 'n_tsne': 156, 'neighbours': 31, 'n_iter': 999, 'kl': 0.48024803400039673, 'cpu_s': 0.815249399999999, 'work_units': np.float64(5966550.223396368)}
+        n_tsne  n_iter  cpu_s    work_units  cpu_s_rel_1500
+buffer                                                     
+1500    1060.0   999.0  9.335  4.350532e+07           1.000
+1000     776.0   999.0  6.001  3.149605e+07           0.643
+750      650.0   999.0  4.667  2.620841e+07           0.500
+500      444.0   999.0  2.847  1.765989e+07           0.305
+375      362.0   999.0  2.066  1.428505e+07           0.221
+250      188.0   999.0  0.934  7.247225e+06           0.100

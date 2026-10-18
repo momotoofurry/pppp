@@ -1,4 +1,5 @@
-"""Tree-size limits (selfcal_sweep.py ... --suffix _leaf) and buffer size / int16 buffer (--suffix _buffer),
+"""Tree-size limits (selfcal_sweep.py ... --suffix _leaf), buffer size / int16 buffer (--suffix _buffer) and
+both together (small int16 buffer + max_leaf_nodes 32, --suffix _combo),
 100 trees / depth 10 / int16 with t-SNE + K-Means, Docker runs.
 
 Baseline = the same model with upstream settings from the _pseudo_c3 run (Docker, t-SNE + K-Means, float
@@ -48,7 +49,7 @@ def main():
     base_acc = base_acc[base_acc.config == 'N100_d10_int16']
     base_tr = base_tr[base_tr.config == 'N100_d10_int16']
     parts = [('baseline', base_acc, base_tr)]
-    for sfx in ['_leaf', '_buffer']:
+    for sfx in ['_leaf', '_buffer', '_combo']:
         if os.path.exists(os.path.join(OUT, f'selfcal_sweep{sfx}.csv')):
             a, t = load(sfx)
             parts.append((sfx[1:], a, t))

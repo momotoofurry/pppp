@@ -17,6 +17,7 @@
 | 推薦的壓縮設定 | **100 棵、深度 10、int16 門檻值**：Flash 88.1 KB，one-shot 準確率 79.75%（完整模型是 80.12%，差 −0.37 個百分點）。Flash 夠用的話，400 棵、深度 10、int16 只差 −0.04 個百分點，要 345.5 KB。**自我校正之後**（3.1 節）：100 棵是 83.96%，完整模型 84.43%，差 −0.47 個百分點，差距沒有明顯擴大。 |
 | 推論需要多少 RAM？ | 實測 **552 B**（特徵緩衝區 + 最壞情況的 stack）。 |
 | 自我校正放得進 MCU 嗎？（估算） | 照論文原樣做（float32 buffer + t-SNE）約需 1208 KB，**放不下**。改用 int16 buffer、100 棵樹、不做 t-SNE，約 334 KB，放得進 AXI 512 KB。但「不做 t-SNE」在論文的 ablation 裡準確率比較低，這是論文要解決的核心問題。 |
+| 能壓到 256 KB 以下嗎？（實測，3.5–3.6 節） | 可以：buffer 375 筆（int16）＋ 新樹 32 葉 ＋ t-SNE，自我校正 83.44%、增益 +3.76，RAM 估算 219 KB，和基準無顯著差異（p = 0.17）。250 筆開始明顯變差。t-SNE 在 PC 上每次 2.1 s（1500 筆 9.3 s），MCU 上的時間還沒量。 |
 | 怎樣才放得進 512 KB？（實測，3.3–3.4 節） | **不必拿掉 t-SNE**：buffer 存成 int16（無損失）並縮到 750 筆，自我校正 83.83%、增益 +4.15，RAM 估算 394 KB；500 筆 280 KB、增益 +3.78。新樹限制 32 葉讓附加樹保證 ≤ 10.6 KB、準確率無顯著差異。兩者合併使用還沒實測。 |
 | 不做 t-SNE 會掉多少？（實測，3.2 節） | 推薦設定上，只用 K-Means 81.03%、不分群 81.64%，t-SNE 版 83.98%；自我校正增益從 +4.30 掉到 +1.35 / +1.96 個百分點（20 人配對 p < 0.001）。完整模型的結果重現了論文的 ablation（84.66 / 80.89 / 82.16 vs 論文 84.6 / 81.0 / 82.7）。 |
 | 換平台結果會變嗎？ | 特徵、預測、one-shot、C/ARM 編譯在 Docker（Linux）和 Windows 上都相同。**自我校正不會逐位元相同**：Linux 84.66% vs Windows 84.43%（差 0.23 個百分點，和 seed 之間的變動同一個等級）。同一個比較只用同一個平台的數字（1.6 節）。 |
@@ -270,8 +271,42 @@ RF 訓練暫存都依 buffer 大小重算，附加樹用各組實測的最大區
    在差不多的 RAM 下，小 buffer 的 t-SNE 遠比拿掉 t-SNE 好（不分群 327 KB、增益只有 +1.96）。
 3. 所以 5.2 節「放得進 512 KB 的只有不做 t-SNE 的做法」要修正：**t-SNE 本身不必拿掉，縮小 buffer 就夠了**。
    下一個真正的限制是 256 KB 以下（目前最小 280 KB），以及 t-SNE 在 MCU 上的運算時間（還沒量）。
-4. **還沒驗證的組合**：小 buffer ＋ `max_leaf_nodes 32`（3.3 節）。依估算 750 筆 ＋ 32 葉約 381 KB、500 筆 ＋ 32 葉約 267 KB，
-   但兩種限制一起用時的準確率還沒跑，不能把兩邊的結果直接相加當成已驗證。
+4. 小 buffer ＋ `max_leaf_nodes 32` 一起用的結果在 3.5 節。
+
+### 3.5 小 buffer ＋ 新樹限制 32 葉（實測，Docker；同上 `leaf_buffer_summary.csv`）
+
+推薦設定 ＋ t-SNE + K-Means，buffer 存成 int16，新樹 `max_leaf_nodes = 32`（附加樹保證 ≤ 10.6 KB），20 人 × 11 block × 3 seed。
+
+| buffer | 自我校正後（seed 範圍） | 增益 | 和基準比（20 人配對） | t-SNE | 自我校正 RAM 合計（估算） |
+|---|---|---|---|---|---|
+| 750 筆 | 83.78（83.68–83.88） | +4.10 | −0.20，9/20 人較好，p = 0.60 | 201 KB | 382 KB |
+| 500 筆 | 83.58（83.51–83.66） | +3.90 | −0.39，7/20，p = 0.14 | 134 KB | 273 KB |
+| **375 筆** | **83.44**（83.17–83.69） | **+3.76** | −0.54，7/20，p = 0.17 | 100 KB | **219 KB** |
+| 250 筆 | 82.83（82.53–83.03） | +3.15 | −1.15，2/20，**p = 0.001** | 67 KB | 164 KB |
+
+觀察：
+1. **256 KB 以下也做得到**：buffer 375 筆 ＋ 32 葉，RAM 估算 219 KB，增益 +3.76（基準 +4.30），和基準沒有顯著差異。
+2. 250 筆開始明顯變差（−1.15 個百分點，20 人中 18 人變差，p = 0.001），所以 buffer 的下限大約在 375 筆。
+3. 和兩項限制分開跑的結果一致（750 筆：單獨 83.83、合併 83.78；500 筆：83.46 / 83.58），兩項限制之間沒有明顯的交互作用。
+
+### 3.6 t-SNE 的運算量（PC 實測；`src/tsne_cost.py` → `results/tsne_cost.csv`）
+
+用和自我校正相同的 buffer（int16、類別平衡後才進 t-SNE）和相同的 t-SNE 設定（3 維、perplexity 10、Barnes-Hut），
+在 PC 上單執行緒量每次 t-SNE 的 CPU 時間，3 位受試者平均：
+
+| buffer | 實際進 t-SNE 的點數 | 迭代次數 | PC CPU 時間 | 相對 1500 筆 |
+|---|---|---|---|---|
+| 1500 | 1060 | 999 | 9.3 s | 1.00 |
+| 1000 | 776 | 999 | 6.0 s | 0.64 |
+| 750 | 650 | 999 | 4.7 s | 0.50 |
+| 500 | 444 | 999 | 2.8 s | 0.31 |
+| 375 | 362 | 999 | 2.1 s | 0.22 |
+| 250 | 188 | 999 | 0.9 s | 0.10 |
+
+- 時間大致和點數成正比；buffer 375 筆時是 1500 筆的 22%。
+- **每次都跑到迭代上限（sklearn 預設 1000 次）**，沒有提早停止，所以減少迭代次數是另一個可以省運算量的方向（準確率影響還沒量）。
+- 這是 PC（x86、sklearn 的 Cython 實作）的時間，**不是 Cortex-M7 的時間**；MCU 上要用 C 實作 Barnes-Hut t-SNE 後在板子上量。
+  自我校正每個 block（30 個 trial）才做一次，所以 MCU 上能接受的時間比即時推論寬鬆得多，但具體能不能接受要等實測。
 
 ---
 
@@ -353,8 +388,9 @@ PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 
    - t-SNE 縮小 buffer（例如 500 筆）
    - 依信心門檻篩選樣本
 3. ~~**Buffer 精度和大小**~~（已完成，3.4 節）：int16 buffer 無損失；750 筆 394 KB、增益 +4.15。
-   接著要做：(a) 小 buffer ＋ 32 葉樹限制一起跑；(b) 往 256 KB 以下推（buffer 250–500、t-SNE 鄰居數）；
-   (c) t-SNE 在 Cortex-M7 上的運算時間（可能變成新的瓶頸）。
+   ~~(a) 小 buffer ＋ 32 葉一起跑~~、~~(b) 往 256 KB 以下推~~（已完成，3.5 節：375 筆 219 KB、增益 +3.76）。
+   接著要做：(c) 用 C 實作 Barnes-Hut t-SNE，在 Cortex-M7 上量運算時間（PC 上 375 筆每次 2.1 s，3.6 節）；
+   (d) 減少 t-SNE 迭代次數（目前每次都跑滿 1000 次）或降低 perplexity，看準確率和運算量的取捨。
 4. **特徵擷取移植到 C**（5.1），在 PC 上逐項比對。
 5. **上板**：設定好時脈（480 MHz）和 I/D-cache，量 `rf_predict` 和特徵擷取的 cycle 數，並在板上確認 `g_pred`。
 6. **MCU 上的 RF 訓練**：先在 PC 用 C 實作 CART，限制深度 10、max_features = 9，和 sklearn 比準確率、建樹時間和暫存記憶體。
@@ -364,6 +400,6 @@ PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`src/c/*` |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`src/c/*` |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
-| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
+| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
