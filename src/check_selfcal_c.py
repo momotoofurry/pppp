@@ -8,7 +8,8 @@ Then the 11 test blocks are streamed in order, row by row as int16 Q5.10 (sc_pus
 self-calibrated model and buffers the row), and sc_end_block() pseudo-labels, trains and replaces trees, all
 with its own RNG. Recorded per block: one-shot and self-calibrated accuracy (C predictions), and the C one-shot predictions
 are checked against pipeline.predict(int16) of the same model. CPU time of sc_end_block is PC time, not MCU time.
-Writes results/selfcal_c_check.csv and prints the comparison with the Python-driven runs.
+--dataset demo: the two-day demo recording (1 subject, 10 blocks); use --subjects 0 and more seeds.
+Writes results/selfcal_c_check<suffix>.csv and prints the comparison with the Python-driven runs.
 Usage (in the container): PYTHONPATH=src python src/check_selfcal_c.py [--seeds 0 1 2] [--jobs 20]
 """
 import argparse
@@ -60,11 +61,12 @@ def build(cc='gcc'):
     return lib
 
 
-def run(subject, seed):
+def run(subject, seed, dataset='arm_position'):
+    import selfcal_sweep as S
     lib = build()
     np.random.seed(seed * 1000 + subject)                  # as selfcal_sweep.run_subject
-    Xc, yc, blocks = P.load_subject(subject)
-    pre = P.load_pretrain()
+    Xc, yc, blocks = P.load_subject(subject, dataset, S.DATASETS[dataset][1])
+    pre = P.load_pretrain(S.DATASETS[dataset][0])
     pruned = P.prune(rf_size.truncate_depth(copy.deepcopy(pre), 10), Xc, yc)
     app = P.train_rf(Xc, yc, 50, 10, None)
     mdl = rf_size.compact_forest(emg_functions.append(P.subset(pruned, range(50)), app))
@@ -95,12 +97,15 @@ def main():
     ap.add_argument('--seeds', type=int, nargs='+', default=[0, 1, 2])
     ap.add_argument('--subjects', type=int, nargs='+', default=list(range(20)))
     ap.add_argument('--jobs', type=int, default=20)
+    ap.add_argument('--dataset', default='arm_position', choices=['arm_position', 'demo'])
+    ap.add_argument('--suffix', default='')
     args = ap.parse_args()
     lib = build()
     import check_selfcal_c as M             # pickle the task by reference (ctypes classes are not picklable)
-    res = Parallel(n_jobs=args.jobs, verbose=5)(delayed(M.run)(s, sd) for sd in args.seeds for s in args.subjects)
+    res = Parallel(n_jobs=args.jobs, verbose=5)(delayed(M.run)(s, sd, args.dataset) for sd in args.seeds
+                                                for s in args.subjects)
     df = pd.DataFrame([r for rr in res for r in rr])
-    df.to_csv(os.path.join(OUT, 'selfcal_c_check.csv'), index=False, float_format='%.4f')
+    df.to_csv(os.path.join(OUT, f'selfcal_c_check{args.suffix}.csv'), index=False, float_format='%.4f')
     per_seed = df.groupby('seed')[['acc_oneshot', 'acc_selfcal']].mean() * 100
     print(per_seed.round(2).to_string())
     print(f"one-shot {per_seed.acc_oneshot.mean():.2f}%  self-cal {per_seed.acc_selfcal.mean():.2f}%  "

@@ -1,0 +1,10 @@
+variant,tsne_iter,acc_oneshot,acc_selfcal,selfcal_seed_min,selfcal_seed_max,gain,diff_vs_sklearn,n_better,n_worse,wilcoxon_p,pc_tsne_cpu_s,pc_step_cpu_s
+"sklearn (reference), 500 it",500,79.68,83.27,83.13,83.37,3.589,,,,,0.8975,
+"sklearn (reference), 1000 it",1000,79.68,83.44,83.17,83.69,3.755,,,,,1.763,
+"C t-SNE, 500 it",500,79.68,83.23,83.11,83.42,3.554,-0.03536,13,7,0.6477,0.301,
+"C t-SNE, 1000 it",1000,79.68,83.59,83.15,84.04,3.912,0.157,14,6,0.1429,0.5479,
+"C t-SNE + C K-Means, 500 it",500,79.68,83.23,83.11,83.42,3.554,-0.03536,13,7,0.6477,,
+"C trees, 500 it",500,79.68,82.94,82.68,83.26,3.257,-0.3323,7,13,0.07585,,
+"all C (Python loop), 500 it",500,79.68,83.23,82.93,83.46,3.551,-0.03879,9,11,0.7012,,
+"C firmware logic (selfcal.c, end to end), 500 it",500,79.68,83.04,82.85,83.23,3.36,-0.2297,9,11,0.2024,,0.7065
+"upstream pipeline on C features, 500 it",500,79.68,83.23,83.09,83.33,3.552,-0.03724,8,12,0.6742,,

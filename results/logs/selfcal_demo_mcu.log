@@ -1,0 +1,7 @@
+[Parallel(n_jobs=20)]: Using backend LokyBackend with 20 concurrent workers.
+[Parallel(n_jobs=20)]: Done   4 out of  10 | elapsed:   25.4s remaining:   38.2s
+[Parallel(n_jobs=20)]: Done   7 out of  10 | elapsed:   25.7s remaining:   11.0s
+[Parallel(n_jobs=20)]: Done  10 out of  10 | elapsed:   26.6s finished
+                                config  n_trees  max_depth precision  new_max_leaf_nodes  new_min_samples_leaf pseudo_label  buffer  buffer_int16  tsne_iter  tsne_perplexity tsne_impl kmeans_impl train_impl  acc_oneshot  acc_selfcal  gain  oneshot_seed_min  oneshot_seed_max  selfcal_seed_min  selfcal_seed_max  gain_seed_min  gain_seed_max  n_seeds  app_nodes_mean  oneshot_app_nodes_mean  app_internal_mean  app_nodes_max  app_internal_max  app_depth_max  compact_KB  compact_KB_max  oneshot_compact_KB
+N100_d10_int16_mln32_buf375_bq16_it500      100         10     int16                  32                     1         tsne     375          True        500               10   sklearn     sklearn    sklearn        81.93        91.29  9.36              80.3             83.37             89.93             92.47            7.7           10.6       10           42.33                   13.21              20.67             63                31             10       82.23           83.53               77.25
+took 27 s

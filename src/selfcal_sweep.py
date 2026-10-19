@@ -46,6 +46,8 @@ float32, static memory, as on the MCU; same initial-embedding draw from numpy's 
 --kmeans-impl c replaces sklearn's KMeans in manifold_clustering by src/c/kmeans.c (float32 Lloyd); names get _kc.
 --features-dir loads the features from another folder (pipeline.py RF_FEATURES_DIR), e.g. build/features_c from
 the C feature extraction (src/check_features_c.py); use --suffix to keep the results apart.
+--dataset demo runs the JNE 2025 demo recording (1 subject, 10 blocks over two days) with its pre-trained model
+(model_pretrain.joblib, as upstream demo_replay.py) instead of arm_position; use --subjects 0 and more seeds.
 --train-impl c trains the self-calibration trees with src/c/rf_train.c (CART on the int16 data, best-first up
 to max_leaf_nodes <= 32, own RNG seeded from numpy's global RNG; needs --buffer-int16); names get _rc.
 
@@ -85,6 +87,7 @@ OUT = os.path.join(P.ROOT, 'results')
 CONFIGS = [(400, None, 'float64'), (400, None, 'float32'), (400, 10, 'int16'), (100, 10, 'int16'),
            (50, 8, 'int16'), (20, 10, 'int16')]
 BUFFER = 30 * 10 * 5        # max_sample_buffer
+DATASETS = {'arm_position': ('model_pretrain_with_66_participants.joblib', 11), 'demo': ('model_pretrain.joblib', 10)}
 MIN_SAMPLE_CLASS = 10
 LABELS = [0, 1, 2, 3, 4, 5]
 REPLACE_FRAC = 0.4          # upstream: 80 of 200 appended trees
@@ -118,7 +121,7 @@ def tsne_with(it, px, impl='sklearn'):
 
 
 def run_subject(subject, N, d, prec, seed, mln=None, msl=1, pl='tsne', buf=BUFFER, bq16=False, it=TSNE_ITER,
-                px=PERPLEXITY, impl='sklearn', km='sklearn', tr='sklearn'):
+                px=PERPLEXITY, impl='sklearn', km='sklearn', tr='sklearn', dataset='arm_position'):
     # manifold_clustering calls emg_functions.get_predictions internally; replace it (in this worker
     # process only, upstream file untouched) with the vectorised version at this config's precision.
     # manifold_clustering only uses the label, so no score is returned.
@@ -134,8 +137,8 @@ def run_subject(subject, N, d, prec, seed, mln=None, msl=1, pl='tsne', buf=BUFFE
     else:
         train_new = P.train_rf
     np.random.seed(seed * 1000 + subject)
-    Xc, yc, blocks = P.load_subject(subject)
-    pre = P.load_pretrain()
+    Xc, yc, blocks = P.load_subject(subject, dataset, DATASETS[dataset][1])
+    pre = P.load_pretrain(DATASETS[dataset][0])
     n_pre, n_app = N // 2, N - N // 2
     n_upd = int(round(REPLACE_FRAC * n_app))
     pruned = P.prune(rf_size.truncate_depth(copy.deepcopy(pre), d), Xc, yc)
@@ -152,7 +155,7 @@ def run_subject(subject, N, d, prec, seed, mln=None, msl=1, pl='tsne', buf=BUFFE
         rows.append(dict(config=cfg_name(N, d, prec, mln, msl, pl, buf, bq16, it, px, impl, km, tr), n_trees=N, max_depth=d if d else 'none',
                          precision=prec, new_max_leaf_nodes=mln if mln else 'none', new_min_samples_leaf=msl,
                          pseudo_label=pl, buffer=buf, buffer_int16=bq16, tsne_iter=it, tsne_perplexity=px, tsne_impl=impl, kmeans_impl=km,
-                         train_impl=tr,
+                         train_impl=tr, dataset=dataset,
                          seed=seed, subject=subject, block=b, acc_oneshot=np.mean(lab_os == y),
                          acc_selfcal=np.mean(lab_sc == y)))
         feat_buf, lab_buf = emg_functions.buffer_update(buf, feat_buf, lab_buf, q16(X) if bq16 else X, lab_sc)
@@ -209,6 +212,7 @@ def main():
     ap.add_argument('--train-impl', default='sklearn', choices=['sklearn', 'c'])
     ap.add_argument('--features-dir', default=None,
                     help='load features from this folder (same layout as upstream features_arm_position)')
+    ap.add_argument('--dataset', default='arm_position', choices=list(DATASETS))
     ap.add_argument('--suffix', default='')
     ap.add_argument('--merge', nargs='+', default=None,
                     help='no run: concatenate selfcal_sweep<suffix>.csv files with these suffixes, write --suffix')
@@ -226,7 +230,7 @@ def main():
         variants = [(m, 1) for m in args.max_leaf_nodes] + [(None, k) for k in args.min_samples_leaf] or [(None, 1)]
         tasks = [(s, *CONFIGS[c], seed, *v, pl, b, args.buffer_int16) for c in args.configs for pl in args.pseudo
                  for b in args.buffer for v in variants for seed in args.seeds for s in args.subjects]
-        tasks = [(*t, it, px, im, args.kmeans_impl, args.train_impl) for im in args.tsne_impl
+        tasks = [(*t, it, px, im, args.kmeans_impl, args.train_impl, args.dataset) for im in args.tsne_impl
                  for px in args.tsne_perplexity for it in args.tsne_iter for t in tasks]
         if 'c' in (args.kmeans_impl, args.train_impl):
             import c_train

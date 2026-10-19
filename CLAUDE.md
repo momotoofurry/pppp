@@ -29,8 +29,12 @@
 - 下一個瓶頸：t-SNE 運算時間（PC 單執行緒 375 筆 2.1 s，每次都跑滿 1000 次迭代），MCU 上未量。
 - t-SNE 迭代減到 500 次（`--tsne-iter`）：83.27%、增益 +3.59，vs 1000 次 −0.17 不顯著（p = 0.14），PC 時間 1.96 → 1.01 s；400 次以下顯著變差（report 3.7）。
 - 降低 perplexity（`--tsne-perplexity` 3/5/7）：PC 上不省時間（時間在 octree 排斥力，不在近鄰項），只省近鄰表 RAM，準確率較低 → 維持 perplexity 10（report 3.8）。
+- **上板前的 C 實作都完成了（report 第 6 節）**：`src/c/` 的 tsne.c、kmeans.c、rf_train.c、selfcal.c、features.c，全部靜態記憶體。
+  PC 端到端 83.04%（sklearn 83.27%，p = 0.20），各段都無顯著差異；Cortex-M7 linker 實測 RAM 自我校正約 223.6 KB、完整管線約 245.0 KB。
+  `src/c/main_selfcal.c` 已包好 DWT cycle 計數，板子到了直接燒錄量時間。selfcal_sweep 新選項：`--tsne-impl c`、`--kmeans-impl c`、
+  `--train-impl c`、`--features-dir`、`--dataset demo`（預設值都重現舊結果）。
 
 ## 建議的下一步
 1. ~~減少 t-SNE 迭代次數~~（完成，report 3.7）、~~降低 perplexity~~（完成，沒用，report 3.8）。
-2. 用 C 實作 Barnes-Hut t-SNE（500 次迭代；要優化的是排斥力／octree），先在 PC 上和 sklearn 對照，等 NUCLEO-H743ZI2 到了再量 MCU 時間。
-3. 特徵擷取移植到 C（report 5.1）。
+2. ~~C 版 t-SNE、K-Means、建樹、自我校正迴圈、特徵擷取~~（完成，report 第 6 節）。
+3. 等 NUCLEO-H743ZI2：燒錄 `main_selfcal.c`（`build/selfcal_arm/`，`src/build_arm_selfcal.py`），量 cycle 數、確認板上預測和 PC 相同。

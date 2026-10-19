@@ -5,6 +5,7 @@
   nums3.json  build5.py  (int16 buffer, buffer size, 32-leaf trees)
   nums4.json  build5.py  (nums3 + small buffer x 32 leaves, t-SNE cost)
   nums5.json  build7.py  (nums4 + t-SNE iteration count)
+  nums6.json  build8.py  (nums5 + C implementations, Cortex-M7 self-calibration build, demo)
 Usage (repo root, in the Docker image): python slides/make_nums.py
 """
 import json
@@ -107,3 +108,48 @@ n5['tsne_iter'] = [dict(it=int(r_.tsne_iter), acc=float(r_.acc_selfcal), gain=fl
                         rel=float(r_.tsne_cpu_rel_1000), subjects=int(r_.cost_subjects))
                    for _, r_ in ti.iterrows()]
 dump('nums5.json', n5)
+
+# ---------------------------------------------------------------- nums6.json (build8.py)
+ci = csv('c_impl_summary.csv')
+sz = csv('arm_selfcal_size.csv')
+md = csv('arm_selfcal_modules.csv')
+n6 = dict(n5)
+n6['c_impl'] = [dict(variant=r_.variant, acc=float(r_.acc_selfcal), gain=float(r_.gain),
+                     diff=None if pd.isna(r_.diff_vs_sklearn) else float(r_.diff_vs_sklearn),
+                     p=None if pd.isna(r_.wilcoxon_p) else float(r_.wilcoxon_p),
+                     better=None if pd.isna(r_.n_better) else int(r_.n_better),
+                     worse=None if pd.isna(r_.n_worse) else int(r_.n_worse)) for _, r_ in ci.iterrows()]
+tc = csv('tsne_c_check.csv')
+n6['tsne_c_time'] = {str(it): dict(c=float(g_.cpu_c_s.mean()), sk=float(g_.cpu_sklearn_s.mean()))
+                     for it, g_ in tc.groupby('max_iter')}
+fcc = csv('features_c_check.csv')
+n6['feat_mismatch'] = {f: int(round(((1 - g_.exact) * g_.n).sum())) for f, g_ in fcc.groupby('feature')}
+n6['feat_values'] = int(fcc[fcc.feature == 'rms'].n.sum())
+sf, sr = csv('selfcal_sweep_fc.csv'), csv('selfcal_sweep_iter.csv')
+sr = sr[sr.tsne_iter == 500].merge(sf, on=['seed', 'subject', 'block'], suffixes=('', '_c'))
+n6['feat_oneshot_same_blocks'] = [int((sr.acc_oneshot == sr.acc_oneshot_c).sum()), int(len(sr))]
+os_ = md[md.opt == '-Os']
+n6['arm'] = {}
+for v, g_ in os_.groupby('variant'):
+    row = sz[(sz.variant == v) & (sz.opt == '-Os')].iloc[0]
+    bss = {m_.split('.')[0]: int(b_) for m_, b_ in zip(g_.module, g_.bss)}
+    sym = dict(x.split('=') for x in row.largest_ram_symbols.split(';'))
+    n6['arm'][v] = dict(text=int(row.text), data=int(row.data), bss=int(row.bss), stack=int(row.worst_stack_bytes),
+                        flash_KB=float(row.flash_KB), bss_modules=bss, buf=int(sym['s_buf']), cal=int(sym['s_cal']),
+                        trees=int(sym['s_tree']),
+                        total_KB=(int(row.bss) + int(row.data) + int(row.worst_stack_bytes)) / 1024)
+if os.path.exists(os.path.join(R, 'c_impl_demo.csv')):
+    n6['demo'] = [dict(variant=r_.variant, oneshot=float(r_.acc_oneshot), acc=float(r_.acc_selfcal), gain=float(r_.gain),
+                       lo=float(r_.selfcal_seed_min), hi=float(r_.selfcal_seed_max),
+                       tail_os=float(r_.oneshot_blocks7_9), tail_sc=float(r_.selfcal_blocks7_9))
+                  for _, r_ in csv('c_impl_demo.csv').iterrows()]
+dump('nums6.json', n6)
+# per-block demo curves (build8.py, 前置結果⑩)
+if os.path.exists(os.path.join(R, 'c_impl_demo.csv')):
+    ref_ = csv('selfcal_sweep_demo_ref.csv')
+    curves = {'full': ref_[ref_.config == 'N400_dnone_float64'], 'mcu_c': csv('selfcal_c_check_demo.csv')}
+    n6['demo_blocks'] = {k: dict(oneshot=[float(v) for v in d.groupby('block').acc_oneshot.mean() * 100],
+                                 selfcal=[float(v) for v in d.groupby('block').acc_selfcal.mean() * 100],
+                                 seeds=int(d.seed.nunique()))
+                         for k, d in curves.items()}
+    dump('nums6.json', n6)
