@@ -42,7 +42,7 @@ unsigned tsne_static_bytes(void)
 }
 
 /* ---------------------------------------------------------------- P: kNN + perplexity search */
-static void joint_probabilities(const int16_t *x, int n, int k, float perplexity)
+static void joint_probabilities(const int16_t *const *x, int n, int k, float perplexity)
 {
     const double desired = log((double)perplexity);
     double sum_all = 0.0;
@@ -50,11 +50,11 @@ static void joint_probabilities(const int16_t *x, int n, int k, float perplexity
         float dk[TSNE_K];               /* k smallest squared distances, ascending */
         uint16_t ik[TSNE_K];
         int m = 0;
-        const int16_t *xi = x + (long)i * TSNE_DIM;
+        const int16_t *xi = x[i];
         for (int j = 0; j < n; j++) {
             if (j == i)
                 continue;
-            const int16_t *xj = x + (long)j * TSNE_DIM;
+            const int16_t *xj = x[j];
             int64_t acc = 0;
             for (int f = 0; f < TSNE_DIM; f++) {
                 int32_t d = (int32_t)xi[f] - xj[f];
@@ -330,7 +330,7 @@ static int descend(float *y, int n, int k, int it0, int it1, float momentum, flo
     return i < it1 ? i : it1 - 1;
 }
 
-int tsne_run(const int16_t *x, int n, float perplexity, int max_iter, const float *init, float *y,
+int tsne_run(const int16_t *const *x, int n, float perplexity, int max_iter, const float *init, float *y,
              tsne_stats_t *st)
 {
     int k = (int)(3.0f * perplexity + 1.0f);

@@ -43,9 +43,9 @@ typedef struct {
     double grad_norm;           /* at the last check */
 } tsne_stats_t;
 
-/* x: n x TSNE_DIM int16 (Q5.10); init / y: n x 3 float (y may alias init).
- * Returns 0, or -1 if n > TSNE_NMAX or n <= k. */
-int tsne_run(const int16_t *x, int n, float perplexity, int max_iter, const float *init, float *y,
+/* rows[i]: TSNE_DIM int16 (Q5.10) features of point i (rows of the RAM buffer, no copy);
+ * init / y: n x 3 float (y may alias init). Returns 0, or -1 if n > TSNE_NMAX or n <= k. */
+int tsne_run(const int16_t *const *rows, int n, float perplexity, int max_iter, const float *init, float *y,
              tsne_stats_t *st);
 
 /* bytes of static memory used by the t-SNE module (for the report) */

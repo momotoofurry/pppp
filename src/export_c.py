@@ -78,7 +78,8 @@ def emlearn_header(mdl, precision, path):
     return dict(emlearn_nodes=len(nodes), emlearn_leaves=len(leaves))
 
 
-def table_header(mdl, precision, path):
+def table_arrays(mdl, precision):
+    """Our table format (see rf_predict.h): roots, feat, thr (stored values), left, right."""
     feat, thr, left, right, roots = [], [], [], [], []
     thr_all = stored_thresholds(mdl, precision)
     cls_all = P.leaf_labels(mdl)
@@ -100,6 +101,11 @@ def table_header(mdl, precision, path):
             thr.append(t[n])
             left.append(enc(l[n]))
             right.append(enc(r[n]))
+    return roots, feat, thr, left, right
+
+
+def table_header(mdl, precision, path):
+    roots, feat, thr, left, right = table_arrays(mdl, precision)
     is16 = precision == 'int16'
     fmt = (lambda v: str(int(v))) if is16 else (lambda v: repr(float(np.float32(v))) + 'f')
     for v in thr:  # float literals must round-trip to the exact float32 value

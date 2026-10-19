@@ -58,7 +58,8 @@ def run(Xq, max_iter=1000, perplexity=10.0, init=None):
     init = np.ascontiguousarray(init, dtype=np.float32)
     y = np.empty_like(init)
     st = Stats()
-    r = lib().tsne_run(Xq.ctypes.data, n, perplexity, max_iter, init.ctypes.data, y.ctypes.data, ctypes.byref(st))
+    rows = (ctypes.c_void_p * n)(*[Xq.ctypes.data + i * Xq.strides[0] for i in range(n)])
+    r = lib().tsne_run(rows, n, perplexity, max_iter, init.ctypes.data, y.ctypes.data, ctypes.byref(st))
     if r != 0:
         raise ValueError(f'tsne_run failed for n = {n}')
     return y, st
