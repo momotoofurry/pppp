@@ -1,0 +1,69 @@
+/* On-device self-calibration of the RF (Cortex-M7), static memory only: the whole upstream loop of
+ * main_replay_arm_position.py for one user after one-shot calibration.
+ *
+ * Model: the one-shot model (SC_N_PRE pruned pre-trained trees + SC_N_APP trees trained on the calibration
+ * data) is written to Flash once per calibration session and never rewritten. Self-calibration keeps
+ * SC_N_APP replaceable slots: each slot uses either its original one-shot tree (Flash) or a new tree in RAM
+ * (<= SC_MAX_LEAVES leaves). Inference = majority vote of the SC_N_PRE + SC_N_APP trees.
+ *
+ * Per test block, rows are streamed in with sc_push() (no block buffer in RAM) and sc_end_block() then does
+ * what upstream does after each block:
+ *   1. (sc_push) predict each row with the self-calibrated model, put row + prediction into the buffer
+ *      (upstream buffer_update: new rows go to the front; when full, each new row evicts the last row of the
+ *      most frequent (pseudo-)label)
+ *   2. re-label the whole buffer with the ORIGINAL one-shot model (as upstream manifold_clustering)
+ *   3. if every class has >= SC_MIN_CLASS rows: take the first m rows of each class (m = smallest count),
+ *      t-SNE (3-D, perplexity 10, SC_TSNE_ITER iterations) -> standardise -> K-Means initialised at the
+ *      class centres -> cluster = pseudo-label; otherwise class-balanced rows with the model labels
+ *   4. train SC_N_UPD trees (depth SC_MAX_DEPTH, <= SC_MAX_LEAVES leaves) on these rows + the calibration
+ *      set, and put them into SC_N_UPD randomly chosen slots
+ * Features are int16 Q5.10 throughout (buffer, calibration set, trees).
+ */
+#pragma once
+#include <stdint.h>
+
+#ifndef SC_BUF
+#define SC_BUF 375
+#endif
+#define SC_CAL_MAX 60
+#define SC_DIM 80
+#define SC_CLASSES 6
+#define SC_N_PRE 50
+#define SC_N_APP 50
+#define SC_N_UPD 20             /* round(0.4 * SC_N_APP), as upstream (80 of 200) */
+#define SC_MIN_CLASS 10
+#define SC_MAX_DEPTH 10
+#define SC_MAX_LEAVES 32
+#ifndef SC_TSNE_ITER
+#define SC_TSNE_ITER 500
+#endif
+#define SC_PERPLEXITY 10.0f
+#ifndef SC_BLOCK_MAX
+#define SC_BLOCK_MAX 4096       /* most rows per block (keys reserved per block; 300 in the data set) */
+#endif
+
+/* one-shot model in our table format (rf_predict.h): SC_N_PRE + SC_N_APP trees */
+typedef struct {
+    const uint32_t *roots;
+    const uint8_t *feat;
+    const int16_t *thr;
+    const uint16_t *left, *right;
+} sc_model_t;
+
+typedef struct {
+    int buffer_n;               /* rows in the buffer */
+    int n_selected;             /* rows used for pseudo-labelling */
+    int clustered;              /* 1: t-SNE + K-Means ran; 0: model labels */
+    int tsne_cells_max;
+    int ram_trees;              /* slots holding a RAM tree */
+    int new_nodes_max;          /* internal nodes of the largest new tree */
+} sc_stats_t;
+
+void sc_init(const sc_model_t *m, const int16_t *cal, const uint8_t *cal_y, int n_cal, uint32_t seed);
+int sc_predict(const int16_t *x);                    /* self-calibrated model */
+int sc_predict_oneshot(const int16_t *x);            /* original one-shot model */
+/* one row of the current block (SC_DIM int16): returns the self-calibrated prediction, buffers the row */
+int sc_push(const int16_t *x);
+/* end of block: pseudo-label the buffer, train SC_N_UPD trees, replace slots */
+void sc_end_block(sc_stats_t *st);
+unsigned sc_static_bytes(void);

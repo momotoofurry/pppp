@@ -1,0 +1,12 @@
+[Parallel(n_jobs=20)]: Using backend LokyBackend with 20 concurrent workers.
+[Parallel(n_jobs=20)]: Done  34 out of  60 | elapsed:   36.9s remaining:   28.2s
+[Parallel(n_jobs=20)]: Done  47 out of  60 | elapsed:   45.4s remaining:   12.6s
+[Parallel(n_jobs=20)]: Done  60 out of  60 | elapsed:   48.4s finished
+      acc_oneshot  acc_selfcal
+seed                          
+0           79.56        83.23
+1           79.77        82.85
+2           79.71        83.03
+one-shot 79.68%  self-cal 83.04%  gain +3.36  C one-shot == Python int16: True
+clustered 99.5% of updates, max RAM trees 50, max new-tree internal nodes 31, max t-SNE cells 792, max selected 372, PC sc_end_block CPU mean 0.707 s
+static bytes of selfcal.c state + work: 93333
