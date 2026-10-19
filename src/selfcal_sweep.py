@@ -41,6 +41,8 @@ _it<n> (when n != 1000).
 --tsne-perplexity sets the t-SNE perplexity (default 10 = upstream). It sets the neighbours per point
 (3 x perplexity + 1), i.e. the work per iteration and the size of the t-SNE neighbour table. Upstream passes
 perplexity=10 explicitly, so the replacement TSNE overrides that keyword. Names get _px<p> (when p != 10).
+--tsne-impl c replaces sklearn's TSNE by the C Barnes-Hut t-SNE (src/c/tsne.c via src/c_tsne.py: int16 input,
+float32, static memory, as on the MCU; same initial-embedding draw from numpy's global RNG). Names get _tc.
 
 Randomness follows upstream: RandomForestClassifier / TSNE / permutation all draw from numpy's
 global RNG, seeded per (seed, subject) with np.random.seed.
@@ -53,6 +55,7 @@ Usage: .venv/Scripts/python src/selfcal_sweep.py [--seeds 0 1 2] [--jobs 20] [--
        python src/selfcal_sweep.py --configs 3 --buffer 1500 1000 750 500 --buffer-int16 --suffix _buffer
        python src/selfcal_sweep.py --configs 3 --buffer 375 --buffer-int16 --max-leaf-nodes 32 --tsne-iter 250 500 --suffix _iter
        python src/selfcal_sweep.py --configs 3 --buffer 375 --buffer-int16 --max-leaf-nodes 32 --tsne-iter 500 1000 --tsne-perplexity 3 5 7 --suffix _px
+       python src/selfcal_sweep.py --configs 3 --buffer 375 --buffer-int16 --max-leaf-nodes 32 --tsne-iter 500 1000 --tsne-impl c --suffix _tc
        .venv/Scripts/python src/selfcal_sweep.py --merge _validation _compressed   (summary only)
 """
 import argparse
@@ -85,10 +88,12 @@ PERPLEXITY = 10             # upstream manifold_clustering
 PSEUDO = {'tsne': ('tsne', MIN_SAMPLE_CLASS), 'kmeans': (None, MIN_SAMPLE_CLASS), 'none': (None, np.inf)}
 
 
-def cfg_name(N, d, prec, mln=None, msl=1, pl='tsne', buf=BUFFER, bq16=False, it=TSNE_ITER, px=PERPLEXITY):
+def cfg_name(N, d, prec, mln=None, msl=1, pl='tsne', buf=BUFFER, bq16=False, it=TSNE_ITER, px=PERPLEXITY,
+             impl='sklearn'):
     return (f'N{N}_d{d if d else "none"}_{prec}' + (f'_mln{mln}' if mln else '') + (f'_msl{msl}' if msl > 1 else '')
             + (f'_pl{pl}' if pl != 'tsne' else '') + (f'_buf{buf}' if buf != BUFFER else '') + ('_bq16' if bq16 else '')
-            + (f'_it{it}' if it != TSNE_ITER else '') + (f'_px{px:g}' if px != PERPLEXITY else ''))
+            + (f'_it{it}' if it != TSNE_ITER else '') + (f'_px{px:g}' if px != PERPLEXITY else '')
+            + ('_tc' if impl == 'c' else ''))
 
 
 def q16(x):
@@ -96,20 +101,23 @@ def q16(x):
     return P.quantize(x).astype(np.float64) / (1 << P.Q_SHIFT)
 
 
-def tsne_with(it, px):
+def tsne_with(it, px, impl='sklearn'):
     """TSNE with max_iter / perplexity forced (the upstream call passes perplexity=10 itself)"""
+    if impl == 'c':
+        import c_tsne
+        return lambda **kw: c_tsne.CTSNE(max_iter=it, perplexity=px)
     if it == TSNE_ITER and px == PERPLEXITY:
         return TSNE
     return lambda **kw: TSNE(**{**kw, 'max_iter': it, 'perplexity': px})
 
 
 def run_subject(subject, N, d, prec, seed, mln=None, msl=1, pl='tsne', buf=BUFFER, bq16=False, it=TSNE_ITER,
-                px=PERPLEXITY):
+                px=PERPLEXITY, impl='sklearn'):
     # manifold_clustering calls emg_functions.get_predictions internally; replace it (in this worker
     # process only, upstream file untouched) with the vectorised version at this config's precision.
     # manifold_clustering only uses the label, so no score is returned.
     emg_functions.get_predictions = lambda mdl, f: (P.predict(mdl, np.asarray(f), prec), None)
-    emg_functions.TSNE = tsne_with(it, px)
+    emg_functions.TSNE = tsne_with(it, px, impl)
     np.random.seed(seed * 1000 + subject)
     Xc, yc, blocks = P.load_subject(subject)
     pre = P.load_pretrain()
@@ -126,9 +134,9 @@ def run_subject(subject, N, d, prec, seed, mln=None, msl=1, pl='tsne', buf=BUFFE
     for b, (X, y) in enumerate(blocks):
         lab_os = P.predict(mdl_prune_append, X, prec)
         lab_sc = P.predict(mdl_sc, X, prec)
-        rows.append(dict(config=cfg_name(N, d, prec, mln, msl, pl, buf, bq16, it, px), n_trees=N, max_depth=d if d else 'none',
+        rows.append(dict(config=cfg_name(N, d, prec, mln, msl, pl, buf, bq16, it, px, impl), n_trees=N, max_depth=d if d else 'none',
                          precision=prec, new_max_leaf_nodes=mln if mln else 'none', new_min_samples_leaf=msl,
-                         pseudo_label=pl, buffer=buf, buffer_int16=bq16, tsne_iter=it, tsne_perplexity=px,
+                         pseudo_label=pl, buffer=buf, buffer_int16=bq16, tsne_iter=it, tsne_perplexity=px, tsne_impl=impl,
                          seed=seed, subject=subject, block=b, acc_oneshot=np.mean(lab_os == y),
                          acc_selfcal=np.mean(lab_sc == y)))
         feat_buf, lab_buf = emg_functions.buffer_update(buf, feat_buf, lab_buf, q16(X) if bq16 else X, lab_sc)
@@ -148,7 +156,7 @@ def run_subject(subject, N, d, prec, seed, mln=None, msl=1, pl='tsne', buf=BUFFE
     st_all = rf_size.forest_stats(mdl_sc)
     st_os = rf_size.forest_stats(P.subset(mdl_prune_append, range(n_pre, N)))
     thr = 'int16' if prec == 'int16' else 'float32'
-    tree = dict(config=cfg_name(N, d, prec, mln, msl, pl, buf, bq16, it, px), seed=seed, subject=subject,
+    tree = dict(config=cfg_name(N, d, prec, mln, msl, pl, buf, bq16, it, px, impl), seed=seed, subject=subject,
                 app_nodes_mean=np.mean([s['nodes'] for s in st_app]),
                 app_nodes_max=max(s['nodes'] for s in st_app),
                 app_internal_mean=np.mean([s['internal'] for s in st_app]),
@@ -179,6 +187,8 @@ def main():
                     help='one variant per value: t-SNE iterations (sklearn max_iter, >= 250)')
     ap.add_argument('--tsne-perplexity', type=float, nargs='+', default=[PERPLEXITY],
                     help='one variant per value: t-SNE perplexity (neighbours = 3 x perplexity + 1)')
+    ap.add_argument('--tsne-impl', nargs='+', default=['sklearn'], choices=['sklearn', 'c'],
+                    help='one variant per value: t-SNE implementation (c = src/c/tsne.c)')
     ap.add_argument('--suffix', default='')
     ap.add_argument('--merge', nargs='+', default=None,
                     help='no run: concatenate selfcal_sweep<suffix>.csv files with these suffixes, write --suffix')
@@ -194,7 +204,11 @@ def main():
         variants = [(m, 1) for m in args.max_leaf_nodes] + [(None, k) for k in args.min_samples_leaf] or [(None, 1)]
         tasks = [(s, *CONFIGS[c], seed, *v, pl, b, args.buffer_int16) for c in args.configs for pl in args.pseudo
                  for b in args.buffer for v in variants for seed in args.seeds for s in args.subjects]
-        tasks = [(*t, it, px) for px in args.tsne_perplexity for it in args.tsne_iter for t in tasks]
+        tasks = [(*t, it, px, im) for im in args.tsne_impl for px in args.tsne_perplexity for it in args.tsne_iter
+                 for t in tasks]
+        if 'c' in args.tsne_impl:
+            import c_tsne
+            c_tsne.build()                 # once, before the workers load it
         res = Parallel(n_jobs=args.jobs, verbose=5)(delayed(run_subject)(*t) for t in tasks)
         acc = pd.DataFrame([r for rows, _ in res for r in rows])
         trees = pd.DataFrame([t for _, t in res])
@@ -203,10 +217,10 @@ def main():
 
     for c, v in [('new_max_leaf_nodes', 'none'), ('new_min_samples_leaf', 1), ('pseudo_label', 'tsne'),
                  ('buffer', BUFFER), ('buffer_int16', False), ('tsne_iter', TSNE_ITER),
-                 ('tsne_perplexity', PERPLEXITY)]:
+                 ('tsne_perplexity', PERPLEXITY), ('tsne_impl', 'sklearn')]:
         acc[c] = acc[c].fillna(v).replace('', v) if c in acc else v   # files from before the option
     key = ['config', 'n_trees', 'max_depth', 'precision', 'new_max_leaf_nodes', 'new_min_samples_leaf', 'pseudo_label',
-           'buffer', 'buffer_int16', 'tsne_iter', 'tsne_perplexity']
+           'buffer', 'buffer_int16', 'tsne_iter', 'tsne_perplexity', 'tsne_impl']
     per_seed = acc.groupby(key + ['seed'], sort=False)[['acc_oneshot', 'acc_selfcal']].mean().reset_index()
     per_seed['gain'] = per_seed.acc_selfcal - per_seed.acc_oneshot
     g = per_seed.groupby(key, sort=False)
