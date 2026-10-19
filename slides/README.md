@@ -13,6 +13,7 @@
 | `build8.py` | 使用者改過的 v6（2026-10-18 19:09，md5 62c1086b…：刪掉參考文獻 3/3 的「＊ 快速檢索」註）→ `build7.py` → v8 | 新增⑧（整條自我校正改用 C，準確率和 sklearn 相同）、⑨（Cortex-M7 linker 實測 RAM 245 KB）、⑩（跨兩天 demo，1 人）；⑥的 MCU 卡片指向⑧⑨、總結頁更新、頁碼 11–21（數字在 `nums6.json`） |
 | `build9.py` | v8（使用者確認未改動，md5 27d8eb68…）→ v9 | 收斂方向：嵌入式自我校正為核心、Kinova Gen3 離散指令閉迴路任務為主要驗證（STM32 決策、PC 只用 Kortex API 轉送）、低信心拒絕、PCA 對齊基準 [19]；RQ2／RQ3、創新點③、總結、實驗設計、設備需求更新；新增「研究範圍」「閉迴路架構」「一年時程」三頁；高齡者改未來工作、int8 CNN 改選做；架構圖與流程圖是原簡報的圖片，只在下方加註記；頁碼依新舊對照自動重編 |
 | `build10.py` | 使用者改過的 v9（2026-10-19 23:00，md5 b2e2960f…，27 頁）→ v10 | 精簡與去模板化：主線 20 頁（前置結果 10 頁併成 6 頁，加「前置結果」分隔頁），其餘移到「附錄」（不刪）；全部頁面拿掉深色「→ 下一步」長條、數字卡片外框，深色卡片改淺色細框，標題去掉「前置結果⑤：」等前綴並對齊；552 B、t-SNE ablation、C 端到端準確率併到保留的頁面；頁碼重新計算 |
+| `build12.py` | 使用者的 v11（= v10 拿掉附錄，2026-10-19 23:10）→ v12 | 給教授的精簡版（16 頁）：新增「我想做的事」開場頁（一句話、已做到／還沒人做／接下來一年、需要老師同意的事，數字從結果頁讀）；只留最接近的研究、RQ、架構、方法、6 頁重現與前置結果、研究範圍；參考文獻只留有引用的 10 篇並重新編號 |
 
 所有數字都從 `results/` 讀，不手打：
 
@@ -26,6 +27,8 @@ docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/work -v "$D":
            python slides/build9.py /d/碩論題目討論_MOMO_v8.pptx /d/碩論題目討論_MOMO_v9.pptx slides/nums6.json'
 # v10 is built from the user-edited v9 (not from the build9 output):
 #   python slides/build10.py /d/碩論題目討論_MOMO_v9.pptx /d/碩論題目討論_MOMO_v10.pptx slides/nums6.json
+# v12 is built from the user's v11:
+#   python slides/build12.py /d/碩論題目討論_MOMO_v11.pptx /d/碩論題目討論_MOMO_v12.pptx
 ```
 
 改完先確認使用者沒有手動改過上一版（例如比對 md5）；改過的話要以使用者的版本為底稿，不要從舊版重新產生。
