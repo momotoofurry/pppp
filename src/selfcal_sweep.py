@@ -44,6 +44,8 @@ perplexity=10 explicitly, so the replacement TSNE overrides that keyword. Names 
 --tsne-impl c replaces sklearn's TSNE by the C Barnes-Hut t-SNE (src/c/tsne.c via src/c_tsne.py: int16 input,
 float32, static memory, as on the MCU; same initial-embedding draw from numpy's global RNG). Names get _tc.
 --kmeans-impl c replaces sklearn's KMeans in manifold_clustering by src/c/kmeans.c (float32 Lloyd); names get _kc.
+--features-dir loads the features from another folder (pipeline.py RF_FEATURES_DIR), e.g. build/features_c from
+the C feature extraction (src/check_features_c.py); use --suffix to keep the results apart.
 --train-impl c trains the self-calibration trees with src/c/rf_train.c (CART on the int16 data, best-first up
 to max_leaf_nodes <= 32, own RNG seeded from numpy's global RNG; needs --buffer-int16); names get _rc.
 
@@ -205,12 +207,16 @@ def main():
                     help='one variant per value: t-SNE implementation (c = src/c/tsne.c)')
     ap.add_argument('--kmeans-impl', default='sklearn', choices=['sklearn', 'c'])
     ap.add_argument('--train-impl', default='sklearn', choices=['sklearn', 'c'])
+    ap.add_argument('--features-dir', default=None,
+                    help='load features from this folder (same layout as upstream features_arm_position)')
     ap.add_argument('--suffix', default='')
     ap.add_argument('--merge', nargs='+', default=None,
                     help='no run: concatenate selfcal_sweep<suffix>.csv files with these suffixes, write --suffix')
     args = ap.parse_args()
     t0 = time.time()
     sfx = args.suffix
+    if args.features_dir:
+        os.environ['RF_FEATURES_DIR'] = os.path.abspath(args.features_dir)   # inherited by the workers
     if args.merge:
         def rd(name):
             return pd.concat([pd.read_csv(os.path.join(OUT, f'{name}{m}.csv'), keep_default_na=False)

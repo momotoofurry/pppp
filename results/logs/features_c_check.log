@@ -1,0 +1,33 @@
+subject 0 done
+subject 1 done
+subject 2 done
+subject 3 done
+subject 4 done
+subject 5 done
+subject 6 done
+subject 7 done
+subject 8 done
+subject 9 done
+subject 10 done
+subject 11 done
+subject 12 done
+subject 13 done
+subject 14 done
+subject 15 done
+subject 16 done
+subject 17 done
+subject 18 done
+subject 19 done
+         values  exact_pct  rel_err_median  rel_err_max  abs_err_max  abs_err_mean  ref_abs_mean
+feature                                                                                         
+rms      537600          0        8.35e-07     0.000101     1.01e-08      1.16e-11      1.52e-05
+wl       537600          0        2.62e-07     6.71e-06     7.94e-08      5.73e-10       0.00194
+ssc      537600        100               0       0.0267            2        0.0001          98.1
+zc       537600        100               0       0.0606            2      0.000902          52.4
+mav      537600          0        1.09e-06     9.11e-05     6.24e-09      1.25e-11      1.13e-05
+skw      537600          0        1.27e-05         6.85     0.000412      6.57e-06           0.5
+vcf      537600          0        1.86e-06      8.4e-05        0.539        0.0148      6.43e+03
+mdf      537600        100               0        0.111         3.91       0.00016          94.3
+mnf      537600          0         9.6e-07     0.000127      0.00778      0.000169           118
+pkf      537600        100               0         0.75         70.3      0.000349          76.1
+static bytes of features.c: 20804

@@ -22,7 +22,9 @@ Q_SHIFT = 10            # int16 fixed point: Q5.10, value = round(x * 1024), ran
 
 
 def load_folder(dataset, subject, folder):
-    fp = os.path.join(REPO, f'features_{dataset}', str(subject), folder)
+    # RF_FEATURES_DIR: alternative feature folder with the same layout (e.g. the C feature extraction,
+    # src/check_features_c.py); default = the upstream features
+    fp = os.path.join(os.environ.get('RF_FEATURES_DIR') or os.path.join(REPO, f'features_{dataset}'), str(subject), folder)
     label = np.load(os.path.join(REPO, f'dataset_{dataset}', str(subject), folder, 'label.npy'))
     f = [np.load(os.path.join(fp, f'feature_{k}.npy')) for k in FEATS]
     nwin = f[0].shape[1]
