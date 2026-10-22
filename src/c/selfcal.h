@@ -87,8 +87,11 @@ typedef struct {
 void sc_init(const sc_model_t *m, const int16_t *cal, const uint8_t *cal_y, int n_cal, uint32_t seed);
 int sc_predict(const int16_t *x);                    /* self-calibrated model */
 int sc_predict_oneshot(const int16_t *x);            /* original one-shot model */
+/* as above, with the votes of the SC_N_PRE + SC_N_APP trees per class (votes: SC_CLASSES entries) */
+int sc_votes_oneshot(const int16_t *x, uint16_t *votes);
 /* one row of the current block (SC_DIM int16): returns the self-calibrated prediction, buffers the row */
 int sc_push(const int16_t *x);
+int sc_push_votes(const int16_t *x, uint16_t *votes);   /* same, also returns the votes per class */
 /* end of block: pseudo-label the buffer, train SC_N_UPD trees, replace slots */
 void sc_end_block(sc_stats_t *st);
 unsigned sc_static_bytes(void);

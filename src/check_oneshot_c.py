@@ -41,7 +41,7 @@ from pipeline import emg_functions  # noqa: E402
 CSRC = os.path.join(P.ROOT, 'src', 'c')
 LIB = os.path.join(P.ROOT, 'build', 'c', 'libfirmware.so')
 OUT = os.path.join(P.ROOT, 'results')
-SRC = ['oneshot.c', 'selfcal.c', 'tsne.c', 'kmeans.c', 'rf_train.c']
+SRC = ['oneshot.c', 'selfcal.c', 'tsne.c', 'kmeans.c', 'rf_train.c', 'decision.c']
 N_PRE, N_APP, CAP = 50, 50, 128 * 1024        # one 128 KB Flash sector for the image
 WRITE_FN = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32, ctypes.c_void_p, ctypes.c_uint32)
 
@@ -94,6 +94,10 @@ def build(cc='gcc'):
     lib.sc_push.argtypes = [ctypes.c_void_p]
     lib.sc_predict_oneshot.argtypes = [ctypes.c_void_p]
     lib.sc_end_block.argtypes = [ctypes.POINTER(ScStats)]
+    lib.sc_push_votes.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    lib.sc_votes_oneshot.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+    lib.dc_replay.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int, ctypes.c_int, ctypes.c_uint16,
+                              ctypes.c_uint8, ctypes.c_void_p, ctypes.c_void_p, ctypes.c_void_p]
     return lib
 
 
@@ -152,8 +156,9 @@ def check_prune(subjects):
     return pd.DataFrame(rows)
 
 
-def run(subject, seed):
-    lib = build()
+def calibrate(lib, subject, seed):
+    """One-shot calibration on the "MCU" for one subject: returns (flash image, sc_model_t, cal_q, labels, stats,
+    bytes written) after sc_init. The ctypes objects the model points into are returned too (keep them alive)."""
     _, arrs = pre_trees()
     tab = table_struct(arrs)
     raw_c, yc = P.load_folder('arm_position', subject, 'calibration')     # raw (not normalised) features
@@ -182,6 +187,12 @@ def run(subject, seed):
     m = Model()
     assert lib.os_model(flash.ctypes.data, ctypes.byref(tab), ctypes.byref(m)) == 0
     lib.sc_init(ctypes.byref(m), cal_q.ctypes.data, y8.ctypes.data, len(raw_c), seed * 1000 + subject + 1)
+    return flash, m, st, int(written.sum()), (arrs, tab, cb, w, cal_q, y8)
+
+
+def run(subject, seed):
+    lib = build()
+    flash, m, st, n_written, _keep = calibrate(lib, subject, seed)
     rows = []
     for b in range(P.N_BLOCKS):
         X, y = P.load_folder('arm_position', subject, f'testing_block{b}')
@@ -196,7 +207,7 @@ def run(subject, seed):
         rows.append(dict(subject=subject, seed=seed, block=b, acc_oneshot=np.mean(os_pred == y),
                          acc_selfcal=np.mean(pred == y), n_pruned_nodes=st.n_pruned_nodes, app_nodes=st.app_nodes,
                          app_leaves_max=st.app_leaves_max, image_bytes=st.image_bytes,
-                         scratch_bytes=st.scratch_bytes, flash_bytes_written=int(written.sum()),
+                         scratch_bytes=st.scratch_bytes, flash_bytes_written=n_written,
                          clustered=sst.clustered))
     return rows
 

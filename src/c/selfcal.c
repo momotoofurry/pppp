@@ -149,9 +149,9 @@ static int vote(const uint16_t *v)
     return b;
 }
 
-int sc_predict(const int16_t *x)
+static int votes_sc(const int16_t *x, uint16_t *v)
 {
-    uint16_t v[SC_CLASSES] = {0};
+    memset(v, 0, sizeof(uint16_t) * SC_CLASSES);
     for (int t = 0; t < SC_N_PRE; t++)
         v[flash_tree(t, x)]++;
     for (int s = 0; s < SC_N_APP; s++)
@@ -159,12 +159,24 @@ int sc_predict(const int16_t *x)
     return vote(v);
 }
 
-int sc_predict_oneshot(const int16_t *x)
+int sc_predict(const int16_t *x)
 {
-    uint16_t v[SC_CLASSES] = {0};
+    uint16_t v[SC_CLASSES];
+    return votes_sc(x, v);
+}
+
+int sc_votes_oneshot(const int16_t *x, uint16_t *v)
+{
+    memset(v, 0, sizeof(uint16_t) * SC_CLASSES);
     for (int t = 0; t < SC_N_PRE + SC_N_APP; t++)
         v[flash_tree(t, x)]++;
     return vote(v);
+}
+
+int sc_predict_oneshot(const int16_t *x)
+{
+    uint16_t v[SC_CLASSES];
+    return sc_votes_oneshot(x, v);
 }
 
 void sc_init(const sc_model_t *m, const int16_t *cal, const uint8_t *cal_y, int n_cal, uint32_t seed)
@@ -215,13 +227,19 @@ static void buffer_push(const int16_t *x, uint8_t lab)
 
 int sc_push(const int16_t *x)
 {
+    uint16_t v[SC_CLASSES];
+    return sc_push_votes(x, v);
+}
+
+int sc_push_votes(const int16_t *x, uint16_t *votes)
+{
     if (!s_in_block) {
         s_in_block = 1;
         s_block_rows = 0;
         s_block_base = s_front - SC_BLOCK_MAX;
         s_front = s_block_base;
     }
-    int lab = sc_predict(x);                  /* the model does not change within a block */
+    int lab = votes_sc(x, votes);             /* the model does not change within a block */
     buffer_push(x, (uint8_t)lab);
     return lab;
 }
