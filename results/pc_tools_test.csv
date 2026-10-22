@@ -1,0 +1,2 @@
+frames_from_tcu,frames_forwarded,frames_received_by_mcu,samples_equal,clipped,emg_csv_rows,mcu_packets_logged,status_events,calibrate_result,mcu_windows,mcu_cal_windows,mcu_lost_packets
+24000,24000,24000,True,0,24000,2,4=60;1=0,0,119,60,0

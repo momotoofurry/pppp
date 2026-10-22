@@ -13,6 +13,11 @@
 #endif
 
 #define NODES (SC_MAX_LEAVES - 1)               /* internal nodes of a RAM tree */
+#if defined(__arm__)
+#define SC_BARRIER() __asm volatile("dmb" ::: "memory")
+#else
+#define SC_BARRIER() __asm volatile("" ::: "memory")
+#endif
 
 typedef struct {                                /* RAM tree, same encoding as rf_predict.h */
     uint8_t n;                                  /* internal nodes; 0 -> single leaf, class in left[0] */
@@ -32,7 +37,7 @@ static int16_t s_cal[SC_CAL_MAX][SC_DIM];
 static uint8_t s_cal_y[SC_CAL_MAX];
 static int s_ncal;
 static ram_tree_t s_tree[SC_N_APP];
-static uint8_t s_ram[SC_N_APP];                 /* slot uses s_tree (1) or the one-shot tree (0) */
+static volatile uint8_t s_ram[SC_N_APP];        /* slot uses s_tree (1) or the one-shot tree (0) */
 static uint32_t s_rng;
 /* ---- work ---- */
 static const int16_t *s_rows[SC_BUF + SC_CAL_MAX];
@@ -159,6 +164,11 @@ static int votes_sc(const int16_t *x, uint16_t *v)
     return vote(v);
 }
 
+int sc_votes(const int16_t *x, uint16_t *votes)
+{
+    return votes_sc(x, votes);
+}
+
 int sc_predict(const int16_t *x)
 {
     uint16_t v[SC_CLASSES];
@@ -185,7 +195,8 @@ void sc_init(const sc_model_t *m, const int16_t *cal, const uint8_t *cal_y, int 
     s_ncal = n_cal < SC_CAL_MAX ? n_cal : SC_CAL_MAX;
     memcpy(s_cal, cal, sizeof(int16_t) * SC_DIM * s_ncal);
     memcpy(s_cal_y, cal_y, s_ncal);
-    memset(s_ram, 0, sizeof s_ram);
+    for (int k = 0; k < SC_N_APP; k++)
+        s_ram[k] = 0;
     s_n = 0;
     s_front = 0;
     s_in_block = 0;
@@ -361,7 +372,12 @@ void sc_end_block(sc_stats_t *st)
         if (!replace[s])
             continue;
         rft_train(s_rows, s_y, nt, SC_MAX_DEPTH, SC_MAX_LEAVES, 8, tree_seed(), &s_new);
+        /* inference may run in an interrupt while this runs: the slot falls back to its one-shot (Flash) tree
+         * while its RAM tree is rewritten, so a half-written tree is never traversed */
+        s_ram[s] = 0;
+        SC_BARRIER();
         store_tree(&s_new, &s_tree[s]);
+        SC_BARRIER();
         s_ram[s] = 1;
         if (s_tree[s].n > st->new_nodes_max)
             st->new_nodes_max = s_tree[s].n;

@@ -1,0 +1,6 @@
+seed,bytes,intact,c_delivered,c_equal_intact,c_crc_errors,c_len_errors,c_skipped_bytes,py_delivered,py_equal_intact,py_crc_errors
+0,956949,2905,2905,True,58,0,19387,2905,True,58
+1,960501,2924,2924,True,51,0,17007,2924,True,51
+2,959984,2922,2922,True,50,1,16829,2922,True,50
+3,959140,2898,2898,True,72,2,24200,2898,True,72
+4,957511,2913,2913,True,52,0,17955,2913,True,52

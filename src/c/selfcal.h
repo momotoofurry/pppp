@@ -92,6 +92,8 @@ int sc_votes_oneshot(const int16_t *x, uint16_t *votes);
 /* one row of the current block (SC_DIM int16): returns the self-calibrated prediction, buffers the row */
 int sc_push(const int16_t *x);
 int sc_push_votes(const int16_t *x, uint16_t *votes);   /* same, also returns the votes per class */
+/* classify only (no buffering): for windows that arrive while sc_end_block() runs in the background */
+int sc_votes(const int16_t *x, uint16_t *votes);
 /* end of block: pseudo-label the buffer, train SC_N_UPD trees, replace slots */
 void sc_end_block(sc_stats_t *st);
 unsigned sc_static_bytes(void);
