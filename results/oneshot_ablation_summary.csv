@@ -1,0 +1,6 @@
+variant,acc_oneshot,diff,better,worse,p
+sklearn,79.68,0,0,0,1
+prune_q16,79.67,-0.006061,4,7,0.3978
+trees_c,79.59,-0.09242,9,11,1
+trees_sk_q16,79.68,0.004545,12,6,0.472
+prune_q16+trees_c,79.58,-0.101,9,11,0.9854

@@ -36,9 +36,11 @@ OUT = os.path.join(P.ROOT, 'results')
 SRC = ['selfcal.c', 'tsne.c', 'kmeans.c', 'rf_train.c']
 
 
-class Model(ctypes.Structure):
+class Model(ctypes.Structure):                 # sc_model_t; the overlay / app fields stay 0 (PC-built model)
     _fields_ = [('roots', ctypes.c_void_p), ('feat', ctypes.c_void_p), ('thr', ctypes.c_void_p),
-                ('left', ctypes.c_void_p), ('right', ctypes.c_void_p)]
+                ('left', ctypes.c_void_p), ('right', ctypes.c_void_p), ('prune_bits', ctypes.c_void_p),
+                ('prune', ctypes.c_void_p), ('n_prune', ctypes.c_int), ('app_nodes', ctypes.c_void_p),
+                ('app_roots', ctypes.c_void_p)]
 
 
 class Stats(ctypes.Structure):

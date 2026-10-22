@@ -27,7 +27,7 @@
 #define RFT_CLASSES 6
 #endif
 #ifndef RFT_MAX_LEAVES
-#define RFT_MAX_LEAVES 32
+#define RFT_MAX_LEAVES 64       /* one-shot trees on 60 rows: <= 60 leaves; self-calibration asks for 32 */
 #endif
 #define RFT_MAX_NODES (2 * RFT_MAX_LEAVES - 1)
 

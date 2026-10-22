@@ -1,0 +1,38 @@
+{'subject': 0, 'n_internal': 12951, 'pruned_python': 412, 'pruned_c': 412, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 1, 'n_internal': 12951, 'pruned_python': 718, 'pruned_c': 718, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 2, 'n_internal': 12951, 'pruned_python': 853, 'pruned_c': 853, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 3, 'n_internal': 12951, 'pruned_python': 622, 'pruned_c': 622, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 4, 'n_internal': 12951, 'pruned_python': 430, 'pruned_c': 430, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 5, 'n_internal': 12951, 'pruned_python': 395, 'pruned_c': 395, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 6, 'n_internal': 12951, 'pruned_python': 370, 'pruned_c': 370, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 7, 'n_internal': 12951, 'pruned_python': 704, 'pruned_c': 704, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 8, 'n_internal': 12951, 'pruned_python': 432, 'pruned_c': 432, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 9, 'n_internal': 12951, 'pruned_python': 760, 'pruned_c': 760, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 10, 'n_internal': 12951, 'pruned_python': 486, 'pruned_c': 486, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 11, 'n_internal': 12951, 'pruned_python': 409, 'pruned_c': 409, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 12, 'n_internal': 12951, 'pruned_python': 934, 'pruned_c': 934, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 13, 'n_internal': 12951, 'pruned_python': 467, 'pruned_c': 467, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 14, 'n_internal': 12951, 'pruned_python': 692, 'pruned_c': 692, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 15, 'n_internal': 12951, 'pruned_python': 544, 'pruned_c': 544, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 16, 'n_internal': 12951, 'pruned_python': 528, 'pruned_c': 528, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 17, 'n_internal': 12951, 'pruned_python': 660, 'pruned_c': 660, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 18, 'n_internal': 12951, 'pruned_python': 678, 'pruned_c': 678, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+{'subject': 19, 'n_internal': 12951, 'pruned_python': 534, 'pruned_c': 534, 'identical': True, 'only_python': 0, 'only_c': 0, 'label_diff': 0}
+[Parallel(n_jobs=20)]: Using backend LokyBackend with 20 concurrent workers.
+pruning identical for 20 of 20 subjects
+[Parallel(n_jobs=20)]: Done  34 out of  60 | elapsed:   29.1s remaining:   22.2s
+[Parallel(n_jobs=20)]: Done  47 out of  60 | elapsed:   34.9s remaining:    9.7s
+[Parallel(n_jobs=20)]: Done  60 out of  60 | elapsed:   37.4s finished
+      acc_oneshot  acc_selfcal
+seed                          
+0           79.14        82.92
+1           79.72        83.01
+2           79.35        83.01
+     metric                                              reference  c_oneshot  reference_value   diff  better  worse     p
+acc_oneshot          sklearn pipeline (selfcal_sweep_iter, 500 it)     79.404           79.680 -0.276       7     13 0.522
+acc_oneshot Python one-shot + C self-calibration (selfcal_c_check)     79.404           79.680 -0.276       7     13 0.522
+acc_selfcal          sklearn pipeline (selfcal_sweep_iter, 500 it)     82.983           83.270 -0.287       8     12 0.277
+acc_selfcal Python one-shot + C self-calibration (selfcal_c_check)     82.983           83.224 -0.241       9     11 0.452
+      n_pruned_nodes  app_nodes  app_leaves_max  image_bytes  scratch_bytes  flash_bytes_written
+mean           581.4      300.8             9.9       7269.1        39915.0               7231.4
+max            934.0      362.0            14.0       8787.0        39915.0               8747.0

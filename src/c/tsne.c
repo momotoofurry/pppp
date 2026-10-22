@@ -35,6 +35,14 @@ static float s_grad[TSNE_NMAX * D3];
 static cell_t s_cell[TSNE_CELLS];
 static int16_t s_stack[8 * MAX_DEPTH + 8];   /* octree traversal */
 
+/* The P / neighbour arrays are only used inside tsne_run(); one-shot calibration (oneshot.c), which runs
+ * before self-calibration starts, borrows them as scratch so it needs no RAM of its own. */
+void *tsne_scratch(unsigned *bytes)
+{
+    *bytes = (unsigned)sizeof s_p;
+    return s_p;
+}
+
 unsigned tsne_static_bytes(void)
 {
     return (unsigned)(sizeof s_nbr + sizeof s_p + sizeof s_upd + sizeof s_gain + sizeof s_grad + sizeof s_cell +

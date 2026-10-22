@@ -1,19 +1,19 @@
 [Parallel(n_jobs=20)]: Using backend LokyBackend with 20 concurrent workers.
-[Parallel(n_jobs=20)]: Done   4 out of  10 | elapsed:   14.8s remaining:   22.2s
-[Parallel(n_jobs=20)]: Done   7 out of  10 | elapsed:   15.0s remaining:    6.4s
-[Parallel(n_jobs=20)]: Done  10 out of  10 | elapsed:   15.3s finished
+[Parallel(n_jobs=20)]: Done   4 out of  10 | elapsed:   14.8s remaining:   22.1s
+[Parallel(n_jobs=20)]: Done   7 out of  10 | elapsed:   14.9s remaining:    6.4s
+[Parallel(n_jobs=20)]: Done  10 out of  10 | elapsed:   15.4s finished
       acc_oneshot  acc_selfcal
 seed                          
-0           83.37        92.83
-1           81.83        91.20
-2           83.07        90.43
-3           81.47        91.80
-4           81.63        90.97
-5           82.60        89.80
-6           81.73        89.83
-7           80.30        90.13
-8           81.03        89.87
-9           82.30        92.00
-one-shot 81.93%  self-cal 90.89%  gain +8.95  C one-shot == Python int16: True
-clustered 100.0% of updates, max RAM trees 50, max new-tree internal nodes 31, max t-SNE cells 757, max selected 366, PC sc_end_block CPU mean 0.404 s
-static bytes of selfcal.c state + work: 93333
+0           83.37        91.60
+1           81.83        91.43
+2           83.07        89.67
+3           81.47        91.43
+4           81.63        90.87
+5           82.60        90.90
+6           81.73        92.27
+7           80.30        91.17
+8           81.03        91.57
+9           82.30        92.10
+one-shot 81.93%  self-cal 91.30%  gain +9.37  C one-shot == Python int16: True
+clustered 100.0% of updates, max RAM trees 50, max new-tree internal nodes 31, max t-SNE cells 749, max selected 366, PC sc_end_block CPU mean 0.405 s
+static bytes of selfcal.c state + work: 94653

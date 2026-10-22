@@ -48,5 +48,8 @@ typedef struct {
 int tsne_run(const int16_t *const *rows, int n, float perplexity, int max_iter, const float *init, float *y,
              tsne_stats_t *st);
 
+/* scratch memory (the P array) for code that runs while no t-SNE is running (one-shot calibration) */
+void *tsne_scratch(unsigned *bytes);
+
 /* bytes of static memory used by the t-SNE module (for the report) */
 unsigned tsne_static_bytes(void);

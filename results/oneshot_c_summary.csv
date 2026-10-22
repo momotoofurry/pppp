@@ -1,0 +1,5 @@
+metric,reference,c_oneshot,reference_value,diff,better,worse,p
+acc_oneshot,"sklearn pipeline (selfcal_sweep_iter, 500 it)",79.4,79.68,-0.2763,7,13,0.5217
+acc_oneshot,Python one-shot + C self-calibration (selfcal_c_check),79.4,79.68,-0.2763,7,13,0.5217
+acc_selfcal,"sklearn pipeline (selfcal_sweep_iter, 500 it)",82.98,83.27,-0.2869,8,12,0.2774
+acc_selfcal,Python one-shot + C self-calibration (selfcal_c_check),82.98,83.22,-0.2414,9,11,0.4524

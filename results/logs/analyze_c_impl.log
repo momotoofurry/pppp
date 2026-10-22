@@ -1,0 +1,15 @@
+                                         variant  tsne_iter  acc_oneshot  acc_selfcal  selfcal_seed_min  selfcal_seed_max  gain  diff_vs_sklearn  n_better  n_worse  wilcoxon_p  pc_tsne_cpu_s  pc_step_cpu_s
+                     sklearn (reference), 500 it        500        79.68       83.270            83.133            83.367 3.589              NaN       NaN      NaN         NaN          0.898            NaN
+                    sklearn (reference), 1000 it       1000        79.68       83.436            83.171            83.689 3.755              NaN       NaN      NaN         NaN          1.763            NaN
+                                 C t-SNE, 500 it        500        79.68       83.234            83.112            83.420 3.554           -0.035      13.0      7.0       0.648          0.301            NaN
+                                C t-SNE, 1000 it       1000        79.68       83.593            83.147            84.043 3.912            0.157      14.0      6.0       0.143          0.548            NaN
+                     C t-SNE + C K-Means, 500 it        500        79.68       83.234            83.112            83.420 3.554           -0.035      13.0      7.0       0.648            NaN            NaN
+                                 C trees, 500 it        500        79.68       82.937            82.682            83.264 3.257           -0.332       7.0     13.0       0.076            NaN            NaN
+                     all C (Python loop), 500 it        500        79.68       83.231            82.927            83.464 3.551           -0.039       9.0     11.0       0.701            NaN            NaN
+C firmware logic (selfcal.c, end to end), 500 it        500        79.68       83.224            83.091            83.423 3.544           -0.045       9.0     11.0       0.898            NaN          0.703
+         upstream pipeline on C features, 500 it        500        79.68       83.232            83.092            83.326 3.552           -0.037       8.0     12.0       0.674            NaN            NaN
+                                        variant  acc_oneshot  acc_selfcal  selfcal_seed_min  selfcal_seed_max  gain  blocks  oneshot_blocks7_9  selfcal_blocks7_9
+                    full model (paper), sklearn        82.40        89.33             87.33             90.83  6.93    10.0              74.84              91.98
+100 trees d10 int16, upstream settings, sklearn        81.93        89.55             86.93             91.60  7.62    10.0              75.44              91.80
+                           MCU setting, sklearn        81.93        91.29             89.93             92.47  9.36     NaN              75.44              92.80
+                  MCU setting, C firmware logic        81.93        91.30             89.67             92.27  9.37     NaN              75.44              92.81

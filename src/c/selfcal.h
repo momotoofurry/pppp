@@ -42,12 +42,37 @@
 #define SC_BLOCK_MAX 4096       /* most rows per block (keys reserved per block; 300 in the data set) */
 #endif
 
-/* one-shot model in our table format (rf_predict.h): SC_N_PRE + SC_N_APP trees */
+/* node of a tree stored as an array of structs (one-shot trees in the Flash image, oneshot.h) */
+typedef struct {
+    uint8_t feat;
+    uint8_t pad;
+    int16_t thr;                /* go left if x < thr (Q5.10) */
+    uint16_t left, right;       /* bit 15 set -> leaf (low bits = class), else node index within the tree */
+} sc_node_t;
+
+/* pruned node of a pre-trained tree: internal node `idx` (global index into the table arrays) is a leaf */
+typedef struct {
+    uint16_t idx;
+    uint8_t label;
+    uint8_t pad;
+} sc_prune_t;
+
+/* one-shot model: SC_N_PRE + SC_N_APP trees.
+ * roots/feat/thr/left/right: our table format (rf_predict.h). Without app_nodes the table holds all
+ * SC_N_PRE + SC_N_APP trees (one-shot model built on the PC). With on-device one-shot calibration (oneshot.c)
+ * the table holds the SC_N_PRE pre-trained trees (const, Flash), pruned through prune_bits / prune (bit g
+ * set: internal node g is now a leaf, label in the sorted list prune[0..n_prune)), and the SC_N_APP
+ * calibration trees are app_nodes / app_roots (root: bit 31 set -> single leaf, else node offset). */
 typedef struct {
     const uint32_t *roots;
     const uint8_t *feat;
     const int16_t *thr;
     const uint16_t *left, *right;
+    const uint8_t *prune_bits;          /* 0: no pruning overlay */
+    const sc_prune_t *prune;
+    int n_prune;
+    const sc_node_t *app_nodes;         /* 0: the app trees are trees SC_N_PRE.. of the table */
+    const uint32_t *app_roots;
 } sc_model_t;
 
 typedef struct {

@@ -60,6 +60,18 @@ static uint32_t rnd(void)
     return s_rng = x;
 }
 
+/* Seed of a tree's own xorshift32 stream. xorshift is linear: if tree seeds were consecutive outputs of this
+ * stream, tree k+1 would replay tree k's draws shifted by one step (nearly the same bootstrap sample). A
+ * splitmix32-style finaliser puts every tree at an unrelated point of the cycle. */
+static uint32_t tree_seed(void)
+{
+    uint32_t x = rnd() + 0x9E3779B9u;
+    x = (x ^ (x >> 16)) * 0x85EBCA6Bu;
+    x = (x ^ (x >> 13)) * 0xC2B2AE35u;
+    x ^= x >> 16;
+    return x ? x : 1u;
+}
+
 static float gauss(void)                        /* Box-Muller */
 {
     float u1 = ((rnd() >> 8) + 1.0f) / 16777217.0f, u2 = (rnd() >> 8) / 16777216.0f;
@@ -67,16 +79,47 @@ static float gauss(void)                        /* Box-Muller */
 }
 
 /* ---------------------------------------------------------------- inference */
+static int pruned_label(uint32_t g)             /* binary search in the sorted prune list */
+{
+    int lo = 0, hi = s_m.n_prune - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) >> 1;
+        if (s_m.prune[mid].idx == g)
+            return s_m.prune[mid].label;
+        if (s_m.prune[mid].idx < g)
+            lo = mid + 1;
+        else
+            hi = mid - 1;
+    }
+    return 0;                                   /* not reached: every set bit has an entry */
+}
+
 static int flash_tree(int t, const int16_t *x)
 {
+    if (t >= SC_N_PRE && s_m.app_nodes) {       /* one-shot calibration tree from the Flash image */
+        const uint32_t root = s_m.app_roots[t - SC_N_PRE];
+        if (root & 0x80000000u)
+            return (int)(root & 0xffu);
+        const sc_node_t *nd = s_m.app_nodes + root;
+        uint16_t n = 0;
+        for (;;) {
+            uint16_t c = (x[nd[n].feat] < nd[n].thr) ? nd[n].left : nd[n].right;
+            if (c & 0x8000u)
+                return c & 0x7fff;
+            n = c;
+        }
+    }
     const uint32_t root = s_m.roots[t];
     if (root & 0x80000000u)
         return (int)(root & 0xffu);
     const uint8_t *feat = s_m.feat + root;
     const int16_t *thr = s_m.thr + root;
     const uint16_t *l = s_m.left + root, *r = s_m.right + root;
+    const uint8_t *bits = (t < SC_N_PRE) ? s_m.prune_bits : 0;
     uint16_t n = 0;
     for (;;) {
+        if (bits && (bits[(root + n) >> 3] >> ((root + n) & 7)) & 1u)
+            return pruned_label(root + n);      /* pruned during one-shot calibration */
         uint16_t c = (x[feat[n]] < thr[n]) ? l[n] : r[n];
         if (c & 0x8000u)
             return c & 0x7fff;
@@ -299,7 +342,7 @@ void sc_end_block(sc_stats_t *st)
     for (int s = 0; s < SC_N_APP; s++) {        /* new trees go to the replaced slots in slot order */
         if (!replace[s])
             continue;
-        rft_train(s_rows, s_y, nt, SC_MAX_DEPTH, SC_MAX_LEAVES, 8, rnd(), &s_new);
+        rft_train(s_rows, s_y, nt, SC_MAX_DEPTH, SC_MAX_LEAVES, 8, tree_seed(), &s_new);
         store_tree(&s_new, &s_tree[s]);
         s_ram[s] = 1;
         if (s_tree[s].n > st->new_nodes_max)
