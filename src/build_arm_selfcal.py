@@ -11,7 +11,8 @@ trees (build/oneshot_dev/pre_model.h: depth 10, compacted, Q5.10) and the subjec
 (build/oneshot_dev/cal_feat.h, raw float), written to the reserved Flash sector through the board layer
 (board_stub.c here: the real Flash driver is the hardware layer), plus 'rt' (main_rt.c: the route-B firmware: serial
 protocol, real-time loop, on-device one-shot calibration and self-calibration; no sample data in Flash, board layer
-stubbed). Records arm-none-eabi-size of the ELF (text / data / bss), the worst-case static stack from
+stubbed), and 'board' (the same with the hardware layer board_h7.c + startup_h7.c on the CMSIS headers in src/c/cmsis:
+compiled only, not run). Records arm-none-eabi-size of the ELF (text / data / bss), the worst-case static stack from
 -fcallgraph-info=su, and text / data / bss per module (.o). Nothing is run: cycle counts need the board.
 Writes results/arm_selfcal_size.csv and results/arm_selfcal_modules.csv.
 Usage (in the container): python src/build_arm_selfcal.py
@@ -34,7 +35,10 @@ SRCS = ['main_selfcal.c', 'selfcal.c', 'tsne.c', 'kmeans.c', 'rf_train.c', 'star
 VARIANTS = {'selfcal': ([], SRCS), 'full': (['-DWITH_FEATURES'], SRCS + ['features.c']),
             'device': (['-DWITH_FEATURES', '-DWITH_ONESHOT'], SRCS + ['features.c', 'oneshot.c', 'board_stub.c']),
             'rt': ([], ['main_rt.c', 'rt.c', 'protocol.c', 'decision.c', 'features.c', 'oneshot.c', 'selfcal.c', 'tsne.c',
-                        'kmeans.c', 'rf_train.c', 'board_stub.c', 'startup_h743.c'])}
+                        'kmeans.c', 'rf_train.c', 'board_stub.c', 'startup_h743.c']),
+            'board': (['-DSTM32H753xx', '-I', os.path.join(CSRC, 'cmsis', 'st'), '-I', os.path.join(CSRC, 'cmsis', 'arm')],
+                      ['main_rt.c', 'rt.c', 'protocol.c', 'decision.c', 'features.c', 'oneshot.c', 'selfcal.c', 'tsne.c',
+                       'kmeans.c', 'rf_train.c', 'board_h7.c', 'startup_h7.c'])}
 DEV = os.path.join(BUILD, 'oneshot_dev')
 RAW_SCALE = 2e-8            # volts per LSB of the int16 stand-in recording
 FLAGS = [f for f in B.FLAGS if f != '-Os']
@@ -117,10 +121,12 @@ def main():
         # pk_feed calls the packet handler through a pointer too, so the handler chain (on_packet -> samples ->
         # features -> votes -> decision -> tx) is added on top: an upper bound
         isr = 0
-        if variant == 'rt':
+        if variant in ('rt', 'board'):
             ci = glob.glob(os.path.join(obj, '*.ci'))
             handler = [t for f in ci for t in re.findall(r'title: "([^"]*on_packet)"', open(f).read())][0]
             isr = B.worst_stack(ci, 'rt_rx')[0] + B.worst_stack(ci, handler)[0] + 104
+            if variant == 'board':   # board_h7.c: SysTick calls rt_rx through a pointer; USART3 can preempt SysTick
+                isr += B.worst_stack(ci, 'SysTick_Handler')[0] + B.worst_stack(ci, 'USART3_IRQHandler')[0] + 104
         syms = T.run('nm', ['-S', '--size-sort', '-t', 'd', elf]).stdout.split('\n')
         big = [l.split() for l in syms if len(l.split()) == 4 and l.split()[2] in 'bBdD']
         big = sorted(big, key=lambda x: -int(x[1]))[:12]

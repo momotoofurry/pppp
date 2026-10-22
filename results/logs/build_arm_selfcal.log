@@ -7,6 +7,8 @@ arm-none-eabi-gcc (15:10.3-2021.07-4) 10.3.1 20210621 (release)
 {'variant': 'device', 'opt': '-O2', 'text': 201488, 'data': 108, 'bss': 251200, 'flash_KB': 196.87109375, 'axi_bss_KB': 245.3125, 'worst_stack_bytes': 2296, 'thread_stack_bytes': 2296, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_front=3048'}
 {'variant': 'rt', 'opt': '-Os', 'text': 118288, 'data': 108, 'bss': 252352, 'flash_KB': 115.62109375, 'axi_bss_KB': 246.4375, 'worst_stack_bytes': 2208, 'thread_stack_bytes': 1776, 'isr_stack_bytes': 432, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_front=3048'}
 {'variant': 'rt', 'opt': '-O2', 'text': 120568, 'data': 108, 'bss': 252360, 'flash_KB': 117.84765625, 'axi_bss_KB': 246.4453125, 'worst_stack_bytes': 2200, 'thread_stack_bytes': 1768, 'isr_stack_bytes': 432, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_front=3048'}
+{'variant': 'board', 'opt': '-Os', 'text': 120192, 'data': 116, 'bss': 256496, 'flash_KB': 117.48828125, 'axi_bss_KB': 250.484375, 'worst_stack_bytes': 2612, 'thread_stack_bytes': 1776, 'isr_stack_bytes': 836, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_rx=4096'}
+{'variant': 'board', 'opt': '-O2', 'text': 122576, 'data': 116, 'bss': 256504, 'flash_KB': 119.81640625, 'axi_bss_KB': 250.4921875, 'worst_stack_bytes': 2600, 'thread_stack_bytes': 1768, 'isr_stack_bytes': 832, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_rx=4096'}
 variant opt         module   text  data    bss
 selfcal -Os main_selfcal.c  98760     0     40
 selfcal -Os      selfcal.c   2238     0  92901
@@ -76,3 +78,27 @@ selfcal -O2 startup_h743.c    168     0      0
      rt -O2     rf_train.c   1948     0   6668
      rt -O2   board_stub.c     44     0      0
      rt -O2 startup_h743.c    168     0      0
+  board -Os      main_rt.c  91037     0     12
+  board -Os           rt.c   1480     4   1202
+  board -Os     protocol.c    446     0      0
+  board -Os     decision.c    324     0      0
+  board -Os     features.c   1768     0  20804
+  board -Os      oneshot.c   2468     0      4
+  board -Os      selfcal.c   2238     0  92901
+  board -Os         tsne.c   3004     0 124766
+  board -Os       kmeans.c   1160     0   1875
+  board -Os     rf_train.c   1742     0   6668
+  board -Os     board_h7.c   1328     8   4144
+  board -Os   startup_h7.c    770     0      0
+  board -O2      main_rt.c  91045     0     12
+  board -O2           rt.c   1616     4   1202
+  board -O2     protocol.c    632     0      0
+  board -O2     decision.c    414     0      0
+  board -O2     features.c   2112     0  20804
+  board -O2      oneshot.c   2904     0      4
+  board -O2      selfcal.c   2668     0  92901
+  board -O2         tsne.c   3480     0 124766
+  board -O2       kmeans.c   1356     0   1875
+  board -O2     rf_train.c   1948     0   6668
+  board -O2     board_h7.c   1452     8   4144
+  board -O2   startup_h7.c    768     0      0
