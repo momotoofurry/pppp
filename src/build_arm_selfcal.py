@@ -9,13 +9,16 @@ one recorded trial, build/d10_n100_i16/raw_input.h as int16, through features.c 
 (-DWITH_FEATURES -DWITH_ONESHOT): the one-shot model is built on the MCU (oneshot.c) from the 50 pre-trained
 trees (build/oneshot_dev/pre_model.h: depth 10, compacted, Q5.10) and the subject-0 calibration features
 (build/oneshot_dev/cal_feat.h, raw float), written to the reserved Flash sector through the board layer
-(board_stub.c here: the real Flash driver is the hardware layer). Records arm-none-eabi-size of the ELF (text / data / bss), the worst-case static stack from
+(board_stub.c here: the real Flash driver is the hardware layer), plus 'rt' (main_rt.c: the route-B firmware: serial
+protocol, real-time loop, on-device one-shot calibration and self-calibration; no sample data in Flash, board layer
+stubbed). Records arm-none-eabi-size of the ELF (text / data / bss), the worst-case static stack from
 -fcallgraph-info=su, and text / data / bss per module (.o). Nothing is run: cycle counts need the board.
 Writes results/arm_selfcal_size.csv and results/arm_selfcal_modules.csv.
 Usage (in the container): python src/build_arm_selfcal.py
 """
 import glob
 import os
+import re
 import sys
 
 import numpy as np
@@ -29,7 +32,9 @@ CSRC, BUILD, OUT = B.CSRC, B.BUILD, B.OUT
 MODEL = os.path.join(BUILD, 'd10_n100_i16')
 SRCS = ['main_selfcal.c', 'selfcal.c', 'tsne.c', 'kmeans.c', 'rf_train.c', 'startup_h743.c']
 VARIANTS = {'selfcal': ([], SRCS), 'full': (['-DWITH_FEATURES'], SRCS + ['features.c']),
-            'device': (['-DWITH_FEATURES', '-DWITH_ONESHOT'], SRCS + ['features.c', 'oneshot.c', 'board_stub.c'])}
+            'device': (['-DWITH_FEATURES', '-DWITH_ONESHOT'], SRCS + ['features.c', 'oneshot.c', 'board_stub.c']),
+            'rt': ([], ['main_rt.c', 'rt.c', 'protocol.c', 'decision.c', 'features.c', 'oneshot.c', 'selfcal.c', 'tsne.c',
+                        'kmeans.c', 'rf_train.c', 'board_stub.c', 'startup_h743.c'])}
 DEV = os.path.join(BUILD, 'oneshot_dev')
 RAW_SCALE = 2e-8            # volts per LSB of the int16 stand-in recording
 FLAGS = [f for f in B.FLAGS if f != '-Os']
@@ -106,11 +111,22 @@ def main():
             sys.exit(r.stderr[-3000:])
         text, data, bss = map(int, T.run('size', [elf]).stdout.splitlines()[1].split()[:3])
         st, path, unknown = B.worst_stack(glob.glob(os.path.join(obj, '*.ci')))
+        # rt_rx runs in the UART interrupt (called through a pointer, invisible to the call graph from
+        # Reset_Handler) and stacks on top of whatever thread code it interrupts; + 104 B for the exception frame
+        # with the FPU context
+        # pk_feed calls the packet handler through a pointer too, so the handler chain (on_packet -> samples ->
+        # features -> votes -> decision -> tx) is added on top: an upper bound
+        isr = 0
+        if variant == 'rt':
+            ci = glob.glob(os.path.join(obj, '*.ci'))
+            handler = [t for f in ci for t in re.findall(r'title: "([^"]*on_packet)"', open(f).read())][0]
+            isr = B.worst_stack(ci, 'rt_rx')[0] + B.worst_stack(ci, handler)[0] + 104
         syms = T.run('nm', ['-S', '--size-sort', '-t', 'd', elf]).stdout.split('\n')
         big = [l.split() for l in syms if len(l.split()) == 4 and l.split()[2] in 'bBdD']
         big = sorted(big, key=lambda x: -int(x[1]))[:12]
         rows.append(dict(variant=variant, opt=opt, text=text, data=data, bss=bss, flash_KB=(text + data) / 1024,
-                         axi_bss_KB=bss / 1024, worst_stack_bytes=st, stack_path=path,
+                         axi_bss_KB=bss / 1024, worst_stack_bytes=st + isr, thread_stack_bytes=st, isr_stack_bytes=isr,
+                         stack_path=path,
                          stack_unknown=';'.join(unknown),
                          largest_ram_symbols=';'.join(f'{x[3]}={int(x[1])}' for x in big)))
         print({k: v for k, v in rows[-1].items() if k != 'stack_path'})

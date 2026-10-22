@@ -11,3 +11,14 @@ int board_flash_write(uint32_t addr, const void *src, uint32_t n);
 int board_flash_flush(void);
 /* erase the 128 KB sector that contains addr; returns 0 on success */
 int board_flash_erase_sector(uint32_t addr);
+
+/* clocks, caches, MPU, the time base and the UART to the PC */
+void board_init(void);
+/* microseconds since board_init() (wraps after ~71 min) */
+uint32_t board_time_us(void);
+/* send bytes to the PC (blocking or queued) */
+void board_uart_tx(const uint8_t *p, uint32_t n);
+/* h is called with the bytes received from the PC, from interrupt context (UART / DMA) */
+void board_set_rx_handler(void (*h)(const uint8_t *p, uint32_t n));
+/* sleep until the next interrupt */
+void board_wait(void);

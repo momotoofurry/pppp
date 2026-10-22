@@ -20,3 +20,27 @@ int board_flash_erase_sector(uint32_t addr)
     (void)addr;
     return -1;
 }
+
+void board_init(void)
+{
+}
+
+uint32_t board_time_us(void)
+{
+    return 0;
+}
+
+void board_uart_tx(const uint8_t *p, uint32_t n)
+{
+    (void)p;
+    (void)n;
+}
+
+void board_set_rx_handler(void (*h)(const uint8_t *p, uint32_t n))
+{
+    (void)h;
+}
+
+void board_wait(void)
+{
+}

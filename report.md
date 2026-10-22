@@ -20,7 +20,8 @@
 | 能壓到 256 KB 以下嗎？（實測，3.5–3.6 節） | 可以：buffer 375 筆（int16）＋ 新樹 32 葉 ＋ t-SNE，自我校正 83.44%、增益 +3.76，RAM 估算 219 KB，和基準無顯著差異（p = 0.17）。250 筆開始明顯變差。t-SNE 在 PC 上每次 2.1 s（1500 筆 9.3 s），MCU 上的時間還沒量。 |
 | t-SNE 迭代可以減少嗎？（實測，3.7 節） | 可以減半：同一設定下 500 次迭代自我校正 83.27%、增益 +3.59，和 1000 次（83.44%、+3.76）差 −0.17 個百分點，不顯著（p = 0.14）；PC 上 t-SNE 時間 1.96 → 1.01 s。400 次開始顯著變差（−0.41，p = 0.017），250 次增益只剩 +0.48。 |
 | 降低 t-SNE perplexity 有用嗎？（實測，3.8 節） | 不太有用：perplexity 3／5／7 在 PC 上**不省時間**（時間由 octree 排斥力決定，和近鄰數無關），只省 t-SNE 的近鄰表 RAM（估算 100 → 54–81 KB），準確率全都比 perplexity 10 低（−0.07 到 −0.69，部分顯著）。維持 perplexity 10、500 次迭代。 |
-| 上板前能先用 C 做完嗎？（實測，第 6 節） | 可以：特徵擷取、t-SNE、K-Means、建樹、整個自我校正迴圈都用 C（靜態記憶體）寫好並在 PC 上驗證，端到端 83.04%（sklearn 83.27%，p = 0.20），沒有一項有顯著差異。Cortex-M7 編譯後 linker 實測 RAM：自我校正約 223.6 KB、加上特徵擷取的完整管線約 245.0 KB，都在 256 KB 以內。跨兩天的 demo（1 人）上，C 韌體邏輯把第 2 天的 75% 拉回 92%（6.6 節）。MCU 時間要等板子。 |
+| 上板前能先用 C 做完嗎？（實測，第 6 節） | 可以：特徵擷取、t-SNE、K-Means、建樹、整個自我校正迴圈都用 C（靜態記憶體）寫好並在 PC 上驗證，端到端 83.22%（sklearn 83.27%，p = 0.90；修正樹的亂數種子之後，7.1 節），沒有一項有顯著差異。跨兩天的 demo（1 人）上，C 韌體邏輯把第 2 天的 75% 拉回 93%（6.6 節）。MCU 時間要等板子。 |
+| one-shot 校正也能在 MCU 上做嗎？（實測，第 7 節） | 可以：剪枝和 Python 逐節點相同（20/20 人），one-shot 79.40%（sklearn 79.68%，p = 0.52），自我校正後 82.98%（83.27%，p = 0.28）。整個路線 B 韌體（序列協定＋即時迴圈＋MCU 上 one-shot＋自我校正）linker 實測 RAM 約 248.7 KB（含中斷 stack 上界），Flash 115.6 KB。 |
 | 怎樣才放得進 512 KB？（實測，3.3–3.4 節） | **不必拿掉 t-SNE**：buffer 存成 int16（無損失）並縮到 750 筆，自我校正 83.83%、增益 +4.15，RAM 估算 394 KB；500 筆 280 KB、增益 +3.78。新樹限制 32 葉讓附加樹保證 ≤ 10.6 KB、準確率無顯著差異。兩者合併使用還沒實測。 |
 | 不做 t-SNE 會掉多少？（實測，3.2 節） | 推薦設定上，只用 K-Means 81.03%、不分群 81.64%，t-SNE 版 83.98%；自我校正增益從 +4.30 掉到 +1.35 / +1.96 個百分點（20 人配對 p < 0.001）。完整模型的結果重現了論文的 ablation（84.66 / 80.89 / 82.16 vs 論文 84.6 / 81.0 / 82.7）。 |
 | 換平台結果會變嗎？ | 特徵、預測、one-shot、C/ARM 編譯在 Docker（Linux）和 Windows 上都相同。**自我校正不會逐位元相同**：Linux 84.66% vs Windows 84.43%（差 0.23 個百分點，和 seed 之間的變動同一個等級）。同一個比較只用同一個平台的數字（1.6 節）。 |
@@ -497,6 +498,8 @@ PC 正確性檢查（MinGW gcc 8.1，3300 筆測試視窗）：3 個設定 × 2 
 - 每來一筆特徵就 `sc_push()`（預測＋放進 buffer），block 結束時 `sc_end_block()`：用原始的一次性模型重新標記 buffer、類別平衡、
   t-SNE＋K-Means 偽標籤、訓練 20 棵新樹、隨機替換 20 個位置。buffer 的順序和淘汰規則和上游 `buffer_update` 相同，
   但不必把整個 block（48 KB）存在 RAM：串流版和整個 block 一次處理的結果**逐位元相同**。亂數用 C 自己的（xorshift）。
+- **更新（2026-10-23，7.1 節）**：發現並修正樹的亂數種子相關的 bug，重跑後 C 韌體邏輯是 **83.22%**、增益 +3.54，
+  和 sklearn 差 −0.05（p = 0.90）；下面這一點是修正前的數字，保留作紀錄（`results/selfcal_c_check.csv` 已是修正後的結果）。
 - PC 端到端（20 人 × 3 seed）：一次性模型的預測和 Python 的 int16 預測**完全相同**（79.68%）；自我校正 **83.04%**、增益 +3.36，
   和 sklearn 差 −0.23（p = 0.20）。99.5% 的 block 有做 t-SNE 分群，新樹最多 31 個內部節點（32 葉），t-SNE 最多 372 點、792 個 cell。
 
@@ -519,6 +522,8 @@ arm-none-eabi-gcc 10.3.1，旗標同第 4 節，`-Os`；`.bss` 放 512 KB AXI SR
 - RAM 的組成（.bss）：自我校正狀態 89.5 KB（buffer 375 × 80 int16 = 58.6 KB、calibration 9.4 KB、RAM 樹 10.6 KB、工作陣列），
   t-SNE 121.8 KB（P 45.4 KB、octree 39.6 KB、近鄰表 22.7 KB、梯度等 17.6 KB），建樹 5.0 KB，K-Means 1.8 KB，特徵擷取 20.3 KB。
   3.5 節的估算是 219 KB（自我校正部分），實測 223.6 KB，相差 2%。
+- **更新（2026-10-23）**：one-shot 的樹需要最多 64 片葉，`RFT_MAX_LEAVES` 由 32 改成 64，建樹的工作陣列多約 3 KB；
+  同樣兩個版本重新編譯後是 226.7 KB／248.2 KB（`results/arm_selfcal_size.csv`）。正式的路線 B 韌體見 7.4 節。
 - Flash 裡的 88 KB 是一次性模型；完整版另含 64 KB 的原始 EMG 範例資料（替代 ADC）、9.6 KB 的 calibration 範例資料，正式版不需要。
 - `src/c/main_selfcal.c` 已經用 DWT 包好 `sc_push`、`sc_end_block`、`fe_push` 的 cycle 計數，**板子到了直接燒錄就能量時間**。
   沒有板子不報 cycle 數。
@@ -533,9 +538,10 @@ JNE 2025 的 demo 錄音（1 位受試者、10 個 block、跨兩天，上游 `d
 | 完整模型（400 棵、不限深度，論文設定） | 82.40 | 89.33（87.33–90.83） | +6.93 | 74.8 → 92.0 |
 | 100 棵、深度 10、int16，上游設定（buffer 1500） | 81.93 | 89.55（86.93–91.60） | +7.62 | 75.4 → 91.8 |
 | MCU 設定（buffer 375 int16、32 葉、t-SNE 500 次），sklearn | 81.93 | 91.29（89.93–92.47） | +9.36 | 75.4 → 92.8 |
-| **MCU 設定，C 韌體邏輯（`selfcal.c`）** | 81.93 | **90.89**（89.80–92.83） | **+8.95** | 75.4 → **92.2** |
+| **MCU 設定，C 韌體邏輯（`selfcal.c`）** | 81.93 | **91.30**（89.67–92.27） | **+9.37** | 75.4 → **92.8** |
 
-- 第 2 天固定模型掉到約 75%，MCU 設定的 C 韌體邏輯把它拉回 92%，**跨日的自我校正增益在記憶體預算內保住了**。
+- 第 2 天固定模型掉到約 75%，MCU 設定的 C 韌體邏輯把它拉回 93%，**跨日的自我校正增益在記憶體預算內保住了**。
+  （修正樹的亂數種子之後重跑的數字；修正前是 90.89%、增益 +8.95、第 2 天後段 92.2%。）
 - MCU 設定甚至比完整模型高（91.3 vs 89.3）；可能是較小的 buffer 對第 2 天的變化反應比較快，但**只有 1 位受試者**，不能下結論。
   跨日的效果要靠正式實驗（RQ2，每人兩天）驗證。
 - Docker 上完整模型 89.33%，1.5 節的 Windows 結果是 90.02%（3 seed），差異和平台／seed 數一致（1.6 節）。
@@ -543,9 +549,70 @@ JNE 2025 的 demo 錄音（1 位受試者、10 個 block、跨兩天，上游 `d
 
 ---
 
+## 7. 韌體：one-shot 上 MCU、指令決策、路線 B（實測，Docker；PC 驗證＋Cortex-M7 編譯，2026-10-23）
+
+板子改成 NUCLEO-H753ZI（和 H743 同一塊 MB1364 板，只多加密模組），**還沒到**。這一節的東西都只有「編譯通過、PC 驗證」。
+完整的狀態和待辦見 `results/firmware_report.md`。
+
+### 7.1 one-shot 校正搬上 MCU（`src/c/oneshot.c`；`src/check_oneshot_c.py`）
+- MCU 自己做：校正特徵的平均和標準差（同 `pipeline.load_subject`）→ Q5.10 → 把上游 `emg_functions.prune` 移植成 C（Flash 裡的預訓練樹不動，
+  剪枝結果是 RAM 裡的位元圖＋排序過的「節點 → 類別」清單）→ 用 `rf_train.c` 長 50 棵新樹（深度 10，葉數上限 64，60 筆資料實際最多 14 片葉）
+  → 全部串流寫進 Flash 最後一個 128 KB sector 的 one-shot image（每個位元組只寫一次，PC 上用模擬 Flash 檢查）。
+  工作記憶體借用 t-SNE 的工作區（約 39 KB），所以不多佔 RAM。
+- **剪枝決策和 Python 逐節點相同：20／20 位受試者**（每人 370–934 個剪枝節點；`results/oneshot_prune_check.csv`）。
+  比對時兩邊用同一組 Q5.10 校正資料，Python 端把門檻 T 換成 (T − 0.5)/1024，讓它的 `x <= thr` 等於 MCU 的 `x < T`。
+- 端到端（20 人 × 3 seed；`results/oneshot_c_summary.csv`）：one-shot **79.40%** vs sklearn 79.68%（−0.28，p = 0.52）；
+  自我校正後 **82.98%** vs 83.27%（−0.29，p = 0.28）。one-shot image 6.1–8.6 KB。
+- **找到的 bug**：韌體用同一條 xorshift32 序列的連續輸出當每棵樹的種子，而 xorshift 是線性的，第 k+1 棵樹的亂數等於第 k 棵往後錯一步，
+  bootstrap 幾乎一樣、樹高度相關。one-shot 因此低了 0.91 個百分點（p = 0.027）。消融（`src/diag_oneshot.py`，`results/oneshot_ablation_summary.csv`）
+  顯示 Q5.10 剪枝、C 建樹各自都 ≤ 0.1 個百分點。改用 splitmix32 打散每棵樹的種子後就沒有差異；同一個 bug 也影響 `selfcal.c` 的新樹，
+  修正後第 6 節的韌體邏輯從 83.04% 變成 83.22%，demo 從 90.89% 變成 91.30%。
+
+### 7.2 多數決平滑＋低信心拒絕（`src/c/decision.c`；`src/eval_decision.py`）
+- 每個 100 ms 視窗：最高票比例 < τ 就拒絕；連續 k 個被接受的視窗同一類才「確立」，確立時送一次該手勢的指令（Tripod＝夾、Open＝放、
+  Power／Pointer＝預設位置 A／B，Lateral、Rest 不送），一直維持同一手勢不會重複送。
+- 回放：MCU 韌體（MCU 上 one-shot＋自我校正）跑 20 人 × 3 seed，共 198,000 個視窗（330 分鐘）；C 的決策和 Python 重寫版在三組設定下逐窗相同。
+- 自我校正後（`results/decision_sweep.csv`，圖 `results/decision_tradeoff.png`）：
+
+| τ | k | 拒絕的視窗 | 被接受視窗的準確率 | 錯誤指令／分鐘 | 送對指令的試次 |
+|---|---|---|---|---|---|
+| 0（不平滑） | 1 | 0% | 83.0% | 26.1 | 86.8% |
+| 0.5 | 1 | 25.6% | 91.5% | 7.3 | 82.9% |
+| 0.6 | 3 | 43.0% | 95.4% | 1.17 | 58.7% |
+| 0.7 | 3 | 59.6% | 97.8% | 0.40 | 41.4% |
+| 0.8 | 3 | 76.3% | 99.1% | 0.05 | 22.1% |
+
+- 這個資料集每個試次只有 1 秒（10 個視窗），k 越大越難在試次內確立；實際使用時手勢可以維持更久，所以「送對指令的試次」會被低估。
+  門檻要用每位受試者第 1 天的資料決定（RQ1／RQ2 的實驗設計），這裡只提供工具和曲線。
+
+### 7.3 路線 B：序列協定與即時迴圈（`src/c/protocol.c`、`src/c/rt.c`、`src/pc/`；`src/check_rt.py`、`src/pc/test_pc_tools.py`）
+- 封包：`A5 5A | type | seq | len | payload | CRC-16/CCITT-FALSE`；樣本 int16、0.25 µV/LSB（±8.19 mV），每包 20 幀，32.9 KB/s（921600 baud 的 36%）。
+- 解析器：故意損壞的串流（2% 位元翻轉、1% 掉包、2% 插入雜訊、隨機切段，5 組）中，每個完好的封包都依序收到、沒有損壞的封包被接受，C 和 Python 相同。
+- 即時迴圈：UART 中斷裡做解析 → 特徵 → z-score → 推論 → 決策 → 指令；主迴圈做 one-shot 建模和自我校正。自我校正期間的視窗只分類不進 buffer；
+  換樹時那個位置暫時改用 Flash 的 one-shot 樹，中斷不會讀到寫到一半的樹。
+- 回放（原始 EMG → int16 → 封包 → `rt_rx`，校正也在「MCU」上做；`results/rt_summary.csv`）：自我校正若在 block 結束時立刻完成，
+  準確率 **82.99%**，和用上游浮點特徵的同一套韌體（82.98%）相同（p = 0.87）；若自我校正跑 20／50 個視窗（2／5 秒），
+  那段時間的視窗不進 buffer，準確率 82.46%／82.37%（−0.52，p = 0.006／−0.61，p = 0.040）。
+- PC 工具（標準函式庫＋pyserial）：`trigno_bridge.py`（TCU 50040／50041 → CSV → 序列埠，同時記錄 MCU 回傳）、`mcu_logger.py`。
+  整合測試：假的 TCU → bridge → TCP → C 的 `rt.c` → 回傳狀態 → CSV，24,000 幀逐筆正確（`results/pc_tools_test.csv`）。
+  TCU 的實際協定（參照 pytrigno）和序列埠都要在實驗室電腦上驗證。
+
+### 7.4 交叉編譯（`src/build_arm_selfcal.py` → `results/arm_selfcal_size.csv`、`arm_selfcal_modules.csv`）
+arm-none-eabi-gcc 10.3.1，`-Os`，.bss 在 AXI SRAM，stack 在 DTCM，最後一個 Flash sector 保留給 one-shot image。**linker 實測：**
+
+| 韌體 | Flash | .bss | .data | stack（thread＋中斷上界） | RAM 合計 |
+|---|---|---|---|---|---|
+| 路線 B 正式版（`main_rt.c`：協定、即時迴圈、MCU 上 one-shot、自我校正） | 115.6 KB | 246.4 KB | 108 B | 1,776 + 432 B | **248.7 KB** |
+| 基準測試版（`main_selfcal.c` device：重播資料、MCU 上 one-shot） | 194.9 KB | 245.3 KB | 108 B | 2,272 B | 247.6 KB |
+
+- 中斷的 stack：`rt_rx` 由 UART 中斷透過函式指標呼叫、封包處理又是函式指標，呼叫圖接不起來，所以用「`rt_rx` 深度＋`on_packet` 深度＋104 B 例外框架」當上界。
+- 正式版的 Flash 裡沒有任何範例資料；約 89 KB 是預訓練的 50 棵樹（`main_rt.o` 的 text 91,037 B，表格在其中）。
+
+---
+
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`main_selfcal.c`、`stm32h743_axi.ld`） |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`src/pc/*`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
-| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
+| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |

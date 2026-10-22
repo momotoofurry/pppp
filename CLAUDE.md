@@ -21,6 +21,8 @@
 4. **改簡報前先比對 md5，確認使用者有沒有手動改過上一版**；改過就以使用者的版本為底稿，另存新版本號，不覆寫舊檔。
 5. 上游程式碼不改；新功能用選項加在 `src/selfcal_sweep.py`，預設值必須重現舊結果（用 `docker/run.sh verify` 確認）。
 6. 每個階段完成就 commit（作者 kirit / kirito520530@gmail.com，訊息結尾加 Co-Authored-By 行）。
+7. C 裡每棵樹的亂數種子要先打散（splitmix32），不能直接用同一條 xorshift 序列的連續輸出：xorshift 是線性的，樹會高度相關（report 7.1）。
+8. 量 stack 時，由中斷或函式指標呼叫的路徑不在呼叫圖裡，要另外算再加上去（`build_arm_selfcal.py` 的 rt 版本）。
 
 ## 目前的結論（推薦設定：100 棵、深度 10、int16 門檻，Flash 88.1 KB，推論 RAM 實測 552 B）
 - PC 重現：自我校正 84.63%（論文 84.6%）。完整模型的偽標籤 ablation 也重現了（84.66 / 80.89 / 82.16 vs 論文 84.6 / 81.0 / 82.7）。
@@ -33,8 +35,12 @@
   PC 端到端 83.04%（sklearn 83.27%，p = 0.20），各段都無顯著差異；Cortex-M7 linker 實測 RAM 自我校正約 223.6 KB、完整管線約 245.0 KB。
   `src/c/main_selfcal.c` 已包好 DWT cycle 計數，板子到了直接燒錄量時間。selfcal_sweep 新選項：`--tsne-impl c`、`--kmeans-impl c`、
   `--train-impl c`、`--features-dir`、`--dataset demo`（預設值都重現舊結果）。
+- **韌體（report 第 7 節、`results/firmware_report.md`，2026-10-23）**：板子改成 NUCLEO-H753ZI（還沒到）。one-shot 校正已搬上 MCU（`oneshot.c`，
+  剪枝和 Python 逐節點相同）；指令決策 `decision.c`（τ、k）；路線 B 序列協定 `protocol.c`＋即時迴圈 `rt.c`＋PC 工具 `src/pc/`；
+  正式韌體 `main_rt.c` linker 實測 RAM 約 248.7 KB、Flash 115.6 KB。韌體邏輯修正樹種子後 83.22%（sklearn 83.27%）。
 
 ## 建議的下一步
 1. ~~減少 t-SNE 迭代次數~~（完成，report 3.7）、~~降低 perplexity~~（完成，沒用，report 3.8）。
 2. ~~C 版 t-SNE、K-Means、建樹、自我校正迴圈、特徵擷取~~（完成，report 第 6 節）。
-3. 等 NUCLEO-H743ZI2：燒錄 `main_selfcal.c`（`build/selfcal_arm/`，`src/build_arm_selfcal.py`），量 cycle 數、確認板上預測和 PC 相同。
+3. 等 NUCLEO-H753ZI：硬體層 `board_h7.c`（時脈、cache、UART、Flash），燒錄 `main_selfcal.c` 量 cycle 數、確認板上預測和 PC 相同；
+   再燒 `main_rt.c` 走路線 B（`src/pc/trigno_bridge.py` 要先在實驗室電腦上對 TCU 驗證）。待決定的事見 `results/firmware_report.md`。

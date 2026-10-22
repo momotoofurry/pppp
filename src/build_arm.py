@@ -54,8 +54,8 @@ class Tool:
         return subprocess.run(cmd, capture_output=True, text=True, cwd=None if self.wsl else cwd)
 
 
-def worst_stack(ci_files):
-    """Deepest static stack path from Reset_Handler using gcc -fcallgraph-info=su output."""
+def worst_stack(ci_files, root='Reset_Handler'):
+    """Deepest static stack path from root (default Reset_Handler) using gcc -fcallgraph-info=su output."""
     stack, edges = {}, {}
     for f in ci_files:
         txt = open(f, encoding='utf8', errors='replace').read()
@@ -71,13 +71,13 @@ def worst_stack(ci_files):
             return 0
         return stack.get(n, 0) + max([depth(c, seen + (n,)) for c in edges.get(n, ())] or [0])
 
-    path, n = [], 'Reset_Handler'
+    path, n = [], root
     while n:
         path.append(f'{n}({stack.get(n, 0)})')
         kids = [c for c in edges.get(n, ()) if c not in [p.split('(')[0] for p in path]]
         n = max(kids, key=lambda c: depth(c, tuple(p.split('(')[0] for p in path)), default=None)
     unknown = sorted(c for cs in edges.values() for c in cs if c not in stack)
-    return depth('Reset_Handler'), ' -> '.join(path), unknown
+    return depth(root), ' -> '.join(path), unknown
 
 
 def main():
