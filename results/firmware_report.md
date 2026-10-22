@@ -24,7 +24,7 @@
 | MCU 上 one-shot 的準確率 vs sklearn | 79.40% vs 79.68%（−0.28，7 人較好／13 人較差，p = 0.52） | `results/oneshot_c_summary.csv` | `6302198` |
 | 接著自我校正後 vs sklearn | 82.98% vs 83.27%（−0.29，p = 0.28） | `results/oneshot_c_summary.csv` | `6302198` |
 | one-shot image 大小 | 6,227–8,787 B（平均 7,269 B） | `results/oneshot_c_check.csv` | `6302198` |
-| 修 bug 前 MCU 上 one-shot | 78.77%（−0.91，p = 0.027） | `results/logs/oneshot_c_check.log` 的第一次執行（commit 訊息有紀錄；檔案已被修正後的結果覆蓋） | `6302198` |
+| 修 bug 前 MCU 上 one-shot | 78.77%（−0.91，p = 0.027） | 只記在 commit `6302198` 的訊息裡：那次執行的輸出在 commit 前就被修正後的結果覆蓋，原始 log 沒有保留；要重現須還原種子修正後重跑 `check_oneshot_c.py` | `6302198` |
 | 消融：Q5.10 剪枝／C 建樹各自的影響 | −0.006／−0.092 個百分點（都不顯著） | `results/oneshot_ablation_summary.csv` | `6302198` |
 | 修 bug 後 C 自我校正韌體邏輯（PC 建 one-shot） | 83.22%（sklearn 83.27%，p = 0.90；修正前 83.04%） | `results/c_impl_summary.csv` | `6302198` |
 | 修 bug 後跨兩天 demo（1 人 × 10 seed） | 91.30%，增益 +9.37，第 2 天後段 75.4 → 92.8%（修正前 90.89%） | `results/c_impl_demo.csv` | `6302198` |
