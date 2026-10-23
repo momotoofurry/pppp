@@ -125,14 +125,96 @@ def ram_bytes(n_ch, buf=BUF, n_cal=60, classes=6):
     return buf * dim * 2 + n_cal * dim * 2 + 2 * classes * dim * 4 + feat
 
 
+def set_name(ch):
+    return 'all8' if len(ch) == 8 else 'ch' + ''.join(str(c + 1) for c in ch)
+
+
+def run_sets(sets, seeds, jobs):
+    """run every channel subset in `sets` (list of 0-based lists) for every seed and both folds -> per-row frame"""
+    tasks = [(set_name(ch), ch, seed, fold) for ch in sets for seed in seeds for fold in FOLDS]
+    res = Parallel(n_jobs=jobs, verbose=5)(delayed(job)(*t) for t in tasks)
+    return pd.DataFrame([r for rows in res for r in rows])
+
+
+def greedy(args):
+    """backward elimination: from 8 channels, at every step drop the channel whose removal costs the least
+    self-calibrated accuracy (mean over the 20 test subjects, search seeds); down to --greedy-min channels.
+    Then the chosen path (and all8) is re-run with the confirmation seeds and tested against all8 on all seeds."""
+    t0 = time.time()
+    current = list(range(8))
+    frames = [run_sets([current], args.seeds, args.jobs)]
+    steps = []
+    while len(current) > args.greedy_min:
+        cands = [[c for c in current if c != d] for d in current]
+        df = run_sets(cands, args.seeds, args.jobs)
+        frames.append(df)
+        score = df.groupby('set').acc_selfcal.mean() * 100
+        for d, ch in zip(current, cands):
+            steps.append(dict(step=8 - len(ch), n_channels=len(ch), removed=d + 1, set=set_name(ch),
+                              acc_selfcal_search=score[set_name(ch)]))
+        best = max(cands, key=lambda ch: score[set_name(ch)])
+        removed = [c for c in current if c not in best][0]
+        for s in steps:
+            if s['step'] == 8 - len(best):
+                s['chosen'] = s['removed'] == removed + 1
+        print(f'step {8 - len(best)}: drop channel {removed + 1} -> {set_name(best)} '
+              f'({score[set_name(best)]:.2f} %), {time.time() - t0:.0f} s', flush=True)
+        current = best
+    search = pd.concat(frames)
+    st = pd.DataFrame(steps)
+    st.to_csv(os.path.join(OUT, f'channel_greedy_steps{args.suffix}.csv'), index=False, float_format='%.4g')
+    path = [list(range(8))] + [[int(c) - 1 for c in s['set'][2:]] for s in steps if s.get('chosen')]
+    conf = run_sets(path, args.confirm_seeds, args.jobs)
+    acc = pd.concat([search[search.set.isin([set_name(ch) for ch in path])], conf])
+    acc.to_csv(os.path.join(OUT, f'channel_greedy{args.suffix}.csv'), index=False, float_format='%.4f')
+    summarize(acc, os.path.join(OUT, f'channel_greedy_summary{args.suffix}.csv'))
+    print(f'took {time.time() - t0:.0f} s')
+
+
+def summarize(acc, path):
+    per_subj = acc.groupby(['set', 'subject'])[['acc_oneshot', 'acc_selfcal']].mean() * 100
+    ref = per_subj.loc['all8'] if 'all8' in per_subj.index.get_level_values(0) else None
+    rows = []
+    for name, g in acc.groupby('set', sort=False):
+        per_seed = g.groupby('seed')[['acc_oneshot', 'acc_selfcal']].mean() * 100
+        ps = per_subj.loc[name]
+        n_ch = int(g.n_channels.iloc[0])
+        row = dict(set=name, n_channels=n_ch, channels=g.channels.iloc[0],
+                   pretrain='authors 66' if name == 'all8_pre66' else '10 (2-fold)',
+                   acc_oneshot=per_seed.acc_oneshot.mean(), acc_selfcal=per_seed.acc_selfcal.mean(),
+                   gain=(per_seed.acc_selfcal - per_seed.acc_oneshot).mean(),
+                   selfcal_seed_min=per_seed.acc_selfcal.min(), selfcal_seed_max=per_seed.acc_selfcal.max(),
+                   n_seeds=len(per_seed), n_subjects=len(ps),
+                   ram_dim_dependent_KB=ram_bytes(n_ch) / 1024,
+                   ram_saved_vs_8ch_KB=(ram_bytes(8) - ram_bytes(n_ch)) / 1024)
+        if ref is not None and name not in ('all8', 'all8_pre66'):
+            for m in ['acc_oneshot', 'acc_selfcal']:
+                d = ps[m] - ref[m]
+                row[f'{m}_diff_vs_all8'] = d.mean()
+                row[f'{m}_better_vs_all8'] = int((d > 0).sum())
+                row[f'{m}_p_vs_all8'] = wilcoxon(ps[m], ref[m]).pvalue if np.any(d != 0) else 1.0
+        rows.append(row)
+    s = pd.DataFrame(rows).sort_values('n_channels', ascending=False, kind='stable')
+    s.to_csv(path, index=False, float_format='%.4g')
+    pd.set_option('display.width', 250)
+    print(s.round(3).to_string(index=False))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--seeds', type=int, nargs='+', default=[0, 1, 2])
     ap.add_argument('--jobs', type=int, default=20)
     ap.add_argument('--sets', nargs='+', default=list(SETS))
     ap.add_argument('--no-pre66', action='store_true', help='skip the reference run with the authors\' model')
+    ap.add_argument('--greedy', action='store_true',
+                    help='backward elimination instead of the fixed sets: search with --seeds, confirm with '
+                         '--confirm-seeds; writes channel_greedy*.csv')
+    ap.add_argument('--greedy-min', type=int, default=2)
+    ap.add_argument('--confirm-seeds', type=int, nargs='+', default=[1, 2])
     ap.add_argument('--suffix', default='')
     args = ap.parse_args()
+    if args.greedy:
+        return greedy(args)
     t0 = time.time()
     tasks = [(n, SETS[n], seed, fold) for n in args.sets for seed in args.seeds for fold in FOLDS]
     if not args.no_pre66:
