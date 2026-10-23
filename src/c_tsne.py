@@ -31,7 +31,7 @@ def build(cc='gcc'):
     if os.path.exists(LIB) and os.path.getmtime(LIB) >= max(os.path.getmtime(s) for s in src + [src[0][:-1] + 'h']):
         return LIB
     os.makedirs(os.path.dirname(LIB), exist_ok=True)
-    subprocess.run([cc, '-O2', '-std=c99', '-Wall', '-fPIC', '-shared', f'-DTSNE_NMAX={NMAX}', '-o', LIB] + src
+    subprocess.run([cc, '-O2', '-std=c99', '-Wall', '-fPIC', '-shared', f'-DTSNE_NMAX={NMAX}', '-DTSNE_P16=0', '-o', LIB] + src
                    + ['-lm'], check=True)
     return LIB
 

@@ -31,6 +31,9 @@
 #ifndef TSNE_DIM
 #define TSNE_DIM 80
 #endif
+#ifndef TSNE_P16
+#define TSNE_P16 1              /* 1: store P as uint16 (conditional p x 65535, one float scale); 0: float32 */
+#endif
 #ifndef TSNE_CELLS
 #define TSNE_CELLS (5 * TSNE_NMAX / 2)   /* octree cells (2.5 n: the replays use at most 787 = 2.10 n); on overflow a point is merged into its cell */
 #endif
@@ -48,7 +51,7 @@ typedef struct {
 int tsne_run(const int16_t *const *rows, int n, float perplexity, int max_iter, const float *init, float *y,
              tsne_stats_t *st);
 
-/* scratch memory (the P array) for code that runs while no t-SNE is running (one-shot calibration) */
+/* scratch memory (the whole t-SNE workspace) for code that runs while no t-SNE is running (one-shot calibration) */
 void *tsne_scratch(unsigned *bytes);
 
 /* bytes of static memory used by the t-SNE module (for the report) */

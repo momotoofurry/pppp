@@ -26,27 +26,44 @@ typedef struct {
     uint16_t point;                 /* leaf: index of its point */
 } cell_t;
 
-/* ---- static workspace (this is the t-SNE RAM on the MCU) ---- */
-static uint16_t s_nbr[TSNE_NMAX * TSNE_K];   /* directed kNN edges */
-static float s_p[TSNE_NMAX * TSNE_K];        /* symmetrised, normalised P per edge (half of p_ij) */
-static float s_upd[TSNE_NMAX * D3];
-static float s_gain[TSNE_NMAX * D3];
-static float s_grad[TSNE_NMAX * D3];
-static cell_t s_cell[TSNE_CELLS];
-static int16_t s_stack[8 * MAX_DEPTH + 8];   /* octree traversal */
+/* ---- static workspace (this is the t-SNE RAM on the MCU) ----
+ * One struct, so the whole block can be lent out as scratch. With TSNE_P16 the edge weight is stored as the
+ * conditional probability (each row sums to 1, so every value is in [0, 1]) x 65535 in a uint16, and the
+ * normalisation 1 / (2 sum) / 65535 is one float: half the RAM of a float32 P, absolute error <= 7.6e-6. */
+#if TSNE_P16
+typedef uint16_t p_t;
+#else
+typedef float p_t;
+#endif
+static struct {
+    uint16_t nbr[TSNE_NMAX * TSNE_K];        /* directed kNN edges */
+    p_t p[TSNE_NMAX * TSNE_K];               /* P per edge (float: symmetrised, normalised; uint16: see above) */
+    float upd[TSNE_NMAX * D3];
+    float gain[TSNE_NMAX * D3];
+    float grad[TSNE_NMAX * D3];
+    cell_t cell[TSNE_CELLS];
+    int16_t stack[8 * MAX_DEPTH + 8];        /* octree traversal */
+} s_ws;
+#define s_nbr (s_ws.nbr)
+#define s_p (s_ws.p)
+#define s_upd (s_ws.upd)
+#define s_gain (s_ws.gain)
+#define s_grad (s_ws.grad)
+#define s_cell (s_ws.cell)
+#define s_stack (s_ws.stack)
+static float s_pscale = 1.0f;                /* P value of an edge = s_p[e] * s_pscale */
 
-/* The P / neighbour arrays are only used inside tsne_run(); one-shot calibration (oneshot.c), which runs
- * before self-calibration starts, borrows them as scratch so it needs no RAM of its own. */
+/* The workspace is only used inside tsne_run(); one-shot calibration (oneshot.c), which runs before
+ * self-calibration starts, borrows it as scratch so it needs no RAM of its own. */
 void *tsne_scratch(unsigned *bytes)
 {
-    *bytes = (unsigned)sizeof s_p;
-    return s_p;
+    *bytes = (unsigned)sizeof s_ws;
+    return &s_ws;
 }
 
 unsigned tsne_static_bytes(void)
 {
-    return (unsigned)(sizeof s_nbr + sizeof s_p + sizeof s_upd + sizeof s_gain + sizeof s_grad + sizeof s_cell +
-                      sizeof s_stack);
+    return (unsigned)(sizeof s_ws + sizeof s_pscale);
 }
 
 /* ---------------------------------------------------------------- P: kNN + perplexity search */
@@ -107,14 +124,23 @@ static void joint_probabilities(const int16_t *const *x, int n, int k, float per
         }
         for (int j = 0; j < k; j++) {
             s_nbr[i * k + j] = ik[j];
+#if TSNE_P16
+            s_p[i * k + j] = (uint16_t)(P[j] * 65535.0 + 0.5);
+#else
             s_p[i * k + j] = (float)P[j];
+#endif
             sum_all += P[j];
         }
     }
     /* P_sym = (P + P^T) / sum(P + P^T); each directed edge carries its own part */
     const double inv = 1.0 / (2.0 * sum_all);
+#if TSNE_P16
+    s_pscale = (float)(inv / 65535.0);
+#else
     for (int e = 0; e < n * k; e++)
         s_p[e] = (float)(s_p[e] * inv);
+    s_pscale = 1.0f;
+#endif
 }
 
 /* ---------------------------------------------------------------- octree */
@@ -290,7 +316,7 @@ static void gradient(const float *y, int n, int k, float exag)
                 d2 += d[a] * d[a];
             }
             float q = DOF / (DOF + d2);
-            float f = exag * s_p[e] * q * sqrtf(q);
+            float f = exag * ((float)s_p[e] * s_pscale) * q * sqrtf(q);
             for (int a = 0; a < D3; a++) {
                 s_grad[i * D3 + a] += f * d[a];
                 s_grad[s_nbr[e] * D3 + a] -= f * d[a];
