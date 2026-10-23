@@ -32,7 +32,7 @@
 #define TSNE_DIM 80
 #endif
 #ifndef TSNE_CELLS
-#define TSNE_CELLS (3 * TSNE_NMAX)   /* octree cells; on overflow a point is merged into its cell */
+#define TSNE_CELLS (5 * TSNE_NMAX / 2)   /* octree cells (2.5 n: the replays use at most 787 = 2.10 n); on overflow a point is merged into its cell */
 #endif
 
 typedef struct {
