@@ -43,6 +43,10 @@ SETS = {   # names use the 1-based channel numbers of the data set
     'drop4-8': [0, 1, 2, 4, 5, 6],
     'ch1357': [0, 2, 4, 6], 'ch2468': [1, 3, 5, 7],
     'ch1-5': [0, 4], 'ch3-7': [2, 6],
+    # chosen after the first sweep (post hoc, from the same 20 subjects): channels 4 and 5 show almost no
+    # gesture-related activation (gesture / rest RMS 1.05 / 1.09) and are the two least important channels of the
+    # 66-participant model; ch1367 keeps the four channels with the most activation outside the 6-8 pair
+    'drop4-5': [0, 1, 2, 5, 6, 7], 'ch1367': [0, 2, 5, 6],
 }
 FOLDS = {'A': (list(range(0, 10)), list(range(10, 20))), 'B': (list(range(10, 20)), list(range(0, 10)))}  # test, pretrain
 N, DEPTH, PREC, BUF, MLN, IT = 100, 10, 'int16', 375, 32, 500

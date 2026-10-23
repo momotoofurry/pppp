@@ -1,0 +1,4 @@
+set,n_channels,channels,pretrain,acc_oneshot,acc_selfcal,gain,selfcal_seed_min,selfcal_seed_max,n_seeds,n_subjects,ram_dim_dependent_KB,ram_saved_vs_8ch_KB,acc_oneshot_diff_vs_all8,acc_oneshot_better_vs_all8,acc_oneshot_p_vs_all8,acc_selfcal_diff_vs_all8,acc_selfcal_better_vs_all8,acc_selfcal_p_vs_all8
+all8,8,1 2 3 4 5 6 7 8,10 (2-fold),78.47,81.85,3.38,81.42,82.29,3,20,89.47,0,,,,,,
+drop4-5,6,1 2 3 6 7 8,10 (2-fold),77.09,81.08,3.986,80.3,81.71,3,20,67.1,22.37,-1.378,4,0.00169,-0.7717,6,0.07585
+ch1367,4,1 3 6 7,10 (2-fold),74.74,77.72,2.979,77.59,77.79,3,20,44.74,44.74,-3.729,5,0.001209,-4.13,3,0.00169

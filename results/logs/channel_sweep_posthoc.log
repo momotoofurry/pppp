@@ -1,0 +1,11 @@
+[Parallel(n_jobs=18)]: Using backend LokyBackend with 18 concurrent workers.
+[Parallel(n_jobs=18)]: Done   3 out of  18 | elapsed:  6.5min remaining: 32.6min
+[Parallel(n_jobs=18)]: Done   7 out of  18 | elapsed:  6.6min remaining: 10.3min
+[Parallel(n_jobs=18)]: Done  11 out of  18 | elapsed:  6.6min remaining:  4.2min
+[Parallel(n_jobs=18)]: Done  15 out of  18 | elapsed:  6.7min remaining:  1.3min
+[Parallel(n_jobs=18)]: Done  18 out of  18 | elapsed:  6.8min finished
+    set  n_channels        channels    pretrain  acc_oneshot  acc_selfcal  gain  selfcal_seed_min  selfcal_seed_max  n_seeds  n_subjects  ram_dim_dependent_KB  ram_saved_vs_8ch_KB  acc_oneshot_diff_vs_all8  acc_oneshot_better_vs_all8  acc_oneshot_p_vs_all8  acc_selfcal_diff_vs_all8  acc_selfcal_better_vs_all8  acc_selfcal_p_vs_all8
+   all8           8 1 2 3 4 5 6 7 8 10 (2-fold)       78.471       81.851 3.380            81.415            82.292        3          20                89.473                0.000                       NaN                         NaN                    NaN                       NaN                         NaN                    NaN
+drop4-5           6     1 2 3 6 7 8 10 (2-fold)       77.093       81.079 3.986            80.303            81.711        3          20                67.104               22.368                    -1.378                         4.0                  0.002                    -0.772                         6.0                  0.076
+ ch1367           4         1 3 6 7 10 (2-fold)       74.741       77.721 2.979            77.589            77.789        3          20                44.736               44.736                    -3.729                         5.0                  0.001                    -4.130                         3.0                  0.002
+took 405 s
