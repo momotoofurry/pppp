@@ -1,0 +1,4 @@
+shift,fixed,tsne,tsne_minus_fixed,tsne_better_than_fixed,tsne_p_vs_fixed,tsne_late_blocks,uhc,uhc_minus_fixed,uhc_better_than_fixed,uhc_p_vs_fixed,uhc_late_blocks,tsne_minus_uhc,tsne_better_than_uhc,p_tsne_vs_uhc,fixed_late_blocks
+0,79.68,83.27,3.589,19,5.722e-06,83.09,80.02,0.3364,12,0.3118,79.16,3.253,18,4.768e-05,77.71
+1,52.18,58.08,5.899,18,0.0001335,58.11,52.39,0.2101,10,0.8408,52.13,5.689,18,0.001986,51.45
+-1,50.09,54.36,4.279,16,0.009436,55.84,49.68,-0.401,7,0.2943,49.29,4.68,17,0.003654,49.34

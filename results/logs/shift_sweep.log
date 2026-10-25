@@ -1,0 +1,10 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:  2.1min
+[Parallel(n_jobs=19)]: Done 124 tasks      | elapsed:  3.8min
+[Parallel(n_jobs=19)]: Done 250 tasks      | elapsed:  6.5min
+[Parallel(n_jobs=19)]: Done 360 out of 360 | elapsed:  8.3min finished
+ shift  fixed   tsne  tsne_minus_fixed  tsne_better_than_fixed  tsne_p_vs_fixed  tsne_late_blocks    uhc  uhc_minus_fixed  uhc_better_than_fixed  uhc_p_vs_fixed  uhc_late_blocks  tsne_minus_uhc  tsne_better_than_uhc  p_tsne_vs_uhc  fixed_late_blocks
+     0 79.680 83.270             3.589                      19            0.000            83.085 80.017            0.336                     12           0.312           79.165           3.253                    18          0.000             77.715
+     1 52.181 58.080             5.899                      18            0.000            58.109 52.391            0.210                     10           0.841           52.133           5.689                    18          0.002             51.452
+    -1 50.085 54.365             4.279                      16            0.009            55.835 49.684           -0.401                      7           0.294           49.285           4.680                    17          0.004             49.341
+took 500 s

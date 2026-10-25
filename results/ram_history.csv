@@ -1,0 +1,4 @@
+commit,step,ram_B,ram_KB,tsne_KB,selfcal_KB,features_KB,other_KB
+e6b1bcd,board layer added,259224,253.15,121.84,90.72,20.32,20.27
+f15cf9e,octree 2.5 n cells,252456,246.54,115.23,90.72,20.32,20.27
+5519744,"16-bit P, shared workspace",229208,223.84,92.53,90.72,20.32,20.27

@@ -2,4 +2,4 @@ variant,acc_oneshot,acc_selfcal,selfcal_seed_min,selfcal_seed_max,gain,blocks,on
 "full model (paper), sklearn",82.4,89.33,87.33,90.83,6.927,10,74.84,91.98
 "100 trees d10 int16, upstream settings, sklearn",81.93,89.55,86.93,91.6,7.62,10,75.44,91.8
 "MCU setting, sklearn",81.93,91.29,89.93,92.47,9.36,,75.44,92.8
-"MCU setting, C firmware logic",81.93,91.3,89.67,92.27,9.366,,75.44,92.81
+"MCU setting, C firmware logic",81.93,91.06,90.17,92.03,9.123,,75.44,92.44
