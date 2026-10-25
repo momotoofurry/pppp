@@ -1,0 +1,22 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done   3 tasks      | elapsed:   11.9s
+[Parallel(n_jobs=19)]: Done 160 out of 160 | elapsed:   29.1s finished
+features ready after 29 s
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:  1.6min
+[Parallel(n_jobs=19)]: Done 124 tasks      | elapsed:  4.8min
+[Parallel(n_jobs=19)]: Done 250 tasks      | elapsed:  9.0min
+[Parallel(n_jobs=19)]: Done 412 tasks      | elapsed: 13.1min
+[Parallel(n_jobs=19)]: Done 610 tasks      | elapsed: 19.4min
+[Parallel(n_jobs=19)]: Done 844 tasks      | elapsed: 26.7min
+[Parallel(n_jobs=19)]: Done 960 out of 960 | elapsed: 29.8min finished
+ shift  fixed   tsne  align_fixed  align_tsne  tsne_late  align_tsne_late  k_true  k_correct       k_values  diff_tsne_vs_fixed  better_tsne_vs_fixed  p_tsne_vs_fixed  diff_align_vs_tsne  better_align_vs_tsne  p_align_vs_tsne  diff_align_vs_noshift  better_align_vs_noshift  p_align_vs_noshift  diff_tsne_vs_noshift  better_tsne_vs_noshift  p_tsne_vs_noshift
+  0.00 79.680 83.232       79.680      83.232     83.296           83.296       0         20           0:20               3.552                    18            0.000               0.000                     0            1.000                  0.000                        0               1.000                 0.000                       0              1.000
+  0.25 76.593 79.831       76.593      79.831     80.457           80.457       0         20           0:20               3.237                    19            0.000               0.000                     0            1.000                 -3.402                        3               0.001                -3.402                       3              0.001
+  0.50 66.426 70.875       67.700      71.421     73.891           73.283       0         12  -3:1 0:12 1:7               4.449                    20            0.000               0.545                     6            0.484                -11.812                        2               0.000               -12.357                       1              0.000
+  0.75 53.955 59.652       77.245      80.597     62.720           81.311       1         20           1:20               5.697                    19            0.000              20.945                    20            0.000                 -2.635                        4               0.009               -23.580                       0              0.000
+  1.00 45.896 49.985       79.680      83.232     51.678           83.296       1         20           1:20               4.089                    19            0.000              33.247                    20            0.000                  0.000                        0               1.000               -33.247                       0              0.000
+ -0.25 77.245 80.597       77.245      80.597     81.311           81.311       0         20           0:20               3.352                    19            0.000               0.000                     0            1.000                 -2.635                        4               0.009                -2.635                       4              0.009
+ -0.50 65.837 70.959       67.700      71.421     73.069           73.283       0          7 -4:1 -1:12 0:7               5.122                    19            0.000               0.462                     6            0.807                -11.812                        2               0.000               -12.273                       1              0.000
+ -1.00 46.965 50.392       79.680      83.232     51.219           83.296      -1         20          -1:20               3.427                    14            0.015              32.840                    20            0.000                  0.000                        0               1.000               -32.840                       0              0.000
+took 1817 s
