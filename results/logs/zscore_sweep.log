@@ -1,0 +1,36 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:  1.6min
+[Parallel(n_jobs=19)]: Done 124 tasks      | elapsed:  5.0min
+[Parallel(n_jobs=19)]: Done 250 tasks      | elapsed:  9.9min
+[Parallel(n_jobs=19)]: Done 412 tasks      | elapsed: 16.3min
+[Parallel(n_jobs=19)]: Done 610 tasks      | elapsed: 24.1min
+[Parallel(n_jobs=19)]: Done 844 tasks      | elapsed: 32.6min
+[Parallel(n_jobs=19)]: Done 1114 tasks      | elapsed: 43.5min
+[Parallel(n_jobs=19)]: Done 1250 out of 1250 | elapsed: 47.8min finished
+     dataset  shift         zs  n_subjects  fixed  adapt  fixed_vs_none  fixed_better  fixed_p  adapt_vs_none  adapt_better  adapt_p
+arm_position   0.00       none          20 79.680 83.232          0.000             0      NaN          0.000             0      NaN
+arm_position   0.00     ema0.1          20 81.357 84.216          1.676            17    0.000          0.984            12    0.024
+arm_position   0.00     ema0.3          20 81.915 84.606          2.235            15    0.002          1.374            13    0.030
+arm_position   0.00       ema1          20 81.338 83.335          1.658            13    0.064          0.103             9    0.898
+arm_position   0.00 ema0.3rest          20 66.836 71.040        -12.844             0    0.000        -12.192             0    0.000
+arm_position   0.25       none          20 76.593 79.831          0.000             0      NaN          0.000             0      NaN
+arm_position   0.25     ema0.1          20 78.851 81.744          2.258            17    0.000          1.914            17    0.001
+arm_position   0.25     ema0.3          20 79.776 82.406          3.182            17    0.000          2.575            15    0.001
+arm_position   0.25       ema1          20 79.408 81.184          2.815            15    0.006          1.354            11    0.123
+arm_position   0.25 ema0.3rest          20 65.460 69.533        -11.133             1    0.000        -10.298             2    0.000
+arm_position   0.50       none          20 67.700 71.421          0.000             0      NaN          0.000             0      NaN
+arm_position   0.50     ema0.1          20 70.979 74.051          3.279            17    0.000          2.630            17    0.002
+arm_position   0.50     ema0.3          20 72.022 75.329          4.322            15    0.002          3.908            15    0.012
+arm_position   0.50       ema1          20 71.618 74.541          3.918            14    0.011          3.120            14    0.033
+arm_position   0.50 ema0.3rest          20 59.096 63.676         -8.604             2    0.000         -7.744             5    0.002
+arm_position   1.00       none          20 79.680 83.232          0.000             0      NaN          0.000             0      NaN
+arm_position   1.00     ema0.1          20 81.357 84.216          1.676            17    0.000          0.984            12    0.024
+arm_position   1.00     ema0.3          20 81.915 84.606          2.235            15    0.002          1.374            13    0.030
+arm_position   1.00       ema1          20 81.338 83.335          1.658            13    0.064          0.103             9    0.898
+arm_position   1.00 ema0.3rest          20 66.836 71.040        -12.844             0    0.000        -12.192             0    0.000
+        demo   0.00       none           1 81.933 91.293          0.000             0      NaN          0.000             0      NaN
+        demo   0.00     ema0.1           1 85.033 92.687          3.100             1      NaN          1.393             1      NaN
+        demo   0.00     ema0.3           1 84.850 92.373          2.917             1      NaN          1.080             1      NaN
+        demo   0.00       ema1           1 83.813 88.337          1.880             1      NaN         -2.957             0      NaN
+        demo   0.00 ema0.3rest           1 71.897 81.390        -10.037             0      NaN         -9.903             0      NaN
+took 2883 s
