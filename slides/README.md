@@ -1,7 +1,8 @@
 # slides/ — 產生「碩論題目討論」簡報的腳本
 
 簡報檔本身不在 repo 裡，放在 Windows 的 `C:\Users\kirit\Downloads\`（WSL 裡是 `/mnt/c/Users/kirit/Downloads/`）。
-每一版都是從上一版加內容，不覆寫舊檔：
+每一版都是從上一版加內容，不覆寫舊檔。資料夾裡只留最新一版的腳本；下表是歷史紀錄，
+`build13.py` 之前的腳本（和 `make_nums.py`、`nums*.json`）已刪除，要看可以從 git 歷史拿（`git log -- slides/`）：
 
 | 腳本 | 輸入 → 輸出 | 內容 |
 |---|---|---|
@@ -20,18 +21,10 @@
 
 ```bash
 # repo 根目錄；Docker image 需含 python-pptx（docker/requirements.txt）
-docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/work -w /work rf-emg python slides/make_nums.py
+# results/ram_history.csv comes from `python3 src/ram_history.py` on the host
 D=/mnt/c/Users/kirit/Downloads
 docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/work -v "$D":/d -w /work rf-emg \
-  bash -c 'python slides/build7.py /d/碩論題目討論_MOMO_v6.pptx /tmp/v7u.pptx slides/nums5.json &&
-           python slides/build8.py /tmp/v7u.pptx /d/碩論題目討論_MOMO_v8.pptx slides/nums6.json &&
-           python slides/build9.py /d/碩論題目討論_MOMO_v8.pptx /d/碩論題目討論_MOMO_v9.pptx slides/nums6.json'
-# v10 is built from the user-edited v9 (not from the build9 output):
-#   python slides/build10.py /d/碩論題目討論_MOMO_v9.pptx /d/碩論題目討論_MOMO_v10.pptx slides/nums6.json
-# v12 is built from the user's v11:
-#   python slides/build12.py /d/碩論題目討論_MOMO_v11.pptx /d/碩論題目討論_MOMO_v12.pptx
-# v13 is built from the user-edited v12 (results/ram_history.csv comes from `python3 src/ram_history.py` on the host):
-#   python slides/build13.py /d/碩論題目討論_MOMO_v12.pptx /d/碩論題目討論_MOMO_v13.pptx
+  python slides/build13.py /d/碩論題目討論_MOMO_v12.pptx /d/碩論題目討論_MOMO_v13.pptx
 ```
 
 改完先確認使用者沒有手動改過上一版（例如比對 md5）；改過的話要以使用者的版本為底稿，不要從舊版重新產生。
