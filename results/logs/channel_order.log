@@ -1,0 +1,47 @@
+correlations done after 11 s
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done   3 out of  20 | elapsed:   30.4s remaining:  2.9min
+[Parallel(n_jobs=19)]: Done   8 out of  20 | elapsed:   32.0s remaining:   48.0s
+[Parallel(n_jobs=19)]: Done  13 out of  20 | elapsed:   37.7s remaining:   20.3s
+[Parallel(n_jobs=19)]: Done  18 out of  20 | elapsed:   38.6s remaining:    4.3s
+[Parallel(n_jobs=19)]: Done  20 out of  20 | elapsed:   46.1s finished
+mean correlation (channels 1-8):
+      1     2     3     4     5     6     7     8
+1  1.00  0.35  0.15  0.10  0.05  0.06  0.09  0.28
+2  0.35  1.00  0.34  0.14  0.04  0.04  0.03  0.11
+3  0.15  0.34  1.00  0.45  0.14  0.08  0.05  0.09
+4  0.10  0.14  0.45  1.00  0.30  0.14  0.07  0.09
+5  0.05  0.04  0.14  0.30  1.00  0.36  0.16  0.10
+6  0.06  0.04  0.08  0.14  0.36  1.00  0.28  0.13
+7  0.09  0.03  0.05  0.07  0.16  0.28  1.00  0.35
+8  0.28  0.11  0.09  0.09  0.10  0.13  0.35  1.00
+best rings:
+ rank                      ring    score  n_subjects_best
+    1           1-2-3-4-5-6-7-8 2.714821               20
+    2           1-2-3-4-6-5-7-8 2.441943                0
+    3           1-2-3-4-5-6-8-7 2.372771                0
+    4           1-2-4-3-5-6-7-8 2.358000                0
+    5           1-2-8-7-6-5-4-3 2.346867                0
+    6           1-2-3-4-5-7-6-8 2.286973                0
+    7           1-2-3-4-8-7-6-5 2.275738                0
+    8           1-2-3-4-7-6-5-8 2.233423                0
+    9           1-2-3-4-5-8-7-6 2.221464                0
+   10           1-7-6-5-4-3-2-8 2.207602                0
+    1 1-2-3-4-5-6-7-8 (assumed) 2.714821               20
+per-subject best ring, how often each pair is adjacent (out of 20):
+    1   2   3   4   5   6   7   8
+1   0  20   0   0   0   0   0  20
+2  20   0  20   0   0   0   0   0
+3   0  20   0  20   0   0   0   0
+4   0   0  20   0  20   0   0   0
+5   0   0   0  20   0  20   0   0
+6   0   0   0   0  20   0  20   0
+7   0   0   0   0   0  20   0  20
+8  20   0   0   0   0   0  20   0
+         all_correct_pct  n_correct_mean  subjects_all_perms_correct  acc_true_order  acc_recovered  acc_loss_max  true_in_top50_pct    n
+method                                                                                                                                   
+gesture             35.0            5.60                           7           73.13          74.56          7.68              100.0  220
+corr                55.0            4.40                          11           73.13          57.24         68.27              100.0  220
+both                95.0            7.60                          19           73.13          74.35          0.00              100.0  220
+model               15.0            4.75                           3           73.13          77.54          0.00              100.0  220
+took 58 s

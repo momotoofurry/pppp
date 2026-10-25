@@ -1,0 +1,5 @@
+method,all_correct_pct,n_correct_mean,subjects_all_perms_correct,acc_true_order,acc_recovered,acc_loss_max,true_in_top50_pct,n
+gesture,35,5.6,7,73.13,74.56,7.679,100,220
+corr,55,4.4,11,73.13,57.24,68.27,100,220
+both,95,7.6,19,73.13,74.35,0,100,220
+model,15,4.75,3,73.13,77.54,0,100,220
