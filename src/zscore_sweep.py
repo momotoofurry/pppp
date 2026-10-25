@@ -11,6 +11,12 @@ Variants (--zs):
   ema0.3rest a = 0.3, but the statistics are taken from a Rest-heavy subset of the block (all Rest windows + a random
              subset of the others so that Rest is half of the windows) - the arm_position blocks are balanced over the
              six gestures, daily use is not; this checks how much an unbalanced gesture mix biases the update
+  bal0.3 / bal0.3rest      class-balanced update (no labels): the block's windows are grouped by the self-calibrated
+             model's predicted class; each class with >= 5 windows gives its mean and variance, and the block statistics
+             are the equal-weight mixture of the classes (mean of class means; mean of class variances + variance of the
+             class means); then the same a = 0.3 update. 'rest' = statistics from the Rest-heavy subset as above.
+  balconf0.3 / balconf0.3rest   as bal, but only windows whose top-vote ratio is >= 0.6 (the decision threshold of
+             shift_sweep's UHC) are used. Device cost: per-class sums of x and x^2 during a block, 6 x 80 x 2 values.
 Each run records the fixed one-shot model (acc_fixed: = "z-score update only" when zs != none) and the
 self-calibrated model (acc_adapt) on the same blocks. The buffer keeps rows as they were normalised when stored
 (as on the device); the calibration set used for new trees stays normalised with the day-1 statistics.
@@ -24,6 +30,8 @@ MCU setting as selfcal_sweep.py / shift_sweep.py: 100 trees, depth 10, int16, in
 <= 32 leaves per block, t-SNE 500 iterations.
 Writes results/zscore_sweep.csv (per run and block) and results/zscore_sweep_summary.csv.
 Usage (in the container): python src/zscore_sweep.py [--jobs 19]
+  class-balanced run: python src/zscore_sweep.py --zs none ema0.3 ema0.3rest bal0.3 bal0.3rest balconf0.3 \
+                          balconf0.3rest --shifts 0 0.25 0.5 --suffix _bal
 """
 import argparse
 import copy
@@ -46,8 +54,12 @@ from pipeline import emg_functions  # noqa: E402
 OUT = os.path.join(P.ROOT, 'results')
 N, DEPTH, PREC, BUF, MLN, IT = SH.N, SH.DEPTH, SH.PREC, SH.BUF, SH.MLN, SH.IT
 REST = 5                                                             # label_order: power lateral tripod pointer open rest
-ZS = {'none': (0.0, False), 'ema0.1': (0.1, False), 'ema0.3': (0.3, False), 'ema1': (1.0, False),
-      'ema0.3rest': (0.3, True)}
+ZS = {'none': (0.0, False, 'pooled'), 'ema0.1': (0.1, False, 'pooled'), 'ema0.3': (0.3, False, 'pooled'),
+      'ema1': (1.0, False, 'pooled'), 'ema0.3rest': (0.3, True, 'pooled'),
+      'bal0.3': (0.3, False, 'bal'), 'bal0.3rest': (0.3, True, 'bal'),
+      'balconf0.3': (0.3, False, 'balconf'), 'balconf0.3rest': (0.3, True, 'balconf')}
+MIN_CLASS = 5
+CONF = 0.6
 
 
 def load(dataset, subject, shift):
@@ -63,11 +75,20 @@ def load(dataset, subject, shift):
     return Xc, yc, [(SH.rotate(X, -k), y) for X, y in blocks], k
 
 
-def stats_subset(X, y, rng):
-    """Rest windows + random other windows so that Rest is half of the subset"""
+def stats_subset(y, rng):
+    """indices: Rest windows + random other windows so that Rest is half of the subset"""
     rest, other = np.where(y == REST)[0], np.where(y != REST)[0]
-    keep = np.concatenate([rest, rng.choice(other, size=min(len(rest), len(other)), replace=False)])
-    return X[keep]
+    return np.concatenate([rest, rng.choice(other, size=min(len(rest), len(other)), replace=False)])
+
+
+def balanced_stats(X, pred):
+    """equal-weight mixture over the predicted classes with >= MIN_CLASS windows; None if fewer than 2 classes"""
+    groups = [X[pred == k] for k in np.unique(pred) if np.sum(pred == k) >= MIN_CLASS]
+    if len(groups) < 2:
+        return None
+    m = np.stack([g.mean(0) for g in groups])
+    v = np.stack([g.var(0) for g in groups])
+    return m.mean(0), v.mean(0) + m.var(0)
 
 
 def run(dataset, subject, seed, shift, zs):
@@ -85,12 +106,15 @@ def run(dataset, subject, seed, shift, zs):
     app = P.train_rf(Xc, yc, n_app, DEPTH, None)
     mdl_os = emg_functions.append(P.subset(pruned, range(n_pre)), app)
     mdl_sc = copy.deepcopy(mdl_os)
-    a, rest_heavy = ZS[zs]
+    a, rest_heavy, mode = ZS[zs]
     feat_buf, lab_buf = np.zeros((0, Xc.shape[1])), np.zeros((0,))
     rows = []
     for b, (X_raw, y) in enumerate(blocks):
         X = (X_raw - mu) / np.sqrt(var)
         lab_os, lab_sc = P.predict(mdl_os, X, PREC), P.predict(mdl_sc, X, PREC)
+        if mode == 'balconf':                                        # confidence of the model that labels the buffer
+            v = SH.votes(mdl_sc, X, PREC)
+            conf = v.max(1) / v.sum(1)
         rows.append(dict(dataset=dataset, subject=subject, seed=seed, shift=shift, zs=zs, block=b, k_est=k_est,
                          acc_fixed=np.mean(lab_os == y), acc_adapt=np.mean(lab_sc == y)))
         feat_buf, lab_buf = emg_functions.buffer_update(BUF, feat_buf, lab_buf, S.q16(X), lab_sc)
@@ -102,9 +126,16 @@ def run(dataset, subject, seed, shift, zs):
             idx_remain = np.concatenate([np.arange(n_pre), np.random.permutation(range(n_pre, N))[:n_app - n_upd]])
             mdl_sc = emg_functions.replace(mdl_sc, new, idx_remain)
         if a > 0:                                                    # statistics for the next block
-            Xs = stats_subset(X_raw, y, rng) if rest_heavy else X_raw
-            mu = (1 - a) * mu + a * Xs.mean(0)
-            var = (1 - a) * var + a * Xs.var(0)
+            idx = stats_subset(y, rng) if rest_heavy else np.arange(len(y))   # y only picks the simulated mix
+            if mode == 'pooled':
+                st = X_raw[idx].mean(0), X_raw[idx].var(0)
+            else:
+                if mode == 'balconf':
+                    idx = idx[conf[idx] >= CONF]
+                st = balanced_stats(X_raw[idx], lab_sc[idx])         # predicted classes, no labels
+            if st is not None:
+                mu = (1 - a) * mu + a * st[0]
+                var = (1 - a) * var + a * st[1]
     return rows
 
 

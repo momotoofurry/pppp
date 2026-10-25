@@ -1,0 +1,39 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:  1.4min
+[Parallel(n_jobs=19)]: Done 124 tasks      | elapsed:  4.7min
+[Parallel(n_jobs=19)]: Done 250 tasks      | elapsed:  8.8min
+[Parallel(n_jobs=19)]: Done 412 tasks      | elapsed: 13.7min
+[Parallel(n_jobs=19)]: Done 610 tasks      | elapsed: 19.7min
+[Parallel(n_jobs=19)]: Done 844 tasks      | elapsed: 26.9min
+[Parallel(n_jobs=19)]: Done 1114 tasks      | elapsed: 33.9min
+[Parallel(n_jobs=19)]: Done 1330 out of 1330 | elapsed: 39.3min finished
+     dataset  shift             zs  n_subjects  fixed  adapt  fixed_vs_none  fixed_better  fixed_p  adapt_vs_none  adapt_better  adapt_p
+arm_position   0.00           none          20 79.680 83.232          0.000             0      NaN          0.000             0      NaN
+arm_position   0.00         ema0.3          20 81.915 84.606          2.235            15    0.002          1.374            13    0.030
+arm_position   0.00     ema0.3rest          20 66.836 71.040        -12.844             0    0.000        -12.192             0    0.000
+arm_position   0.00         bal0.3          20 81.394 84.135          1.714            16    0.002          0.903            12    0.143
+arm_position   0.00     bal0.3rest          20 81.560 84.168          1.879            17    0.001          0.935            13    0.083
+arm_position   0.00     balconf0.3          20 81.520 84.160          1.840            15    0.008          0.928            13    0.076
+arm_position   0.00 balconf0.3rest          20 80.165 83.055          0.484            10    0.756         -0.177             9    0.812
+arm_position   0.25           none          20 76.593 79.831          0.000             0      NaN          0.000             0      NaN
+arm_position   0.25         ema0.3          20 79.776 82.406          3.182            17    0.000          2.575            15    0.001
+arm_position   0.25     ema0.3rest          20 65.460 69.533        -11.133             1    0.000        -10.298             2    0.000
+arm_position   0.25         bal0.3          20 79.039 81.811          2.445            16    0.001          1.980            16    0.001
+arm_position   0.25     bal0.3rest          20 79.354 81.845          2.760            16    0.001          2.014            16    0.003
+arm_position   0.25     balconf0.3          20 78.702 81.431          2.108            13    0.019          1.600            13    0.028
+arm_position   0.25 balconf0.3rest          20 77.015 80.141          0.422            11    0.648          0.311            10    0.841
+arm_position   0.50           none          20 67.700 71.421          0.000             0      NaN          0.000             0      NaN
+arm_position   0.50         ema0.3          20 72.022 75.329          4.322            15    0.002          3.908            15    0.012
+arm_position   0.50     ema0.3rest          20 59.096 63.676         -8.604             2    0.000         -7.744             5    0.002
+arm_position   0.50         bal0.3          20 71.239 74.715          3.539            15    0.003          3.294            15    0.019
+arm_position   0.50     bal0.3rest          20 71.473 74.654          3.773            16    0.003          3.233            15    0.021
+arm_position   0.50     balconf0.3          20 69.616 73.220          1.916            13    0.143          1.799            14    0.114
+arm_position   0.50 balconf0.3rest          20 68.034 71.737          0.334            10    0.748          0.317            12    0.729
+        demo   0.00           none           1 81.933 91.293          0.000             0      NaN          0.000             0      NaN
+        demo   0.00         ema0.3           1 84.850 92.373          2.917             1      NaN          1.080             1      NaN
+        demo   0.00     ema0.3rest           1 71.897 81.390        -10.037             0      NaN         -9.903             0      NaN
+        demo   0.00         bal0.3           1 84.820 91.997          2.887             1      NaN          0.703             1      NaN
+        demo   0.00     bal0.3rest           1 84.693 92.547          2.760             1      NaN          1.253             1      NaN
+        demo   0.00     balconf0.3           1 85.230 93.030          3.297             1      NaN          1.737             1      NaN
+        demo   0.00 balconf0.3rest           1 84.977 93.380          3.043             1      NaN          2.087             1      NaN
+took 2368 s
