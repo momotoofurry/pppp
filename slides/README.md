@@ -16,6 +16,7 @@
 | `build10.py` | 使用者改過的 v9（2026-10-19 23:00，md5 b2e2960f…，27 頁）→ v10 | 精簡與去模板化：主線 20 頁（前置結果 10 頁併成 6 頁，加「前置結果」分隔頁），其餘移到「附錄」（不刪）；全部頁面拿掉深色「→ 下一步」長條、數字卡片外框，深色卡片改淺色細框，標題去掉「前置結果⑤：」等前綴並對齊；552 B、t-SNE ablation、C 端到端準確率併到保留的頁面；頁碼重新計算 |
 | `build12.py` | 使用者的 v11（= v10 拿掉附錄，2026-10-19 23:10）→ v12 | 給教授的精簡版（16 頁）：新增「我想做的事」開場頁（一句話、已做到／還沒人做／接下來一年、需要老師同意的事，數字從結果頁讀）；只留最接近的研究、RQ、架構、方法、6 頁重現與前置結果、研究範圍；參考文獻只留有引用的 10 篇並重新編號 |
 | `build13.py` | 使用者改過的 v12（2026-10-20 00:07，md5 577fc746…，只改第 2 頁第三欄）→ v13 | 加最新實驗（18 頁）：RAM 頁改成三個版本的 linker 實測（253.2 → 246.5 → 223.8 KB，`results/ram_history.csv`）、C 端到端 83.23%；demo 頁換成 16 位元 P 之後的曲線（92.4%）；新增「通道數」「電極轉一格」兩頁；第 2、3、5 頁的數字跟著更新，第 2 頁加兩點、開發板改 H753ZI；參考文獻加 [11] Campbell 2024、[12] Orlandi 2026。直接讀 `results/*.csv`，不用 nums*.json |
+| `build14.py` | v13（使用者未改動，2026-10-25 20:32:58）→ v14 | 第 15 頁「電極轉一格」換成更正後的數字（轉原始 EMG 再標準化，`shift_sweep_raw*_uhc.csv`：固定 45.9％、UHC 比固定更差）；新增第 16 頁「束帶情境」（部分偏移＋開機對齊，`shift_sweep_raw*.csv`）；第 2 頁對應那一點與備註（19 頁） |
 
 所有數字都從 `results/` 讀，不手打：
 
@@ -24,7 +25,8 @@
 # results/ram_history.csv comes from `python3 src/ram_history.py` on the host
 D=/mnt/c/Users/kirit/Downloads
 docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/work -v "$D":/d -w /work rf-emg \
-  python slides/build13.py /d/碩論題目討論_MOMO_v12.pptx /d/碩論題目討論_MOMO_v13.pptx
+  bash -c 'python slides/build13.py /d/碩論題目討論_MOMO_v12.pptx /d/碩論題目討論_MOMO_v13.pptx &&
+           python slides/build14.py /d/碩論題目討論_MOMO_v13.pptx /d/碩論題目討論_MOMO_v14.pptx'
 ```
 
 改完先確認使用者沒有手動改過上一版（例如比對 md5）；改過的話要以使用者的版本為底稿，不要從舊版重新產生。
