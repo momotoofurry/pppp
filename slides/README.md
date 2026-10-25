@@ -2,7 +2,7 @@
 
 簡報檔本身不在 repo 裡，放在 Windows 的 `C:\Users\kirit\Downloads\`（WSL 裡是 `/mnt/c/Users/kirit/Downloads/`）。
 每一版都是從上一版加內容，不覆寫舊檔。資料夾裡只留最新一版的腳本；下表是歷史紀錄，
-`build13.py` 之前的腳本（和 `make_nums.py`、`nums*.json`）已刪除，要看可以從 git 歷史拿（`git log -- slides/`）：
+`build14.py` 之前的腳本（和 `make_nums.py`、`nums*.json`）已刪除，要看可以從 git 歷史拿（`git log -- slides/`）：
 
 | 腳本 | 輸入 → 輸出 | 內容 |
 |---|---|---|
@@ -25,9 +25,10 @@
 # results/ram_history.csv comes from `python3 src/ram_history.py` on the host
 D=/mnt/c/Users/kirit/Downloads
 docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/work -v "$D":/d -w /work rf-emg \
-  bash -c 'python slides/build13.py /d/碩論題目討論_MOMO_v12.pptx /d/碩論題目討論_MOMO_v13.pptx &&
-           python slides/build14.py /d/碩論題目討論_MOMO_v13.pptx /d/碩論題目討論_MOMO_v14.pptx'
+  python slides/build14.py /d/碩論題目討論_MOMO_v13.pptx /d/碩論題目討論_MOMO_v14.pptx
 ```
+
+v14 的底稿是 Downloads 裡的 v13（`build13.py` 產生，已刪除；要重新產生 v13 得從 git 歷史拿回 `build13.py` 和 v12）。
 
 改完先確認使用者沒有手動改過上一版（例如比對 md5）；改過的話要以使用者的版本為底稿，不要從舊版重新產生。
 
