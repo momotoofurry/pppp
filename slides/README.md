@@ -14,6 +14,7 @@
 | `build9.py` | v8（使用者確認未改動，md5 27d8eb68…）→ v9 | 收斂方向：嵌入式自我校正為核心、Kinova Gen3 離散指令閉迴路任務為主要驗證（STM32 決策、PC 只用 Kortex API 轉送）、低信心拒絕、PCA 對齊基準 [19]；RQ2／RQ3、創新點③、總結、實驗設計、設備需求更新；新增「研究範圍」「閉迴路架構」「一年時程」三頁；高齡者改未來工作、int8 CNN 改選做；架構圖與流程圖是原簡報的圖片，只在下方加註記；頁碼依新舊對照自動重編 |
 | `build10.py` | 使用者改過的 v9（2026-10-19 23:00，md5 b2e2960f…，27 頁）→ v10 | 精簡與去模板化：主線 20 頁（前置結果 10 頁併成 6 頁，加「前置結果」分隔頁），其餘移到「附錄」（不刪）；全部頁面拿掉深色「→ 下一步」長條、數字卡片外框，深色卡片改淺色細框，標題去掉「前置結果⑤：」等前綴並對齊；552 B、t-SNE ablation、C 端到端準確率併到保留的頁面；頁碼重新計算 |
 | `build12.py` | 使用者的 v11（= v10 拿掉附錄，2026-10-19 23:10）→ v12 | 給教授的精簡版（16 頁）：新增「我想做的事」開場頁（一句話、已做到／還沒人做／接下來一年、需要老師同意的事，數字從結果頁讀）；只留最接近的研究、RQ、架構、方法、6 頁重現與前置結果、研究範圍；參考文獻只留有引用的 10 篇並重新編號 |
+| `build13.py` | 使用者改過的 v12（2026-10-20 00:07，md5 577fc746…，只改第 2 頁第三欄）→ v13 | 加最新實驗（18 頁）：RAM 頁改成三個版本的 linker 實測（253.2 → 246.5 → 223.8 KB，`results/ram_history.csv`）、C 端到端 83.23%；demo 頁換成 16 位元 P 之後的曲線（92.4%）；新增「通道數」「電極轉一格」兩頁；第 2、3、5 頁的數字跟著更新，第 2 頁加兩點、開發板改 H753ZI；參考文獻加 [11] Campbell 2024、[12] Orlandi 2026。直接讀 `results/*.csv`，不用 nums*.json |
 
 所有數字都從 `results/` 讀，不手打：
 
@@ -29,6 +30,8 @@ docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/work -v "$D":
 #   python slides/build10.py /d/碩論題目討論_MOMO_v9.pptx /d/碩論題目討論_MOMO_v10.pptx slides/nums6.json
 # v12 is built from the user's v11:
 #   python slides/build12.py /d/碩論題目討論_MOMO_v11.pptx /d/碩論題目討論_MOMO_v12.pptx
+# v13 is built from the user-edited v12 (results/ram_history.csv comes from `python3 src/ram_history.py` on the host):
+#   python slides/build13.py /d/碩論題目討論_MOMO_v12.pptx /d/碩論題目討論_MOMO_v13.pptx
 ```
 
 改完先確認使用者沒有手動改過上一版（例如比對 md5）；改過的話要以使用者的版本為底稿，不要從舊版重新產生。
