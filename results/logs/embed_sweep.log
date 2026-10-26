@@ -1,0 +1,27 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:  1.6min
+[Parallel(n_jobs=19)]: Done 124 tasks      | elapsed:  2.9min
+[Parallel(n_jobs=19)]: Done 250 tasks      | elapsed:  4.0min
+[Parallel(n_jobs=19)]: Done 412 tasks      | elapsed:  6.6min
+[Parallel(n_jobs=19)]: Done 610 tasks      | elapsed:  8.2min
+[Parallel(n_jobs=19)]: Done 780 out of 780 | elapsed:  9.7min finished
+     dataset  shift   embed  n_subjects  fixed  adapt  gain  gain_p  vs_tsne  better_than_tsne  vs_tsne_p  embed_cpu_s
+arm_position    0.0    tsne          20 79.680 83.232 3.552   0.000    0.000                 0        NaN        3.187
+arm_position    0.0    none          20 79.680 83.207 3.527   0.000   -0.025                11      0.648          NaN
+arm_position    0.0 ldacal5          20 79.680 83.334 3.654   0.000    0.102                11      0.622        0.001
+arm_position    0.0 ldacal3          20 79.680 82.912 3.232   0.000   -0.320                 8      0.277        0.001
+arm_position    0.0 ldabuf5          20 79.680 82.945 3.265   0.000   -0.287                 7      0.261        0.099
+arm_position    0.0    pca5          20 79.680 82.826 3.146   0.000   -0.406                 9      0.261        0.007
+arm_position    0.5    tsne          20 67.700 71.421 3.721   0.000    0.000                 0        NaN        2.765
+arm_position    0.5    none          20 67.700 71.179 3.479   0.000   -0.241                10      0.825          NaN
+arm_position    0.5 ldacal5          20 67.700 70.386 2.686   0.001   -1.034                 5      0.030        0.001
+arm_position    0.5 ldacal3          20 67.700 69.474 1.774   0.005   -1.947                 3      0.002        0.001
+arm_position    0.5 ldabuf5          20 67.700 71.507 3.807   0.000    0.086                12      0.469        0.091
+arm_position    0.5    pca5          20 67.700 70.783 3.083   0.000   -0.638                 8      0.295        0.007
+        demo    0.0    tsne           1 81.933 91.293 9.360     NaN    0.000                 0        NaN        2.505
+        demo    0.0    none           1 81.933 91.253 9.320     NaN   -0.040                 0        NaN          NaN
+        demo    0.0 ldacal5           1 81.933 91.303 9.370     NaN    0.010                 1        NaN        0.001
+        demo    0.0 ldacal3           1 81.933 91.213 9.280     NaN   -0.080                 0        NaN        0.001
+        demo    0.0 ldabuf5           1 81.933 89.670 7.737     NaN   -1.623                 0        NaN        0.075
+        demo    0.0    pca5           1 81.933 91.563 9.630     NaN    0.270                 1        NaN        0.006
+took 595 s
