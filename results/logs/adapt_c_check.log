@@ -1,0 +1,17 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:   11.6s
+[Parallel(n_jobs=19)]: Done 124 tasks      | elapsed:   32.6s
+[Parallel(n_jobs=19)]: Done 250 tasks      | elapsed:  1.1min
+[Parallel(n_jobs=19)]: Done 412 tasks      | elapsed:  1.8min
+[Parallel(n_jobs=19)]: Done 610 tasks      | elapsed:  3.0min
+[Parallel(n_jobs=19)]: Done 720 out of 720 | elapsed:  3.7min finished
+ shift  update  c_fixed  py_fixed  c_adapt  py_adapt  c_minus_py  c_better     p  k_same  k_runs
+   0.0       1   81.423    81.393   83.875    83.665       0.210        15 0.058      60      60
+   0.0       0   79.680    79.680   83.201    83.207      -0.006        13 0.522      60      60
+   0.5       1   71.283    71.262   74.742    74.560       0.183        12 0.114      60      60
+   0.5       0   67.700    67.700   71.171    71.179      -0.008         8 0.927      60      60
+   1.0       1   81.423    81.393   83.875    83.665       0.210        15 0.058      60      60
+   1.0       0   79.680    79.680   83.201    83.207      -0.006        13 0.522      60      60
+C: clustered 96.3% of updates, z-score updated 100.0% of blocks, max new-tree internal nodes 31.0, PC sc_end_block CPU mean 0.0254 s
+static bytes: selfcal.c 90153  adapt.c 5120
+took 231 s

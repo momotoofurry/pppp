@@ -6,9 +6,14 @@
 
 #include "kmeans.h"
 #include "rf_train.h"
+#if SC_EMBED
 #include "tsne.h"
+#if TSNE_NMAX < SC_BUF
+#error "tsne.h: TSNE_NMAX too small for the self-calibration buffer"
+#endif
+#endif
 
-#if TSNE_NMAX < SC_BUF || KM_NMAX < SC_BUF || RFT_NMAX < SC_BUF + SC_CAL_MAX || RFT_MAX_LEAVES < SC_MAX_LEAVES
+#if KM_NMAX < SC_BUF || RFT_NMAX < SC_BUF + SC_CAL_MAX || RFT_MAX_LEAVES < SC_MAX_LEAVES || KM_QDIM != SC_DIM
 #error "module sizes too small for the self-calibration buffer"
 #endif
 
@@ -43,7 +48,9 @@ static uint32_t s_rng;
 static const int16_t *s_rows[SC_BUF + SC_CAL_MAX];
 static uint8_t s_y[SC_BUF + SC_CAL_MAX];
 static uint16_t s_sel[SC_BUF];
+#if SC_EMBED
 static float s_emb[SC_BUF * 3];
+#endif
 static uint8_t s_km[SC_BUF];
 static rft_tree_t s_new;
 static int32_t s_block_base;                    /* keys reserved for the rows concatenated in this block */
@@ -52,7 +59,10 @@ static int s_block_rows, s_in_block;
 unsigned sc_static_bytes(void)
 {
     return (unsigned)(sizeof s_m + sizeof s_buf + sizeof s_lab + sizeof s_key + sizeof s_cal + sizeof s_cal_y +
-                      sizeof s_tree + sizeof s_ram + sizeof s_rows + sizeof s_y + sizeof s_sel + sizeof s_emb +
+                      sizeof s_tree + sizeof s_ram + sizeof s_rows + sizeof s_y + sizeof s_sel +
+#if SC_EMBED
+                      sizeof s_emb +
+#endif
                       sizeof s_km + sizeof s_new);
 }
 
@@ -77,11 +87,13 @@ static uint32_t tree_seed(void)
     return x ? x : 1u;
 }
 
+#if SC_EMBED
 static float gauss(void)                        /* Box-Muller */
 {
     float u1 = ((rnd() >> 8) + 1.0f) / 16777217.0f, u2 = (rnd() >> 8) / 16777216.0f;
     return sqrtf(-2.0f * logf(u1)) * cosf(6.2831853f * u2);
 }
+#endif
 
 /* ---------------------------------------------------------------- inference */
 static int pruned_label(uint32_t g)             /* binary search in the sorted prune list */
@@ -331,6 +343,22 @@ void sc_end_block(sc_stats_t *st)
     }
     st->buffer_n = s_n;
     st->n_selected = ns;
+#if !SC_EMBED
+    if (mn >= SC_MIN_CLASS) {                   /* K-Means on the rows, initialised at the class centres */
+        static float ctr[SC_CLASSES * SC_DIM];
+        group_centres_q(s_rows, ns, s_y, SC_CLASSES, ctr);
+        if (km_fit_q(s_rows, ns, SC_CLASSES, ctr, 300, 1e-4f, s_km) >= 0) {
+            int seen[SC_CLASSES] = {0}, all = 1;
+            for (int i = 0; i < ns; i++)
+                seen[s_km[i]] = 1;
+            for (int k = 0; k < SC_CLASSES; k++)
+                all &= seen[k];
+            if (all)
+                memcpy(s_y, s_km, ns);
+            st->clustered = 1;
+        }
+    }
+#else
     if (mn >= SC_MIN_CLASS) {
         tsne_stats_t ts;
         for (int i = 0; i < 3 * ns; i++)
@@ -352,6 +380,7 @@ void sc_end_block(sc_stats_t *st)
             st->tsne_cells_max = ts.cells_max;
         }
     }
+#endif
     /* 4. train SC_N_UPD trees on pseudo-labelled rows + calibration set, replace random slots */
     int nt = ns;
     for (int i = 0; i < s_ncal; i++) {

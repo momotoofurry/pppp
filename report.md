@@ -817,7 +817,57 @@ arm-none-eabi-gcc 10.3.1，`-Os`，.bss 在 AXI SRAM，stack 在 DTCM，最後�
   2. RAM（估算，未重新編譯）：t-SNE 的 92.5 KB 不再需要，但 MCU 上的 one-shot 借用 t-SNE 的工作區（39,915 B，7.6 節），要另外給它一塊；
      完整韌體約 223.8 − 92.5 + 39.0 ≈ 170 KB，餘裕從 32 KB 變成約 86 KB。每個 block 少了數秒的 t-SNE（MCU 上未量）。
   3. 下一步（待驗證）：省下的 RAM 可以換成更大的 buffer（例如 750 筆 int16 多 60 KB），看「不嵌入＋大 buffer」能不能超過現在的 83.23%；
-     還要把韌體改成不嵌入版、重新用 linker 量 RAM，並在 C 版上逐列比對。
+     還要把韌體改成不嵌入版、重新用 linker 量 RAM，並在 C 版上逐列比對。（兩者都已做，見 11.1、第 12 節）
+
+### 11.1 不嵌入時 buffer 要多大（`embed_sweep.py --embed tsne none --buffers 375 500 750 1000 --suffix _buf`）
+
+| 設定 | 偏移 0 | vs t-SNE 375（p） | 偏移 ½ | vs t-SNE 375（p） | demo |
+|---|---|---|---|---|---|
+| t-SNE，375 筆（原本） | 83.23% | — | 71.42% | — | 91.29% |
+| 不嵌入，375 筆 | 83.21% | −0.03（0.65） | 71.18% | −0.24（0.83） | 91.25% |
+| 不嵌入，500 筆 | 83.04% | −0.20（0.65） | 70.75% | −0.67（0.29） | 91.33% |
+| 不嵌入，750 筆 | 82.60% | −0.63（0.20） | 70.44% | −0.98（0.13） | 89.97% |
+| 不嵌入，1,000 筆 | 82.19% | −1.04（0.13） | 70.32% | −1.11（0.18） | 89.17% |
+
+- 不嵌入時 buffer 越大反而越差（不顯著但趨勢一致，demo 也一樣）：大 buffer 混了更舊、分布不同的資料，在 80 維上直接分群時更難分開；
+  t-SNE 的好處正好是在大 buffer 時把它們拉開（第 3 節：1,500 筆時 t-SNE +4.30、只用 K-Means +1.35）。
+- 所以韌體維持 375 筆、不做 t-SNE，省下的 RAM 當成餘裕，不拿去換大 buffer。
+
+## 12. 韌體 v2：不做 t-SNE＋開機對齊＋類別平衡 z-score 更新（PC 驗證＋Cortex-M7 編譯，2026-10-27）
+
+- 改動（`src/c/`）：
+  - `selfcal.h/.c`：編譯選項 `SC_EMBED`（預設 0）。0 = K-Means 直接在 375 筆 buffer 的 80 個 int16 特徵上跑（上游 `embedding=None`），
+    以 one-shot 模型的類別中心初始化；1 = 原本的 t-SNE 版。
+  - `kmeans.c`：新增 `km_fit_q`／`group_centres_q`（直接讀 buffer 列、不複製，和 3 維版同樣的 sklearn Lloyd 規則）。
+  - `oneshot.c/.h`：沒有 t-SNE 時不能借 t-SNE 工作區，改用自己的 40,960 B（`OS_WORK_BYTES`；需要 39,915 B）。
+  - `adapt.c/.h`（新）：開機對齊（`ad_align_push`／`ad_align_finish`，和 `shift_sweep.estimate_rotation` 同一算法）、
+    `ad_map`（通道重排）、`ad_normalize`（目前統計值的 z-score＋Q5.10）、`ad_observe`／`ad_end_block`（類別平衡更新，Welford，a = 0.3、每類 ≥ 5 個視窗）。
+  - `rt.c/.h`：`RT_ADAPT`（預設 1）。特徵 → `ad_map` → `ad_normalize` → `sc_push_votes` → `ad_observe(預測類別)`；
+    每個自我校正 block 後 `ad_end_block`；新控制指令 `RT_ALIGN_START`／`RT_ALIGN_END`（收一段任意動作、估轉法，狀態事件 `RT_EV_ALIGNED`）。
+  - 舊版仍可用 `-DSC_EMBED=1 -DRT_ADAPT=0` 編出；`check_selfcal_c.py`、`check_oneshot_c.py`、`check_rt.py` 固定用舊版（它們的結果檔是舊版做的）。
+- PC 驗證（`src/check_adapt_c.py` → `results/adapt_c_check*.csv`）：同一個 one-shot 模型，C（`adapt.c`＋`selfcal.c`，SC_EMBED = 0）
+  對照 Python（`zscore_sweep.run(..., embed='none')`），20 人 × 11 block × 3 seed，偏移 0／½／1 格：
+
+| 偏移 | z-score 更新 | C 自我校正 | Python | C − Python（p） | 估到的轉法相同 |
+|---|---|---|---|---|---|
+| 0 | 關 | 83.20% | 83.21% | −0.01（0.52） | 60／60 |
+| 0 | **開** | **83.88%** | 83.67% | +0.21（0.058） | 60／60 |
+| ½ | 關 | 71.17% | 71.18% | −0.01（0.93） | 60／60 |
+| ½ | **開** | **74.74%** | 74.56% | +0.18（0.11） | 60／60 |
+| 1（對齊後） | 開 | 83.88% | 83.67% | +0.21（0.058） | 60／60 |
+
+  更新關閉時 one-shot 準確率 C 和 Python 完全相同（79.68%）；更新開啟時差異來自 C 用 float32 統計值、樹的亂數不同，都不顯著。
+  PC 上 `sc_end_block` 平均 0.025 s CPU（t-SNE 版約 1 s；MCU 時間未量）；K-Means 跑了 96.3% 的 block（其餘是某類別少於 10 筆，用模型標籤）。
+- Cortex-M7 編譯（`build_arm_selfcal.py` 新增 `rt2`／`board2`，`results/arm_selfcal_size.csv`、`arm_selfcal_modules.csv`）：
+
+| 版本（含硬體層，-Os） | RAM | Flash | 最大的幾塊 |
+|---|---|---|---|
+| 舊版 `board`（t-SNE） | 223.8 KB | 117.6 KB | t-SNE 工作區 94.5 KB、buffer 60.0 KB |
+| **新版 `board2`** | **175.9 KB** | 111.1 KB | buffer 60.0 KB、one-shot 工作區 40.0 KB、特徵 ring 12.5 KB、RAM 樹 10.6 KB、adapt 5.0 KB |
+
+  離 256 KB 的餘裕從 32.2 KB 變成 80.1 KB。舊版各變體重新編譯後 RAM 不變（±4 B 對齊）。最深 stack 路徑從 t-SNE 變成建樹（`rft_train`）。
+- 準確率對照：新版完整流程（不嵌入＋z-score 更新）83.88%，t-SNE 版＋類別平衡更新（第 10.1 節）84.14%、只自我校正 83.23%。
+- 尚未做：上板量時間；路線 A／B 實際串流測試（`check_rt.py` 仍是舊版）；`RT_ALIGN_*` 指令的 PC 端工具。
 
 ---
 

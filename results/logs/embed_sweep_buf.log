@@ -1,0 +1,24 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:  1.5min
+[Parallel(n_jobs=19)]: Done 124 tasks      | elapsed:  2.5min
+[Parallel(n_jobs=19)]: Done 250 tasks      | elapsed:  3.5min
+[Parallel(n_jobs=19)]: Done 412 tasks      | elapsed:  6.1min
+[Parallel(n_jobs=19)]: Done 610 tasks      | elapsed:  8.3min
+[Parallel(n_jobs=19)]: Done 650 out of 650 | elapsed:  8.6min finished
+     dataset  shift      embed  n_subjects  fixed  adapt  gain  gain_p  vs_tsne  better_than_tsne  vs_tsne_p  embed_cpu_s
+arm_position    0.0       tsne          20 79.680 83.232 3.552   0.000    0.000                 0        NaN        2.808
+arm_position    0.0       none          20 79.680 83.207 3.527   0.000   -0.025                11      0.648          NaN
+arm_position    0.0  none_b500          20 79.680 83.036 3.356   0.000   -0.196                10      0.648          NaN
+arm_position    0.0  none_b750          20 79.680 82.601 2.921   0.001   -0.631                 9      0.202          NaN
+arm_position    0.0 none_b1000          20 79.680 82.190 2.510   0.007   -1.042                 8      0.133          NaN
+arm_position    0.5       tsne          20 67.700 71.421 3.721   0.000    0.000                 0        NaN        2.525
+arm_position    0.5       none          20 67.700 71.179 3.479   0.000   -0.241                10      0.825          NaN
+arm_position    0.5  none_b500          20 67.700 70.749 3.049   0.000   -0.671                 8      0.294          NaN
+arm_position    0.5  none_b750          20 67.700 70.439 2.739   0.002   -0.982                 9      0.133          NaN
+arm_position    0.5 none_b1000          20 67.700 70.315 2.615   0.015   -1.106                 9      0.177          NaN
+        demo    0.0       tsne           1 81.933 91.293 9.360     NaN    0.000                 0        NaN        2.337
+        demo    0.0       none           1 81.933 91.253 9.320     NaN   -0.040                 0        NaN          NaN
+        demo    0.0  none_b500           1 81.933 91.327 9.393     NaN    0.033                 1        NaN          NaN
+        demo    0.0  none_b750           1 81.933 89.970 8.037     NaN   -1.323                 0        NaN          NaN
+        demo    0.0 none_b1000           1 81.933 89.173 7.240     NaN   -2.120                 0        NaN          NaN
+took 529 s

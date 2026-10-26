@@ -20,6 +20,8 @@ MCU setting: 100 trees, depth 10, int16, int16 buffer of 375, 20 new trees <= 32
 Records per block the accuracies and the CPU time of the embedding call (PC, one core, only indicative).
 Writes results/embed_sweep.csv and results/embed_sweep_summary.csv.
 Usage (in the container): python src/embed_sweep.py [--jobs 19]
+  buffer size without t-SNE: python src/embed_sweep.py --embed tsne none --buffers 375 500 750 1000 --suffix _buf
+  (config names none_b<rows>; t-SNE stays at 375 rows as the reference)
 """
 import argparse
 import copy
@@ -76,7 +78,7 @@ class Linear:
         return Zx
 
 
-def run(dataset, subject, seed, shift, embed):
+def run(dataset, subject, seed, shift, embed, buf=BUF):
     emg_functions.get_predictions = lambda mdl, f: (P.predict(mdl, np.asarray(f), PREC), None)
     np.random.seed(seed * 1000 + subject)
     Xc_raw, yc, blocks, k_est = Z.load(dataset, subject, shift)
@@ -115,11 +117,12 @@ def run(dataset, subject, seed, shift, embed):
         X = (X_raw - mu) / sd
         lab_os, lab_sc = P.predict(mdl_os, X, PREC), P.predict(mdl_sc, X, PREC)
         TIMES.clear()
-        feat_buf, lab_buf = emg_functions.buffer_update(BUF, feat_buf, lab_buf, S.q16(X), lab_sc)
+        feat_buf, lab_buf = emg_functions.buffer_update(buf, feat_buf, lab_buf, S.q16(X), lab_sc)
         feat_sel, lab_pseudo, lab_buf = emg_functions.manifold_clustering(
             feat_buf, list(S.LABELS), S.MIN_SAMPLE_CLASS, mdl_os, 'kmeans',
             embedding=None if embed == 'none' else 'tsne')
-        rows.append(dict(dataset=dataset, subject=subject, seed=seed, shift=shift, embed=embed, block=b, k_est=k_est,
+        rows.append(dict(dataset=dataset, subject=subject, seed=seed, shift=shift,
+                         embed=embed if buf == BUF else f'{embed}_b{buf}', buffer=buf, block=b, k_est=k_est,
                          acc_fixed=np.mean(lab_os == y), acc_adapt=np.mean(lab_sc == y),
                          embed_cpu_s=sum(TIMES) if TIMES else np.nan))
         if len(lab_pseudo) >= 10:
@@ -136,7 +139,7 @@ def summarize(acc):
     out = []
     for (ds, sh), g in ps.groupby(level=[0, 1]):
         ref = g.xs('tsne', level='embed').droplevel([0, 1])
-        for e in EMBEDS:
+        for e in dict.fromkeys(acc.embed):                         # order of appearance
             if e not in g.index.get_level_values('embed'):
                 continue
             cur = g.xs(e, level='embed').droplevel([0, 1])
@@ -160,16 +163,18 @@ def main():
     ap.add_argument('--subjects', type=int, nargs='+', default=list(range(20)))
     ap.add_argument('--no-demo', action='store_true')
     ap.add_argument('--jobs', type=int, default=19)
+    ap.add_argument('--buffers', type=int, nargs='+', default=[BUF], help='buffer rows (int16); t-SNE always at 375')
     ap.add_argument('--suffix', default='')
     args = ap.parse_args()
     t0 = time.time()
     import check_features_c as FC
     FC.lib()
     Parallel(n_jobs=args.jobs)(delayed(SH.prepare)(s, sh) for sh in args.shifts for s in args.subjects)
-    tasks = [('arm_position', s, seed, sh, e) for sh in args.shifts for e in args.embed for seed in args.seeds
+    cfg = [(e, b) for e in args.embed for b in (args.buffers if e != 'tsne' else [BUF])]
+    tasks = [('arm_position', s, seed, sh, e, b) for sh in args.shifts for e, b in cfg for seed in args.seeds
              for s in args.subjects]
     if not args.no_demo:
-        tasks += [('demo', 0, seed, 0.0, e) for e in args.embed for seed in range(args.demo_seeds)]
+        tasks += [('demo', 0, seed, 0.0, e, b) for e, b in cfg for seed in range(args.demo_seeds)]
     res = Parallel(n_jobs=args.jobs, verbose=5)(delayed(run)(*t) for t in tasks)
     acc = pd.DataFrame([r for rows in res for r in rows])
     acc.to_csv(os.path.join(OUT, f'embed_sweep{args.suffix}.csv'), index=False, float_format='%.4f')

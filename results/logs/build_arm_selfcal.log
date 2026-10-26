@@ -1,104 +1,156 @@
 arm-none-eabi-gcc (15:10.3-2021.07-4) 10.3.1 20210621 (release)
-{'variant': 'selfcal', 'opt': '-Os', 'text': 115632, 'data': 104, 'bss': 230364, 'flash_KB': 113.0234375, 'axi_bss_KB': 224.96484375, 'worst_stack_bytes': 1704, 'thread_stack_bytes': 1704, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_front=3048;s_new=2548'}
-{'variant': 'selfcal', 'opt': '-O2', 'text': 116872, 'data': 104, 'bss': 230364, 'flash_KB': 114.234375, 'axi_bss_KB': 224.96484375, 'worst_stack_bytes': 1728, 'thread_stack_bytes': 1728, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_front=3048;s_new=2548'}
-{'variant': 'full', 'opt': '-Os', 'text': 185600, 'data': 104, 'bss': 251808, 'flash_KB': 181.3515625, 'axi_bss_KB': 245.90625, 'worst_stack_bytes': 2224, 'thread_stack_bytes': 2224, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_front=3048'}
-{'variant': 'full', 'opt': '-O2', 'text': 187232, 'data': 104, 'bss': 251808, 'flash_KB': 182.9453125, 'axi_bss_KB': 245.90625, 'worst_stack_bytes': 2248, 'thread_stack_bytes': 2248, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_front=3048'}
-{'variant': 'device', 'opt': '-Os', 'text': 199512, 'data': 108, 'bss': 251200, 'flash_KB': 194.94140625, 'axi_bss_KB': 245.3125, 'worst_stack_bytes': 2272, 'thread_stack_bytes': 2272, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_front=3048'}
-{'variant': 'device', 'opt': '-O2', 'text': 201488, 'data': 108, 'bss': 251200, 'flash_KB': 196.87109375, 'axi_bss_KB': 245.3125, 'worst_stack_bytes': 2296, 'thread_stack_bytes': 2296, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_front=3048'}
-{'variant': 'rt', 'opt': '-Os', 'text': 118288, 'data': 108, 'bss': 252352, 'flash_KB': 115.62109375, 'axi_bss_KB': 246.4375, 'worst_stack_bytes': 2208, 'thread_stack_bytes': 1776, 'isr_stack_bytes': 432, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_front=3048'}
-{'variant': 'rt', 'opt': '-O2', 'text': 120568, 'data': 108, 'bss': 252360, 'flash_KB': 117.84765625, 'axi_bss_KB': 246.4453125, 'worst_stack_bytes': 2200, 'thread_stack_bytes': 1768, 'isr_stack_bytes': 432, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_front=3048'}
-{'variant': 'board', 'opt': '-Os', 'text': 120192, 'data': 116, 'bss': 256496, 'flash_KB': 117.48828125, 'axi_bss_KB': 250.484375, 'worst_stack_bytes': 2612, 'thread_stack_bytes': 1776, 'isr_stack_bytes': 836, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_rx=4096'}
-{'variant': 'board', 'opt': '-O2', 'text': 122576, 'data': 116, 'bss': 256504, 'flash_KB': 119.81640625, 'axi_bss_KB': 250.4921875, 'worst_stack_bytes': 2600, 'thread_stack_bytes': 1768, 'isr_stack_bytes': 832, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_p=46500;s_cell=40500;s_nbr=23250;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_gain=4500;s_grad=4500;s_upd=4500;s_rx=4096'}
-variant opt         module   text  data    bss
-selfcal -Os main_selfcal.c  98760     0     40
-selfcal -Os      selfcal.c   2238     0  92901
-selfcal -Os         tsne.c   3004     0 124766
-selfcal -Os       kmeans.c   1160     0   1875
-selfcal -Os     rf_train.c   1742     0   6668
-selfcal -Os startup_h743.c    170     0      0
-selfcal -O2 main_selfcal.c  98792     0     40
-selfcal -O2      selfcal.c   2668     0  92901
-selfcal -O2         tsne.c   3480     0 124766
-selfcal -O2       kmeans.c   1356     0   1875
-selfcal -O2     rf_train.c   1948     0   6668
-selfcal -O2 startup_h743.c    168     0      0
-   full -Os main_selfcal.c 162904     0    684
-   full -Os      selfcal.c   2238     0  92901
-   full -Os         tsne.c   3004     0 124766
-   full -Os       kmeans.c   1160     0   1875
-   full -Os     rf_train.c   1742     0   6668
-   full -Os startup_h743.c    170     0      0
-   full -Os     features.c   1768     0  20804
-   full -O2 main_selfcal.c 163032     0    684
-   full -O2      selfcal.c   2668     0  92901
-   full -O2         tsne.c   3480     0 124766
-   full -O2       kmeans.c   1356     0   1875
-   full -O2     rf_train.c   1948     0   6668
-   full -O2 startup_h743.c    168     0      0
-   full -O2     features.c   2112     0  20804
- device -Os main_selfcal.c 174605     4     68
- device -Os      selfcal.c   2238     0  92901
- device -Os         tsne.c   3004     0 124766
- device -Os       kmeans.c   1160     0   1875
- device -Os     rf_train.c   1742     0   6668
- device -Os startup_h743.c    170     0      0
- device -Os     features.c   1768     0  20804
- device -Os      oneshot.c   2468     0      4
- device -Os   board_stub.c     30     0      0
- device -O2 main_selfcal.c 174661     4     68
- device -O2      selfcal.c   2668     0  92901
- device -O2         tsne.c   3480     0 124766
- device -O2       kmeans.c   1356     0   1875
- device -O2     rf_train.c   1948     0   6668
- device -O2 startup_h743.c    168     0      0
- device -O2     features.c   2112     0  20804
- device -O2      oneshot.c   2904     0      4
- device -O2   board_stub.c     44     0      0
-     rt -Os      main_rt.c  91037     0     12
-     rt -Os           rt.c   1480     4   1202
-     rt -Os     protocol.c    446     0      0
-     rt -Os     decision.c    324     0      0
-     rt -Os     features.c   1768     0  20804
-     rt -Os      oneshot.c   2468     0      4
-     rt -Os      selfcal.c   2238     0  92901
-     rt -Os         tsne.c   3004     0 124766
-     rt -Os       kmeans.c   1160     0   1875
-     rt -Os     rf_train.c   1742     0   6668
-     rt -Os   board_stub.c     30     0      0
-     rt -Os startup_h743.c    170     0      0
-     rt -O2      main_rt.c  91045     0     12
-     rt -O2           rt.c   1616     4   1202
-     rt -O2     protocol.c    632     0      0
-     rt -O2     decision.c    414     0      0
-     rt -O2     features.c   2112     0  20804
-     rt -O2      oneshot.c   2904     0      4
-     rt -O2      selfcal.c   2668     0  92901
-     rt -O2         tsne.c   3480     0 124766
-     rt -O2       kmeans.c   1356     0   1875
-     rt -O2     rf_train.c   1948     0   6668
-     rt -O2   board_stub.c     44     0      0
-     rt -O2 startup_h743.c    168     0      0
-  board -Os      main_rt.c  91037     0     12
-  board -Os           rt.c   1480     4   1202
-  board -Os     protocol.c    446     0      0
-  board -Os     decision.c    324     0      0
-  board -Os     features.c   1768     0  20804
-  board -Os      oneshot.c   2468     0      4
-  board -Os      selfcal.c   2238     0  92901
-  board -Os         tsne.c   3004     0 124766
-  board -Os       kmeans.c   1160     0   1875
-  board -Os     rf_train.c   1742     0   6668
-  board -Os     board_h7.c   1328     8   4144
-  board -Os   startup_h7.c    770     0      0
-  board -O2      main_rt.c  91045     0     12
-  board -O2           rt.c   1616     4   1202
-  board -O2     protocol.c    632     0      0
-  board -O2     decision.c    414     0      0
-  board -O2     features.c   2112     0  20804
-  board -O2      oneshot.c   2904     0      4
-  board -O2      selfcal.c   2668     0  92901
-  board -O2         tsne.c   3480     0 124766
-  board -O2       kmeans.c   1356     0   1875
-  board -O2     rf_train.c   1948     0   6668
-  board -O2     board_h7.c   1452     8   4144
-  board -O2   startup_h7.c    768     0      0
+{'variant': 'selfcal', 'opt': '-Os', 'text': 115752, 'data': 108, 'bss': 200344, 'flash_KB': 113.14453125, 'axi_bss_KB': 195.6484375, 'worst_stack_bytes': 1704, 'thread_stack_bytes': 1704, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_ws=94516;s_buf=60000;s_tree=10900;s_cal=9600;s_emb=4500;s_front=3048;s_new=2548;s_rows=1740;dist.0=1500;s_key=1500;s_idx=880;s_samples=880'}
+{'variant': 'selfcal', 'opt': '-O2', 'text': 117040, 'data': 108, 'bss': 200344, 'flash_KB': 114.40234375, 'axi_bss_KB': 195.6484375, 'worst_stack_bytes': 1720, 'thread_stack_bytes': 1720, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_ws=94516;s_buf=60000;s_tree=10900;s_cal=9600;s_emb=4500;s_front=3048;s_new=2548;s_rows=1740;dist.0=1500;s_key=1500;s_idx=880;s_samples=880'}
+{'variant': 'full', 'opt': '-Os', 'text': 185720, 'data': 108, 'bss': 221796, 'flash_KB': 181.47265625, 'axi_bss_KB': 216.59765625, 'worst_stack_bytes': 2224, 'thread_stack_bytes': 2224, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_ws=94516;s_buf=60000;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_front=3048;s_new=2548;s_im=2048;s_re=2048;s_rows=1740;s_hamm=1600'}
+{'variant': 'full', 'opt': '-O2', 'text': 187400, 'data': 108, 'bss': 221796, 'flash_KB': 183.11328125, 'axi_bss_KB': 216.59765625, 'worst_stack_bytes': 2240, 'thread_stack_bytes': 2240, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_ws=94516;s_buf=60000;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_front=3048;s_new=2548;s_im=2048;s_re=2048;s_rows=1740;s_hamm=1600'}
+{'variant': 'device', 'opt': '-Os', 'text': 199632, 'data': 112, 'bss': 221180, 'flash_KB': 195.0625, 'axi_bss_KB': 215.99609375, 'worst_stack_bytes': 2272, 'thread_stack_bytes': 2272, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_ws=94516;s_buf=60000;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_front=3048;s_new=2548;s_im=2048;s_re=2048;s_rows=1740;s_hamm=1600'}
+{'variant': 'device', 'opt': '-O2', 'text': 201664, 'data': 112, 'bss': 221180, 'flash_KB': 197.046875, 'axi_bss_KB': 215.99609375, 'worst_stack_bytes': 2288, 'thread_stack_bytes': 2288, 'isr_stack_bytes': 0, 'stack_unknown': '', 'largest_ram_symbols': 's_ws=94516;s_buf=60000;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_front=3048;s_new=2548;s_im=2048;s_re=2048;s_rows=1740;s_hamm=1600'}
+{'variant': 'rt', 'opt': '-Os', 'text': 118400, 'data': 112, 'bss': 222328, 'flash_KB': 115.734375, 'axi_bss_KB': 217.1171875, 'worst_stack_bytes': 2208, 'thread_stack_bytes': 1776, 'isr_stack_bytes': 432, 'stack_unknown': '', 'largest_ram_symbols': 's_ws=94516;s_buf=60000;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_front=3048;s_new=2548;s_im=2048;s_re=2048;s_rows=1740;s_hamm=1600'}
+{'variant': 'rt', 'opt': '-O2', 'text': 120736, 'data': 112, 'bss': 222336, 'flash_KB': 118.015625, 'axi_bss_KB': 217.125, 'worst_stack_bytes': 2192, 'thread_stack_bytes': 1760, 'isr_stack_bytes': 432, 'stack_unknown': '', 'largest_ram_symbols': 's_ws=94516;s_buf=60000;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_front=3048;s_new=2548;s_im=2048;s_re=2048;s_rows=1740;s_hamm=1600'}
+{'variant': 'board', 'opt': '-Os', 'text': 120304, 'data': 120, 'bss': 226472, 'flash_KB': 117.6015625, 'axi_bss_KB': 221.1640625, 'worst_stack_bytes': 2612, 'thread_stack_bytes': 1776, 'isr_stack_bytes': 836, 'stack_unknown': '', 'largest_ram_symbols': 's_ws=94516;s_buf=60000;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_rx=4096;s_front=3048;s_new=2548;s_im=2048;s_re=2048;s_rows=1740'}
+{'variant': 'board', 'opt': '-O2', 'text': 122744, 'data': 120, 'bss': 226480, 'flash_KB': 119.984375, 'axi_bss_KB': 221.171875, 'worst_stack_bytes': 2592, 'thread_stack_bytes': 1760, 'isr_stack_bytes': 832, 'stack_unknown': '', 'largest_ram_symbols': 's_ws=94516;s_buf=60000;s_ring=12800;s_tree=10900;s_cal=9600;s_emb=4500;s_rx=4096;s_front=3048;s_new=2548;s_im=2048;s_re=2048;s_rows=1740'}
+{'variant': 'rt2', 'opt': '-Os', 'text': 111728, 'data': 108, 'bss': 173320, 'flash_KB': 109.21484375, 'axi_bss_KB': 169.2578125, 'worst_stack_bytes': 2092, 'thread_stack_bytes': 1428, 'isr_stack_bytes': 664, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_work=40960;s_ring=12800;s_tree=10900;s_cal=9600;s_front=3048;s_new=2548;s_im=2048;s_re=2048;ctr.0=1920;s_cm=1920;s_cm2=1920'}
+{'variant': 'rt2', 'opt': '-O2', 'text': 113560, 'data': 108, 'bss': 173328, 'flash_KB': 111.00390625, 'axi_bss_KB': 169.265625, 'worst_stack_bytes': 2100, 'thread_stack_bytes': 1428, 'isr_stack_bytes': 672, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_work=40960;s_ring=12800;s_tree=10900;s_cal=9600;s_front=3048;s_new=2548;s_im=2048;s_re=2048;ctr.0=1920;s_cm=1920;s_cm2=1920'}
+{'variant': 'board2', 'opt': '-Os', 'text': 113624, 'data': 116, 'bss': 177464, 'flash_KB': 111.07421875, 'axi_bss_KB': 173.3046875, 'worst_stack_bytes': 2496, 'thread_stack_bytes': 1428, 'isr_stack_bytes': 1068, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_work=40960;s_ring=12800;s_tree=10900;s_cal=9600;s_rx=4096;s_front=3048;s_new=2548;s_im=2048;s_re=2048;ctr.0=1920;s_cm=1920'}
+{'variant': 'board2', 'opt': '-O2', 'text': 115568, 'data': 116, 'bss': 177472, 'flash_KB': 112.97265625, 'axi_bss_KB': 173.3125, 'worst_stack_bytes': 2500, 'thread_stack_bytes': 1428, 'isr_stack_bytes': 1072, 'stack_unknown': '', 'largest_ram_symbols': 's_buf=60000;s_work=40960;s_ring=12800;s_tree=10900;s_cal=9600;s_rx=4096;s_front=3048;s_new=2548;s_im=2048;s_re=2048;ctr.0=1920;s_cm=1920'}
+variant opt         module   text  data   bss
+selfcal -Os main_selfcal.c  98760     0    40
+selfcal -Os      selfcal.c   2238     0 92901
+selfcal -Os         tsne.c   3120     4 94748
+selfcal -Os       kmeans.c   2182     0  5295
+selfcal -Os     rf_train.c   1742     0  6668
+selfcal -Os startup_h743.c    170     0     0
+selfcal -O2 main_selfcal.c  98792     0    40
+selfcal -O2      selfcal.c   2668     0 92901
+selfcal -O2         tsne.c   3652     4 94748
+selfcal -O2       kmeans.c   2568     0  5295
+selfcal -O2     rf_train.c   1948     0  6668
+selfcal -O2 startup_h743.c    168     0     0
+   full -Os main_selfcal.c 162904     0   684
+   full -Os      selfcal.c   2238     0 92901
+   full -Os         tsne.c   3120     4 94748
+   full -Os       kmeans.c   2182     0  5295
+   full -Os     rf_train.c   1742     0  6668
+   full -Os startup_h743.c    170     0     0
+   full -Os     features.c   1768     0 20804
+   full -O2 main_selfcal.c 163032     0   684
+   full -O2      selfcal.c   2668     0 92901
+   full -O2         tsne.c   3652     4 94748
+   full -O2       kmeans.c   2568     0  5295
+   full -O2     rf_train.c   1948     0  6668
+   full -O2 startup_h743.c    168     0     0
+   full -O2     features.c   2112     0 20804
+ device -Os main_selfcal.c 174605     4    68
+ device -Os      selfcal.c   2238     0 92901
+ device -Os         tsne.c   3120     4 94748
+ device -Os       kmeans.c   2182     0  5295
+ device -Os     rf_train.c   1742     0  6668
+ device -Os startup_h743.c    170     0     0
+ device -Os     features.c   1768     0 20804
+ device -Os      oneshot.c   2468     0     4
+ device -Os   board_stub.c     30     0     0
+ device -O2 main_selfcal.c 174661     4    68
+ device -O2      selfcal.c   2668     0 92901
+ device -O2         tsne.c   3652     4 94748
+ device -O2       kmeans.c   2568     0  5295
+ device -O2     rf_train.c   1948     0  6668
+ device -O2 startup_h743.c    168     0     0
+ device -O2     features.c   2112     0 20804
+ device -O2      oneshot.c   2904     0     4
+ device -O2   board_stub.c     44     0     0
+     rt -Os      main_rt.c  91037     0    12
+     rt -Os           rt.c   1480     4  1202
+     rt -Os     protocol.c    446     0     0
+     rt -Os     decision.c    324     0     0
+     rt -Os     features.c   1768     0 20804
+     rt -Os      oneshot.c   2468     0     4
+     rt -Os      selfcal.c   2238     0 92901
+     rt -Os       kmeans.c   2182     0  5295
+     rt -Os     rf_train.c   1742     0  6668
+     rt -Os         tsne.c   3120     4 94748
+     rt -Os   board_stub.c     30     0     0
+     rt -Os startup_h743.c    170     0     0
+     rt -O2      main_rt.c  91045     0    12
+     rt -O2           rt.c   1616     4  1202
+     rt -O2     protocol.c    632     0     0
+     rt -O2     decision.c    414     0     0
+     rt -O2     features.c   2112     0 20804
+     rt -O2      oneshot.c   2904     0     4
+     rt -O2      selfcal.c   2668     0 92901
+     rt -O2       kmeans.c   2568     0  5295
+     rt -O2     rf_train.c   1948     0  6668
+     rt -O2         tsne.c   3652     4 94748
+     rt -O2   board_stub.c     44     0     0
+     rt -O2 startup_h743.c    168     0     0
+  board -Os      main_rt.c  91037     0    12
+  board -Os           rt.c   1480     4  1202
+  board -Os     protocol.c    446     0     0
+  board -Os     decision.c    324     0     0
+  board -Os     features.c   1768     0 20804
+  board -Os      oneshot.c   2468     0     4
+  board -Os      selfcal.c   2238     0 92901
+  board -Os       kmeans.c   2182     0  5295
+  board -Os     rf_train.c   1742     0  6668
+  board -Os         tsne.c   3120     4 94748
+  board -Os     board_h7.c   1328     8  4144
+  board -Os   startup_h7.c    770     0     0
+  board -O2      main_rt.c  91045     0    12
+  board -O2           rt.c   1616     4  1202
+  board -O2     protocol.c    632     0     0
+  board -O2     decision.c    414     0     0
+  board -O2     features.c   2112     0 20804
+  board -O2      oneshot.c   2904     0     4
+  board -O2      selfcal.c   2668     0 92901
+  board -O2       kmeans.c   2568     0  5295
+  board -O2     rf_train.c   1948     0  6668
+  board -O2         tsne.c   3652     4 94748
+  board -O2     board_h7.c   1452     8  4144
+  board -O2   startup_h7.c    768     0     0
+    rt2 -Os      main_rt.c  91037     0    12
+    rt2 -Os           rt.c   1620     4  1518
+    rt2 -Os     protocol.c    446     0     0
+    rt2 -Os     decision.c    324     0     0
+    rt2 -Os     features.c   1768     0 20804
+    rt2 -Os      oneshot.c   2416     0 40964
+    rt2 -Os      selfcal.c   2042     0 90321
+    rt2 -Os       kmeans.c   2182     0  5295
+    rt2 -Os     rf_train.c   1742     0  6668
+    rt2 -Os        adapt.c   1617     0  5120
+    rt2 -Os   board_stub.c     30     0     0
+    rt2 -Os startup_h743.c    170     0     0
+    rt2 -O2      main_rt.c  91045     0    12
+    rt2 -O2           rt.c   1756     4  1518
+    rt2 -O2     protocol.c    632     0     0
+    rt2 -O2     decision.c    414     0     0
+    rt2 -O2     features.c   2112     0 20804
+    rt2 -O2      oneshot.c   2808     0 40964
+    rt2 -O2      selfcal.c   2408     0 90321
+    rt2 -O2       kmeans.c   2568     0  5295
+    rt2 -O2     rf_train.c   1948     0  6668
+    rt2 -O2        adapt.c   1767     0  5120
+    rt2 -O2   board_stub.c     44     0     0
+    rt2 -O2 startup_h743.c    168     0     0
+ board2 -Os      main_rt.c  91037     0    12
+ board2 -Os           rt.c   1620     4  1518
+ board2 -Os     protocol.c    446     0     0
+ board2 -Os     decision.c    324     0     0
+ board2 -Os     features.c   1768     0 20804
+ board2 -Os      oneshot.c   2416     0 40964
+ board2 -Os      selfcal.c   2042     0 90321
+ board2 -Os       kmeans.c   2182     0  5295
+ board2 -Os     rf_train.c   1742     0  6668
+ board2 -Os        adapt.c   1617     0  5120
+ board2 -Os     board_h7.c   1328     8  4144
+ board2 -Os   startup_h7.c    770     0     0
+ board2 -O2      main_rt.c  91045     0    12
+ board2 -O2           rt.c   1756     4  1518
+ board2 -O2     protocol.c    632     0     0
+ board2 -O2     decision.c    414     0     0
+ board2 -O2     features.c   2112     0 20804
+ board2 -O2      oneshot.c   2808     0 40964
+ board2 -O2      selfcal.c   2408     0 90321
+ board2 -O2       kmeans.c   2568     0  5295
+ board2 -O2     rf_train.c   1948     0  6668
+ board2 -O2        adapt.c   1767     0  5120
+ board2 -O2     board_h7.c   1452     8  4144
+ board2 -O2   startup_h7.c    768     0     0

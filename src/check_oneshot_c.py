@@ -81,7 +81,9 @@ def build(cc='gcc'):
     deps = src + [s[:-1] + 'h' for s in src]
     if not os.path.exists(LIB) or os.path.getmtime(LIB) < max(os.path.getmtime(s) for s in deps):
         os.makedirs(os.path.dirname(LIB), exist_ok=True)
-        subprocess.run([cc, '-O2', '-std=c99', '-Wall', '-fPIC', '-shared', '-o', LIB] + src + ['-lm'], check=True)
+        # the earlier firmware (t-SNE, no input adaptation): this check's results files were made with it
+        subprocess.run([cc, '-O2', '-std=c99', '-Wall', '-fPIC', '-shared', '-DSC_EMBED=1', '-DRT_ADAPT=0', '-o', LIB] + src
+                       + ['-lm'], check=True)
     lib = ctypes.CDLL(LIB)
     lib.os_feature_buffer.restype = ctypes.c_void_p
     lib.os_calibrate.argtypes = [ctypes.POINTER(Table), ctypes.c_void_p, ctypes.c_int, ctypes.c_uint32,

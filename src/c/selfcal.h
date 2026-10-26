@@ -13,8 +13,12 @@
  *      most frequent (pseudo-)label)
  *   2. re-label the whole buffer with the ORIGINAL one-shot model (as upstream manifold_clustering)
  *   3. if every class has >= SC_MIN_CLASS rows: take the first m rows of each class (m = smallest count),
- *      t-SNE (3-D, perplexity 10, SC_TSNE_ITER iterations) -> standardise -> K-Means initialised at the
- *      class centres -> cluster = pseudo-label; otherwise class-balanced rows with the model labels
+ *      K-Means initialised at the class centres -> cluster = pseudo-label; otherwise class-balanced rows with
+ *      the model labels. SC_EMBED selects what K-Means runs on:
+ *        0 (default)  the 80 int16 features of the rows themselves (upstream embedding=None). At the MCU buffer
+ *                     size this is as accurate as t-SNE (results/embed_sweep_summary.csv: 83.21 vs 83.23%,
+ *                     p = 0.65) and needs no t-SNE module (tsne.c is not linked)
+ *        1            t-SNE (3-D, perplexity 10, SC_TSNE_ITER iterations) -> standardise (the earlier firmware)
  *   4. train SC_N_UPD trees (depth SC_MAX_DEPTH, <= SC_MAX_LEAVES leaves) on these rows + the calibration
  *      set, and put them into SC_N_UPD randomly chosen slots
  * Features are int16 Q5.10 throughout (buffer, calibration set, trees).
@@ -34,6 +38,9 @@
 #define SC_MIN_CLASS 10
 #define SC_MAX_DEPTH 10
 #define SC_MAX_LEAVES 32
+#ifndef SC_EMBED
+#define SC_EMBED 0
+#endif
 #ifndef SC_TSNE_ITER
 #define SC_TSNE_ITER 500
 #endif
@@ -78,8 +85,8 @@ typedef struct {
 typedef struct {
     int buffer_n;               /* rows in the buffer */
     int n_selected;             /* rows used for pseudo-labelling */
-    int clustered;              /* 1: t-SNE + K-Means ran; 0: model labels */
-    int tsne_cells_max;
+    int clustered;              /* 1: K-Means (after t-SNE if SC_EMBED) ran; 0: model labels */
+    int tsne_cells_max;         /* 0 without t-SNE */
     int ram_trees;              /* slots holding a RAM tree */
     int new_nodes_max;          /* internal nodes of the largest new tree */
 } sc_stats_t;

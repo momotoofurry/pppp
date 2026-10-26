@@ -20,7 +20,9 @@
 #include <string.h>
 
 #include "rf_train.h"
+#if SC_EMBED
 #include "tsne.h"
+#endif
 
 #if RFT_MAX_LEAVES < OS_MAX_LEAVES
 #error "rf_train.h: RFT_MAX_LEAVES must be >= OS_MAX_LEAVES for one-shot trees"
@@ -33,7 +35,7 @@
 #define ST_PRUNED 2
 #define ST_BLOCKED 3                  /* below a pruned node: unreachable */
 
-typedef struct {                      /* all working memory, placed in tsne_scratch() */
+typedef struct {                      /* all working memory, placed in work_area() */
     float feat[OS_CAL_MAX][SC_DIM];   /* raw calibration features (filled by the caller) */
     int16_t q[OS_CAL_MAX][SC_DIM];
     const int16_t *rows[OS_CAL_MAX];
@@ -47,10 +49,21 @@ typedef struct {                      /* all working memory, placed in tsne_scra
     uint8_t bits[];                   /* prune bitmap, ceil(n_internal / 8) bytes */
 } scratch_t;
 
+#if SC_EMBED
+#define work_area tsne_scratch                /* borrowed: one-shot runs before the first t-SNE */
+#else
+static uint64_t s_work[(OS_WORK_BYTES + 7) / 8];
+static void *work_area(unsigned *bytes)
+{
+    *bytes = (unsigned)sizeof s_work;
+    return s_work;
+}
+#endif
+
 static scratch_t *scratch(uint32_t n_internal, uint32_t *need, uint32_t *have)
 {
     unsigned bytes;
-    void *p = tsne_scratch(&bytes);
+    void *p = work_area(&bytes);
     *need = (uint32_t)sizeof(scratch_t) + (n_internal + 7) / 8;
     *have = bytes;
     return *need <= bytes ? (scratch_t *)p : 0;
@@ -59,13 +72,13 @@ static scratch_t *scratch(uint32_t n_internal, uint32_t *need, uint32_t *have)
 const int16_t *os_cal_rows(void)
 {
     unsigned bytes;
-    return &((scratch_t *)tsne_scratch(&bytes))->q[0][0];
+    return &((scratch_t *)work_area(&bytes))->q[0][0];
 }
 
 float *os_feature_buffer(void)
 {
     unsigned bytes;
-    return &((scratch_t *)tsne_scratch(&bytes))->feat[0][0];
+    return &((scratch_t *)work_area(&bytes))->feat[0][0];
 }
 
 static uint32_t align(uint32_t x)

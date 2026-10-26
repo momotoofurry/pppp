@@ -91,7 +91,8 @@ def balanced_stats(X, pred):
     return m.mean(0), v.mean(0) + m.var(0)
 
 
-def run(dataset, subject, seed, shift, zs):
+def run(dataset, subject, seed, shift, zs, embed='tsne'):
+    """embed: 'tsne' (as upstream) or 'none' (K-Means on the 80 features, embed_sweep.py / firmware SC_EMBED = 0)"""
     emg_functions.get_predictions = lambda mdl, f: (P.predict(mdl, np.asarray(f), PREC), None)
     emg_functions.TSNE = S.tsne_with(IT, S.PERPLEXITY)
     np.random.seed(seed * 1000 + subject)
@@ -119,7 +120,7 @@ def run(dataset, subject, seed, shift, zs):
                          acc_fixed=np.mean(lab_os == y), acc_adapt=np.mean(lab_sc == y)))
         feat_buf, lab_buf = emg_functions.buffer_update(BUF, feat_buf, lab_buf, S.q16(X), lab_sc)
         feat_sel, lab_pseudo, lab_buf = emg_functions.manifold_clustering(
-            feat_buf, list(S.LABELS), S.MIN_SAMPLE_CLASS, mdl_os, 'kmeans', embedding='tsne')
+            feat_buf, list(S.LABELS), S.MIN_SAMPLE_CLASS, mdl_os, 'kmeans', embedding=None if embed == 'none' else 'tsne')
         if len(lab_pseudo) >= 10:
             new = P.train_rf(np.concatenate([feat_sel, S.q16(Xc)]), np.concatenate([lab_pseudo, yc]), n_upd, DEPTH,
                              None, MLN)

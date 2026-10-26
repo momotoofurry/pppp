@@ -1,4 +1,4 @@
-/* K-Means (Lloyd) on the standardised t-SNE embedding, static memory only. See kmeans.h. */
+/* K-Means (Lloyd) on the standardised t-SNE embedding or on the int16 buffer rows, static memory only. See kmeans.h. */
 #include "kmeans.h"
 
 #include <float.h>
@@ -6,9 +6,12 @@
 
 static uint8_t s_old[KM_NMAX];
 
+static float s_qdist[KM_NMAX];
+static float s_qsum[KM_KMAX * KM_QDIM];
+
 unsigned km_static_bytes(void)
 {
-    return (unsigned)sizeof s_old;
+    return (unsigned)(sizeof s_old + sizeof s_qdist + sizeof s_qsum);
 }
 
 static int assign(const float *x, int n, const float *ctr, int k, uint8_t *lab, float *dist)
@@ -131,4 +134,116 @@ void group_centres(const float *x, int n, const uint8_t *lab, int k, float *ctr)
     for (int c = 0; c < k; c++)
         for (int a = 0; a < KM_DIM; a++)
             ctr[c * KM_DIM + a] /= cnt[c] ? cnt[c] : 1;
+}
+
+/* ---------------------------------------------------------------- on the int16 rows (no embedding) */
+
+static float qdist2(const int16_t *x, const float *c)
+{
+    float d = 0.0f;
+    for (int a = 0; a < KM_QDIM; a++) {
+        float t = (float)x[a] - c[a];
+        d += t * t;
+    }
+    return d;
+}
+
+static int assign_q(const int16_t *const *rows, int n, const float *ctr, int k, uint8_t *lab, float *dist)
+{
+    int changed = 0;
+    for (int i = 0; i < n; i++) {
+        float best = FLT_MAX;
+        int b = 0;
+        for (int c = 0; c < k; c++) {
+            float d = qdist2(rows[i], ctr + c * KM_QDIM);
+            if (d < best) {              /* ties -> lowest cluster, as sklearn */
+                best = d;
+                b = c;
+            }
+        }
+        if (dist)
+            dist[i] = best;
+        changed |= lab[i] != b;
+        lab[i] = (uint8_t)b;
+    }
+    return changed;
+}
+
+int km_fit_q(const int16_t *const *rows, int n, int k, float *ctr, int max_iter, float tol_rel, uint8_t *lab)
+{
+    if (n > KM_NMAX || k > KM_KMAX || n < k)
+        return -1;
+    double var = 0.0;                    /* sklearn: tol = tol_rel * mean over dimensions of the data variance */
+    for (int a = 0; a < KM_QDIM; a++) {
+        double m = 0.0, s = 0.0;
+        for (int i = 0; i < n; i++)
+            m += rows[i][a];
+        m /= n;
+        for (int i = 0; i < n; i++)
+            s += (rows[i][a] - m) * (rows[i][a] - m);
+        var += s / n;
+    }
+    const double tol = tol_rel * var / KM_QDIM;
+    int it, strict = 0;
+    memset(s_old, 0xFF, n);
+    for (it = 0; it < max_iter; it++) {
+        assign_q(rows, n, ctr, k, lab, s_qdist);
+        float *sum = s_qsum;
+        int cnt[KM_KMAX] = {0};
+        memset(sum, 0, sizeof(float) * k * KM_QDIM);
+        for (int i = 0; i < n; i++) {
+            cnt[lab[i]]++;
+            for (int a = 0; a < KM_QDIM; a++)
+                sum[lab[i] * KM_QDIM + a] += rows[i][a];
+        }
+        for (int c = 0; c < k; c++) {    /* empty cluster: the point farthest from its centre */
+            if (cnt[c])
+                continue;
+            int far = 0;
+            for (int i = 1; i < n; i++)
+                if (s_qdist[i] > s_qdist[far] && cnt[lab[i]] > 1)
+                    far = i;
+            int o = lab[far];
+            cnt[o]--;
+            for (int a = 0; a < KM_QDIM; a++) {
+                sum[o * KM_QDIM + a] -= rows[far][a];
+                sum[c * KM_QDIM + a] = rows[far][a];
+            }
+            cnt[c] = 1;
+            s_qdist[far] = 0.0f;
+            lab[far] = (uint8_t)c;
+        }
+        double shift = 0.0;
+        for (int c = 0; c < k; c++)
+            for (int a = 0; a < KM_QDIM; a++) {
+                float v = sum[c * KM_QDIM + a] / cnt[c];
+                double d = v - ctr[c * KM_QDIM + a];
+                shift += d * d;
+                ctr[c * KM_QDIM + a] = v;
+            }
+        if (memcmp(lab, s_old, n) == 0) {
+            strict = 1;
+            break;
+        }
+        if (shift <= tol)
+            break;
+        memcpy(s_old, lab, n);
+    }
+    if (!strict)
+        assign_q(rows, n, ctr, k, lab, 0);
+    return it;
+}
+
+void group_centres_q(const int16_t *const *rows, int n, const uint8_t *lab, int k, float *ctr)
+{
+    int cnt[KM_KMAX] = {0};
+    memset(ctr, 0, sizeof(float) * k * KM_QDIM);
+    for (int i = 0; i < n; i++) {
+        cnt[lab[i]]++;
+        for (int a = 0; a < KM_QDIM; a++)
+            ctr[lab[i] * KM_QDIM + a] += rows[i][a];
+    }
+    for (int c = 0; c < k; c++)
+        for (int a = 0; a < KM_QDIM; a++)
+            ctr[c * KM_QDIM + a] /= cnt[c] ? cnt[c] : 1;
 }

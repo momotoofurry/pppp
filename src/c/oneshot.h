@@ -11,8 +11,9 @@
  *      each byte written once; the hardware writer is in the board layer, the PC check uses a RAM array)
  * Image layout: [header (padded to 32 B)] [prune list] [app tree nodes (sc_node_t)] [prune bitmap];
  * the header is written last. os_model() turns an image (+ the pre-trained table) into an sc_model_t.
- * All working memory is borrowed from the t-SNE workspace (tsne_scratch): one-shot calibration runs before
- * self-calibration starts, so the two never run at the same time.
+ * Working memory: with SC_EMBED = 1 it is borrowed from the t-SNE workspace (tsne_scratch; one-shot calibration
+ * runs before self-calibration starts, so the two never run at the same time); without t-SNE (SC_EMBED = 0, the
+ * default) it is a static block of OS_WORK_BYTES (39,915 B were needed for the 50 pre-trained trees, report 7.6).
  */
 #pragma once
 #include <stdint.h>
@@ -28,6 +29,9 @@
 #define OS_TREE_INT_MAX 1023          /* internal nodes of one depth-10 tree */
 #define OS_PRE_INT_MAX 65535u         /* prune list uses 16-bit node indices */
 #define OS_ALIGN 32u                  /* STM32H7 Flash word */
+#ifndef OS_WORK_BYTES
+#define OS_WORK_BYTES 40960u          /* own work area when there is no t-SNE workspace to borrow (SC_EMBED = 0) */
+#endif
 
 /* the SC_N_PRE pre-trained trees, our table format (rf_predict.h), const in Flash */
 typedef struct {
@@ -58,7 +62,7 @@ typedef struct {
     int app_nodes;                    /* internal nodes of the app trees */
     int app_leaves_max;
     uint32_t image_bytes;
-    uint32_t scratch_bytes;           /* borrowed from the t-SNE workspace */
+    uint32_t scratch_bytes;           /* work area used (t-SNE workspace or own block) */
 } os_stats_t;
 
 /* buffer for the raw (not normalised) calibration features, OS_CAL_MAX x SC_DIM float: fill it, then calibrate */
@@ -67,7 +71,8 @@ float *os_feature_buffer(void);
  * (for sc_init). Returns 0, or a negative error (-1 sizes, -2 scratch too small, -3 writer, -4 image full). */
 int os_calibrate(const os_table_t *pre, const uint8_t *y, int n, uint32_t seed, const os_writer_t *w, int16_t *cal_q,
                  os_stats_t *st);
-/* the Q5.10 calibration rows of the last os_calibrate() (valid until the first t-SNE runs: pass them to sc_init) */
+/* the Q5.10 calibration rows of the last os_calibrate() (with SC_EMBED = 1 only valid until the first t-SNE runs:
+ * pass them to sc_init) */
 const int16_t *os_cal_rows(void);
 /* z-score + Q5.10 of one feature vector with the statistics of an image (as fe_normalize_q16) */
 void os_normalize(const os_header_t *h, const float *feat, int16_t *out);

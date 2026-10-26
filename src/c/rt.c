@@ -4,6 +4,9 @@
 #include <string.h>
 
 #include "features.h"
+#if RT_ADAPT
+#include "adapt.h"
+#endif
 
 static rt_config_t s_cfg;
 static pk_parser_t s_pk;
@@ -21,6 +24,9 @@ static const os_header_t *s_hdr;
 static uint16_t s_tx_seq[3];                    /* COMMAND, PRED, STATUS */
 static float s_feat[FE_DIM];
 static int16_t s_q[FE_DIM];
+#if RT_ADAPT
+static float s_al[FE_DIM];                      /* feature vector after the channel alignment */
+#endif
 
 static uint32_t now(void)
 {
@@ -92,13 +98,29 @@ static void on_window(void)
         }
         return;
     }
+#if RT_ADAPT
+    if (s_mode == RT_MODE_ALIGN) {
+        ad_align_push(s_feat);
+        return;
+    }
+#endif
     if (s_mode != RT_MODE_RUN)
         return;
     uint16_t votes[SC_CLASSES];
     int pushed = 0;
+#if RT_ADAPT
+    ad_map(s_feat, s_al);
+    ad_normalize(s_al, s_q);
+#else
     os_normalize(s_hdr, s_feat, s_q);
+#endif
     if (!s_sc_request && !s_sc_running) {
-        sc_push_votes(s_q, votes);
+        int lab = sc_push_votes(s_q, votes);
+#if RT_ADAPT
+        ad_observe(s_al, lab);                  /* not while self-calibration runs: ad_end_block() follows it */
+#else
+        (void)lab;
+#endif
         pushed = 1;
         s_cnt.pushed++;
         if (++s_in_block == RT_BLOCK) {
@@ -188,6 +210,21 @@ static void on_control(const uint8_t *p, uint16_t len)
         if (len >= 2)
             s_report = p[1];
         break;
+#if RT_ADAPT
+    case RT_ALIGN_START:
+        if (s_mode == RT_MODE_RUN && !s_sc_running && !s_sc_request) {
+            ad_align_reset();
+            s_mode = RT_MODE_ALIGN;
+        }
+        break;
+    case RT_ALIGN_END:
+        if (s_mode == RT_MODE_ALIGN) {
+            int k = ad_align_finish();
+            s_mode = RT_MODE_RUN;
+            status(RT_EV_ALIGNED, k);
+        }
+        break;
+#endif
     }
 }
 
@@ -220,6 +257,9 @@ void rt_idle(void)
         if (r == 0) {
             sc_init(&m, os_cal_rows(), s_cal_y, (int)s_cnt.cal_windows, s_cfg.seed + 1u);
             s_hdr = (const os_header_t *)s_cfg.image;
+#if RT_ADAPT
+            ad_init(s_hdr->mu, s_hdr->inv_sd, os_feature_buffer(), (int)s_cnt.cal_windows);
+#endif
             s_in_block = 0;
             s_mode = RT_MODE_RUN;
         }
@@ -232,6 +272,11 @@ void rt_idle(void)
         s_sc_running = 1;
         s_sc_request = 0;
         sc_end_block(&st);
+#if RT_ADAPT
+        ad_stats_t ast;                         /* the real-time context may read the statistics meanwhile: a
+                                                   window then mixes old and new values of a few features */
+        ad_end_block(&ast);
+#endif
         s_sc_running = 0;
         s_cnt.selfcal_blocks++;
         status(RT_EV_SELFCAL, (int32_t)s_cnt.selfcal_blocks);
