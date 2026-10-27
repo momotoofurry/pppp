@@ -1,0 +1,26 @@
+pool Flash KB (unpruned, depth 10): {50: 88.7, 100: 175.9, 200: 351.2}
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:   12.3s
+[Parallel(n_jobs=19)]: Done 124 tasks      | elapsed:   39.4s
+[Parallel(n_jobs=19)]: Done 250 tasks      | elapsed:  1.5min
+[Parallel(n_jobs=19)]: Done 412 tasks      | elapsed:  2.5min
+[Parallel(n_jobs=19)]: Done 610 tasks      | elapsed:  3.9min
+[Parallel(n_jobs=19)]: Done 844 tasks      | elapsed:  5.3min
+[Parallel(n_jobs=19)]: Done 900 out of 900 | elapsed:  5.8min finished
+ shift variant  pool  pool_flash_KB  in_first50  fixed  adapt  fixed_vs_first  fixed_better  fixed_p  adapt_vs_first  adapt_better  adapt_p
+  0.00   first    50         88.728       50.00 81.393 83.665           0.000             0    1.000           0.000             0    1.000
+  0.00   cv100   100        175.896       25.70 81.363 83.875          -0.030             7    0.261           0.210             8    0.596
+  0.00   cv200   200        351.239       13.50 81.111 83.346          -0.283             6    0.165          -0.319             8    0.133
+  0.00  raw100   100        175.896       26.50 81.540 84.025           0.147             8    0.596           0.360            12    0.756
+  0.00  raw200   200        351.239       13.55 81.181 83.623          -0.213             6    0.216          -0.042             9    0.629
+  0.25   first    50         88.728       50.00 79.124 81.179           0.000             0    1.000           0.000             0    1.000
+  0.25   cv100   100        175.896       25.70 79.036 81.164          -0.088             6    0.314          -0.015             7    0.261
+  0.25   cv200   200        351.239       13.50 78.827 80.788          -0.296             5    0.027          -0.391             7    0.076
+  0.25  raw100   100        175.896       26.50 79.137 81.399           0.013             9    0.622           0.220             9    0.648
+  0.25  raw200   200        351.239       13.55 78.834 80.970          -0.289             6    0.090          -0.210             6    0.117
+  0.50   first    50         88.728       50.00 71.262 74.560           0.000             0    1.000           0.000             0    1.000
+  0.50   cv100   100        175.896       25.70 71.135 74.574          -0.127             5    0.261           0.015             9    0.898
+  0.50   cv200   200        351.239       13.50 70.892 74.211          -0.370             6    0.165          -0.349             8    0.409
+  0.50  raw100   100        175.896       26.50 71.221 74.500          -0.041             6    0.261          -0.060            11    0.729
+  0.50  raw200   200        351.239       13.55 70.945 74.242          -0.317             4    0.033          -0.318             8    0.330
+took 362 s

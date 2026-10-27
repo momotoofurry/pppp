@@ -888,11 +888,30 @@ arm-none-eabi-gcc 10.3.1，`-Os`，.bss 在 AXI SRAM，stack 在 DTCM，最後�
 - 結論：**不採用**。偏 ½ 格沒有顯著改善（+0.96，p = 0.37），沒偏移時固定模型顯著變差（−2.52），把增強資料放進自我校正的標籤集更差。
   可能的原因（未驗證）：增強讓附加樹學到「通道混在一起」的邊界，犧牲了沒偏移時的精準度；而自我校正和 z-score 更新本來就在補偏移。
 
+## 14. 更大的預訓練樹池：one-shot 時挑最適合的 50 棵（實測，Docker，2026-10-27；`src/pool_sweep.py` → `results/pool_sweep*.csv`）
+
+- 作者的 66 人模型只有 200 棵樹，所以樹池最多 200 棵（沒有 400 棵可用）；比較樹池 100 和 200 棵。
+- 做法：樹池的樹（深度 10）只用校正資料打分數，取前 50 棵剪枝；其餘為韌體 v2 的 Python 流程。剪枝會用校正資料重新標記節點，剪枝後的校正準確率分不出好壞，所以比較兩種分數：
+  - `raw`：未剪枝的樹在校正資料上的準確率
+  - `cv`：每類校正資料按時間分前後兩半，一半剪枝、另一半算準確率，兩個方向取平均
+- Flash（我們的表格式，未剪枝深度 10）：50 棵 88.7 KB、100 棵 175.9 KB、200 棵 351.2 KB（2 MB 內都放得下）。
+- 20 人 × 11 block × 3 seed，自我校正後的準確率，對照「前 50 棵」（同偏移，Wilcoxon 配對）：
+
+| 偏移 | 前 50 棵 | raw 100 | cv 100 | raw 200 | cv 200 |
+|---|---|---|---|---|---|
+| 0 | 83.67% | 84.03%（+0.36，p = 0.76） | 83.88%（+0.21，p = 0.60） | 83.62%（−0.04，p = 0.63） | 83.35%（−0.32，p = 0.13） |
+| ¼ | 81.18% | 81.40%（+0.22，p = 0.65） | 81.16%（−0.02，p = 0.26） | 80.97%（−0.21，p = 0.12） | 80.79%（−0.39，p = 0.076） |
+| ½ | 74.56% | 74.50%（−0.06，p = 0.73） | 74.57%（+0.02，p = 0.90） | 74.24%（−0.32，p = 0.33） | 74.21%（−0.35，p = 0.41） |
+
+- 固定模型（只 one-shot）：樹池 200 在 ¼ 格（cv，−0.30，p = 0.027）和 ½ 格（raw，−0.32，p = 0.033）顯著變差，其餘都不顯著。
+- 挑出來的 50 棵中，原本前 50 棵的比例：樹池 100 約 26 棵、樹池 200 約 13.5 棵（等於隨機的期望值 25、12.5），表示 60 筆校正資料打的分數幾乎分不出樹的好壞。
+- 結論：**不採用**，維持前 50 棵。可能的原因（未驗證）：60 個校正視窗太少，分數主要是雜訊；樹池越大，越可能挑到只是剛好符合校正資料的樹。
+
 ---
 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`src/pc/*`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`src/pc/*`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
 | 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
