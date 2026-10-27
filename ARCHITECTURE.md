@@ -109,5 +109,5 @@ RAM 的變化（`results/ram_history.csv`）：253.2 KB（加上硬體層）→ 
 | 韌體 | `src/c/`：`features.c`、`adapt.c`、`selfcal.c`、`kmeans.c`、`rf_train.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board_h7.c`、`main_rt.c` |
 | 編譯與 RAM | `src/build_arm_selfcal.py` → `results/arm_selfcal_size.csv`；`src/ram_history.py` → `results/ram_history.csv` |
 | C 對照 Python | `src/check_adapt_c.py`（v2）、`check_selfcal_c.py`、`check_oneshot_c.py`、`check_rt.py`、`check_features_c.py`（舊版） |
-| 實驗 | `src/shift_sweep.py`（電極轉動、開機對齊）、`zscore_sweep.py`（z-score 更新）、`embed_sweep.py`（t-SNE／LDA／不嵌入、buffer 大小）、`aug_sweep.py`（校正資料轉動增強，不採用，第 13 節）、`pool_sweep.py`（從 100／200 棵挑 50 棵，不採用，第 14 節）、`decision_v2.py`（決策 τ × 平滑規則，第 15 節）、`channel_sweep.py`、`channel_order.py` |
+| 實驗 | `src/shift_sweep.py`（電極轉動、開機對齊）、`zscore_sweep.py`（z-score 更新）、`embed_sweep.py`（t-SNE／LDA／不嵌入、buffer 大小）、`aug_sweep.py`（校正資料轉動增強，不採用，第 13 節）、`pool_sweep.py`（從 100／200 棵挑 50 棵，不採用，第 14 節）、`decision_v2.py`（決策 τ × 平滑規則，第 15 節）、`filt_sweep.py`（偽標籤篩選，不採用，第 16 節）、`channel_sweep.py`、`channel_order.py` |
 | 紀錄 | `report.md`；Notion「碩論實驗紀錄」（韌體修改紀錄、設計決定、文獻追蹤） |

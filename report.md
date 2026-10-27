@@ -944,11 +944,31 @@ arm-none-eabi-gcc 10.3.1，`-Os`，.bss 在 AXI SRAM，stack 在 DTCM，最後�
   - 該選哪一點取決於任務能容忍多少誤觸發（Kinova 夾放：錯誤的「放」比慢一點嚴重），要在先導實驗中決定；
     這個資料集每試次只有 1 秒，k、N 大的設定被低估（同 7.2 節）。
 
+## 16. 偽標籤篩選：K-Means 和森林投票一致才拿來訓練（實測，Docker，2026-10-27；`src/filt_sweep.py` → `results/filt_sweep*.csv`）
+
+- 做法：韌體 v2 的 Python 流程；K-Means 給出 buffer 的偽標籤後，只留下和森林投票一致的列再訓練 20 棵新樹（剩不到 10 列就不更新）。
+  - `os`：和 one-shot 模型一致；`sc`：和目前自我校正模型一致；`both`：三者一致。
+  - 診斷用：buffer 旁邊另外記真實標籤（只用來算偽標籤正確率，流程不用）。upstream 的 buffer 不是先進先出（會刪掉最多的那類），所以用列的內容對回標籤。
+  - 裝置成本：每個 block 對 ≤ 375 列多跑一次森林、375 B 的遮罩。
+- 20 人 × 11 block × 3 seed，對照不篩選（同偏移，Wilcoxon 配對）：
+
+| 偏移 | 篩選 | 留下的列 | 偽標籤正確率（全部 → 留下的） | 自我校正後 | vs 不篩選（p，變好人數） |
+|---|---|---|---|---|---|
+| 0 | 不篩選 | 100% | 84.1% | 83.67% | — |
+| 0 | os | 84.8% | 84.0% → 90.4% | 83.74% | +0.07（0.96，9／20） |
+| 0 | **sc** | 85.8% | 84.2% → 91.2% | 83.96% | +0.30（0.31，12／20） |
+| 0 | both | 82.4% | 84.2% → 91.7% | 83.76% | +0.09（0.84，9／20） |
+| ¼ | 不篩選／sc | 100%／84.0% | 81.6%／81.7% → 89.3% | 81.18%／81.08% | −0.10（0.67） |
+| ½ | 不篩選／sc | 100%／81.0% | 74.7%／75.0% → 82.9% | 74.56%／74.66% | +0.10（0.81） |
+
+- 結論：**不採用**。篩選讓偽標籤正確率提高約 7–8 個百分點，但最後的準確率沒有顯著改變（−0.24～+0.30，全部 p ≥ 0.27）。
+  可能的原因（未驗證）：被篩掉的多半是兩個模型都不確定的邊界列，新樹本來就從校正資料學得到乾淨的部分；少了這些列，新樹學到的邊界資訊也變少，兩者抵消。
+
 ---
 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`src/pc/*`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`src/pc/*`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
 | 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
