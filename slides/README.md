@@ -2,7 +2,7 @@
 
 簡報檔本身不在 repo 裡，放在 Windows 的 `C:\Users\kirit\Downloads\`（WSL 裡是 `/mnt/c/Users/kirit/Downloads/`）。
 每一版都是從上一版加內容，不覆寫舊檔。資料夾裡只留最新一版的腳本；下表是歷史紀錄，
-`build16.py` 之前的腳本（和 `make_nums.py`、`nums*.json`）已刪除，要看可以從 git 歷史拿（`git log -- slides/`）：
+`build17.py` 之前的腳本（和 `make_nums.py`、`nums*.json`）已刪除，要看可以從 git 歷史拿（`git log -- slides/`）：
 
 | 腳本 | 輸入 → 輸出 | 內容 |
 |---|---|---|
@@ -19,6 +19,7 @@
 | `build14.py` | v13（使用者未改動，2026-10-25 20:32:58）→ v14 | 第 15 頁「電極轉一格」換成更正後的數字（轉原始 EMG 再標準化，`shift_sweep_raw*_uhc.csv`：固定 45.9％、UHC 比固定更差）；新增第 16 頁「束帶情境」（部分偏移＋開機對齊，`shift_sweep_raw*.csv`）；第 2 頁對應那一點與備註（19 頁） |
 | `build15.py` | v14（使用者未改動，2026-10-25 21:41）→ v15 | 韌體 v2：第 10 頁換成「偽標籤不需要 t-SNE」（`embed_sweep_summary*.csv`）、第 11 頁換成「類別平衡 z-score 更新」（`zscore_sweep_summary_bal.csv`）、第 12 頁換成 v2 的 RAM 175.9 KB 與 C 對照 83.87%（`ram_history.csv`、`adapt_c_check*.csv`）；第 2–6、13、16 頁的 223.8 KB／t-SNE／87% 跟著更新（19 頁，t-SNE 迭代那頁被取代） |
 | `build16.py` | v15（使用者未改動，2026-10-27 12:21）→ v16 | 參考文獻前加兩頁「工作紀錄」（10/17–10/24、10/25–10/27）：每天做了什麼與結果；10/24 之後的數字讀 `results/*.csv`，之前的數字是 report.md 摘要的數字（腳本檢查都出現在 report.md）；21 頁 |
+| `build17.py` | v16（2026-10-27）→ v17 | 「工作紀錄（2/2）」加一列：比較組 Zanghieri 2023 [8] PCA 對齊（`pca_baseline_summary.csv`）；第 3 頁貢獻②和備註加上同資料比較的結果（v2 比 [8] 高 3.6–32.9 點）；21 頁 |
 
 所有數字都從 `results/` 讀，不手打：
 
@@ -27,7 +28,7 @@
 # results/ram_history.csv comes from `python3 src/ram_history.py` on the host
 D=/mnt/c/Users/kirit/Downloads
 docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD":/work -v "$D":/d -w /work rf-emg \
-  python slides/build16.py /d/碩論題目討論_MOMO_v15.pptx /d/碩論題目討論_MOMO_v16.pptx
+  python slides/build17.py /d/碩論題目討論_MOMO_v16.pptx /d/碩論題目討論_MOMO_v17.pptx
 ```
 
 v15 的底稿是 Downloads 裡的 v14（`build14.py` 產生，已刪除；要重新產生 v14 得從 git 歷史拿回 `build14.py` 和 v13）。

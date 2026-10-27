@@ -1,0 +1,13 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:   12.8s
+[Parallel(n_jobs=19)]: Done 124 tasks      | elapsed:   39.2s
+[Parallel(n_jobs=19)]: Done 250 tasks      | elapsed:  1.3min
+[Parallel(n_jobs=19)]: Done 412 tasks      | elapsed:  2.1min
+[Parallel(n_jobs=19)]: Done 610 tasks      | elapsed:  3.2min
+[Parallel(n_jobs=19)]: Done 720 out of 720 | elapsed:  3.7min finished
+ shift  fixed    pca  pca_cum  pca_vs_fixed_diff  pca_vs_fixed_better  pca_vs_fixed_p  pca_cum_vs_fixed_diff  pca_cum_vs_fixed_better  pca_cum_vs_fixed_p     v2  v2_vs_pca_diff  v2_vs_pca_better  v2_vs_pca_p  v2_vs_pca_cum_diff  v2_vs_pca_cum_better  v2_vs_pca_cum_p
+  0.00 79.680 72.074   75.679             -7.607                    2           0.000                 -4.001                        5               0.003 83.665          11.591                20        0.000               7.986                    20            0.000
+  0.25 76.593 73.730   74.764             -2.863                    8           0.105                 -1.830                        8               0.133 81.179           7.449                20        0.000               6.416                    20            0.000
+  0.50 66.426 68.427   70.915              2.001                   14           0.189                  4.488                       15               0.006 74.560           6.132                18        0.002               3.645                    16            0.009
+  1.00 45.896 49.634   50.802              3.738                   13           0.076                  4.906                       16               0.012 83.665          34.031                20        0.000              32.863                    20            0.000
+took 233 s

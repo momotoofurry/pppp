@@ -964,11 +964,40 @@ arm-none-eabi-gcc 10.3.1，`-Os`，.bss 在 AXI SRAM，stack 在 DTCM，最後�
 - 結論：**不採用**。篩選讓偽標籤正確率提高約 7–8 個百分點，但最後的準確率沒有顯著改變（−0.24～+0.30，全部 p ≥ 0.27）。
   可能的原因（未驗證）：被篩掉的多半是兩個模型都不確定的邊界列，新樹本來就從校正資料學得到乾淨的部分；少了這些列，新樹學到的邊界資訊也變少，兩者抵消。
 
+## 17. 比較組：Zanghieri 2023 [8] 的免標籤 PCA 對齊（實測，Docker，2026-10-27；`src/pca_baseline.py` → `results/pca_baseline*.csv`）
+
+- [8] 的做法（讀原始程式 github.com/pulp-bio/online-semg-posture-adaptation 的 `protocol.calibration_experiment`）：分類器（MLP）訓練在
+  參考 session 標準化後通道的主成分上；新 session 不用標籤，重新估平均、尺度和主成分（Oja SGA，用參考主成分初始化），
+  依參考主成分重新排序並對齊正負號，再用新的主成分投影。**分類器不更新**。
+- 套到本研究（我們的改寫，不是原文設定）：
+  - 每種特徵（10 種）各自在 8 個通道的空間做同樣的 PCA 對齊：參考＝第 1 天校正，新＝測試 block 0（無標籤，和開機對齊用同一份資料）。
+  - 對齊後的主成分座標放回參考特徵空間，所以同一個 one-shot RF（第 1 天 z-score）可以直接分類。
+  - 用批次 PCA（`eigh`）取代 Oja：等於線上估計收斂後的結果，是 [8] 的最好情況。
+  - `pca`：只用 block 0 估一次；`pca_cum`：每個 block 用之前所有 block 重新估（因果）。
+  - 原文是 4 個通道、手臂姿勢改變、MLP；這裡是 8 通道、束帶轉動、RF，結果只代表這個改寫在本資料上的表現。
+- 20 人 × 11 block × 3 seed，同一個 one-shot 模型（同 seed）。韌體 v2 的數字取自 `aug_sweep.csv`（不增強），同 seed、同模型：
+
+| 偏移 | 不適應（不對齊） | [8] PCA（block 0） | [8] PCA（逐 block） | 韌體 v2（本研究） | v2 − [8] block 0（p，人數） | v2 − [8] 逐 block（p，人數） |
+|---|---|---|---|---|---|---|
+| 0 | 79.68% | 72.07%（−7.61，p < 0.001） | 75.68%（−4.00，p = 0.003） | **83.67%** | +11.59（< 0.001，20／20） | +7.99（< 0.001，20／20） |
+| ¼ | 76.59% | 73.73%（−2.86，p = 0.11） | 74.76%（−1.83，p = 0.13） | **81.18%** | +7.45（< 0.001，20／20） | +6.42（< 0.001，20／20） |
+| ½ | 66.43% | 68.43%（+2.00，p = 0.19） | 70.92%（+4.49，p = 0.006） | **74.56%** | +6.13（0.002，18／20） | +3.65（0.009，16／20） |
+| 1 | 45.90% | 49.63%（+3.74，p = 0.076） | 50.80%（+4.91，p = 0.012） | **83.67%** | +34.03（< 0.001，20／20） | +32.86（< 0.001，20／20） |
+
+- 「不適應」和第 8.1 節的固定模型逐位相同（79.68／76.59／66.43／45.90%），流程沒有改到。
+- 結論：
+  1. 在這份資料上，[8] 的 PCA 對齊**沒偏移時反而顯著變差**（−7.6），偏 ½ 格和 1 格時逐 block 版有小幅改善（+4.5／+4.9）。
+  2. 本研究的韌體 v2 在每一種偏移下都顯著比 [8] 好：對 [8] 較好的逐 block 版 +3.6～+32.9（16–20／20 人，p ≤ 0.009）。
+     整格轉動的差距主要來自開機對齊；半格時（開機對齊沒有幫助）差距 +3.6 來自自我校正＋z-score 更新。
+  3. 可能的原因（未驗證）：PCA 對齊假設新舊資料只差一個旋轉，但 block 0 的手勢分布和校正資料不同，主成分本身會變；
+     而且 8 維、每種特徵分開做，排序和正負號的配對容易出錯。RF 也不像 [8] 的 MLP 是在主成分上訓練的。
+- 限制：這是改寫，不是 [8] 原文的完整重現（原文的 MLP、量化、UniBo-INAIL 資料都沒有用）；正式論文要說明這一點，最好也在先導資料上跑。
+
 ---
 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`src/pc/*`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`src/pc/*`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
 | 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
