@@ -1,0 +1,33 @@
+features ready after 17 s
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:   27.4s
+[Parallel(n_jobs=19)]: Done 124 tasks      | elapsed:  1.3min
+[Parallel(n_jobs=19)]: Done 250 tasks      | elapsed:  2.7min
+[Parallel(n_jobs=19)]: Done 412 tasks      | elapsed:  4.4min
+[Parallel(n_jobs=19)]: Done 610 tasks      | elapsed:  6.3min
+[Parallel(n_jobs=19)]: Done 844 tasks      | elapsed:  8.1min
+[Parallel(n_jobs=19)]: Done 1114 tasks      | elapsed: 10.3min
+[Parallel(n_jobs=19)]: Done 1200 out of 1200 | elapsed: 11.0min finished
+ shift   aug  fixed  adapt  fixed_vs_none  fixed_better  fixed_p  adapt_vs_none  adapt_better  adapt_p
+ -0.50  none 71.262 74.560          0.000             0    1.000          0.000             0    1.000
+ -0.50   app 71.516 75.519          0.254            10    0.956          0.960            10    0.368
+ -0.50 app25 71.328 74.998          0.066             9    0.869          0.439            13    0.123
+ -0.50 appsc 71.162 75.119         -0.101             8    0.674          0.559            10    0.985
+  0.00  none 81.393 83.665          0.000             0    1.000          0.000             0    1.000
+  0.00   app 78.872 82.993         -2.521             2    0.001         -0.672             8    0.133
+  0.00 app25 80.109 83.183         -1.284             3    0.002         -0.482             6    0.097
+  0.00 appsc 78.611 82.220         -2.782             2    0.001         -1.445             5    0.007
+  0.25  none 79.124 81.179          0.000             0    1.000          0.000             0    1.000
+  0.25   app 78.389 81.493         -0.735             6    0.165          0.314            12    0.571
+  0.25 app25 78.836 81.342         -0.288             8    0.596          0.163            12    0.596
+  0.25 appsc 78.087 80.991         -1.037             5    0.083         -0.188             7    0.596
+  0.50  none 71.262 74.560          0.000             0    1.000          0.000             0    1.000
+  0.50   app 71.516 75.519          0.254            10    0.956          0.960            10    0.368
+  0.50 app25 71.328 74.998          0.066             9    0.869          0.439            13    0.123
+  0.50 appsc 71.162 75.119         -0.101             8    0.674          0.559            10    0.985
+  1.00  none 81.393 83.665          0.000             0    1.000          0.000             0    1.000
+  1.00   app 78.872 82.993         -2.521             2    0.001         -0.672             8    0.133
+  1.00 app25 80.109 83.183         -1.284             3    0.002         -0.482             6    0.097
+  1.00 appsc 78.611 82.220         -2.782             2    0.001         -1.445             5    0.007
+calibration rows: {'app': 60.0, 'app25': 60.0, 'appsc': 300.0, 'none': 60.0}
+took 677 s
