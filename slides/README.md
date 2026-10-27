@@ -1,7 +1,7 @@
 # slides/ — 產生「碩論題目討論」簡報的腳本
 
 簡報檔本身不在 repo 裡，放在 Windows 的 `C:\Users\kirit\Downloads\`（WSL 裡是 `/mnt/c/Users/kirit/Downloads/`）。
-每一版都是從上一版加內容，不覆寫舊檔。資料夾裡只留最新一版的腳本；下表是歷史紀錄，
+**2026-10-27 起只改 `碩論題目討論_MOMO_v17.pptx` 這一份（直接覆寫），不再新增簡報檔。** 之前每一版都是從上一版加內容，不覆寫舊檔。資料夾裡只留最新一版的腳本；下表是歷史紀錄，
 `build17.py` 之前的腳本（和 `make_nums.py`、`nums*.json`）已刪除，要看可以從 git 歷史拿（`git log -- slides/`）：
 
 | 腳本 | 輸入 → 輸出 | 內容 |
