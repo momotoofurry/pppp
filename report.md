@@ -907,11 +907,48 @@ arm-none-eabi-gcc 10.3.1，`-Os`，.bss 在 AXI SRAM，stack 在 DTCM，最後�
 - 挑出來的 50 棵中，原本前 50 棵的比例：樹池 100 約 26 棵、樹池 200 約 13.5 棵（等於隨機的期望值 25、12.5），表示 60 筆校正資料打的分數幾乎分不出樹的好壞。
 - 結論：**不採用**，維持前 50 棵。可能的原因（未驗證）：60 個校正視窗太少，分數主要是雜訊；樹池越大，越可能挑到只是剛好符合校正資料的樹。
 
+## 15. 決策模組調整：τ × 平滑規則（韌體 v2 的票數；實測，Docker，2026-10-27；`src/decision_v2.py` → `results/decision_v2_*.csv`）
+
+- 票數：韌體 v2 的 C 版流程（同 `check_adapt_c.py`，開機對齊＋類別平衡 z-score 更新＋不嵌入自我校正），記下每個 100 ms 視窗 100 棵樹的票數；
+  20 人 × 3 seed × 偏移 0／½，共 396,000 個視窗。每個試次 1 秒（10 個視窗），狀態每個試次重設（同 7.2 節）。
+- 規則：
+  - `streak k`：`decision.c`（連續 k 個被接受的視窗同一類，用 C 的 `dc_replay`）；k = 1–5
+  - `major N`（新，只有 Python）：最近 N 個視窗裡某一類超過一半（被拒絕的視窗不算票）；N = 3／5／7
+  - τ = 0、0.30–0.95（間隔 0.05）
+- 指標：**有效準確率**＝（指令手勢試次的第一個指令正確＋Rest／Lateral 試次沒有送指令）／全部試次；錯誤指令／分鐘；延遲（試次開始到第一個正確指令）。
+- 用「留一人」選設定（在其他 19 人、偏移 0 上選，套到被留下的人、兩種偏移），對照韌體目前的預設 τ = 0.6、streak 3：
+
+| 自我校正後 | 選法 | 選到的設定（20 次中） | 有效準確率 | 錯誤指令／分 | 延遲 | 拒絕 |
+|---|---|---|---|---|---|---|
+| 偏移 0 | 預設 τ 0.6、k 3 | — | 73.6% | 1.14 | 376 ms | 39.7% |
+| 偏移 0 | 只看有效準確率 | major7 τ 0.3（16 次） | **86.2%**（19／20 人較好，p < 0.001） | **6.72** | 422 ms | 0.6% |
+| 偏移 0 | 錯誤指令 ≤ 1／分 | major5 τ 0.65（15 次） | 71.3%（p = 0.0003，較差） | 1.06 | 400 ms | 46.2% |
+| 偏移 ½ | 預設 | — | 60.2% | 1.20 | 405 ms | 54.6% |
+| 偏移 ½ | 只看有效準確率 | 同上 | 77.9%（19／20，p < 0.001） | 9.85 | 436 ms | 1.4% |
+| 偏移 ½ | 錯誤指令 ≤ 1／分 | 同上 | 57.2%（較差，p < 0.001） | 1.05 | 425 ms | 61.8% |
+
+- 同樣的錯誤指令預算下，兩種規則幾乎一樣（全部 20 人的曲線，偏移 0）：
+
+| 錯誤指令預算 | streak 最好 | major 最好 |
+|---|---|---|
+| ≤ 0.5／分 | 64.7%（k 4、τ 0.65、0.42／分、483 ms） | 64.8%（N 5、τ 0.70、0.38／分、416 ms） |
+| ≤ 1.2／分 | 73.7%（k 1、τ 0.70、1.17／分、223 ms） | 73.5%（N 7、τ 0.6、1.05／分、472 ms） |
+| ≤ 2／分 | 78.0%（k 3、τ 0.55、1.90／分、359 ms） | 78.0%（N 3、τ 0.6、1.98／分、277 ms） |
+| ≤ 4／分 | 84.1%（k 5、τ 0.35、3.91／分、523 ms） | 82.7%（N 5、τ 0.5、3.42／分、346 ms） |
+
+  （這張表是在全部受試者上挑的，偏樂觀，只用來看曲線形狀。）
+- 結論：
+  - 有效準確率可以從 73.6% 拉到 86%，但代價是錯誤指令從每分鐘約 1 次變成約 7 次；同樣錯誤率下沒有「免費」的進步。
+  - 「最近 N 筆多數決」和 streak 在同一條取捨曲線上，**不加進韌體**；目前的 τ 0.6、k 3 已經在曲線上（1.14／分、73.6%）。
+  - 同一錯誤率下，延遲可以靠選規則調（例如 ≤ 1.2／分時 streak 1、τ 0.7 只要 223 ms，但拒絕 58%）。
+  - 該選哪一點取決於任務能容忍多少誤觸發（Kinova 夾放：錯誤的「放」比慢一點嚴重），要在先導實驗中決定；
+    這個資料集每試次只有 1 秒，k、N 大的設定被低估（同 7.2 節）。
+
 ---
 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`src/pc/*`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`src/pc/*`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
 | 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |

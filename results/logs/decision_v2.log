@@ -1,0 +1,38 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:   12.5s
+[Parallel(n_jobs=19)]: Done 108 out of 120 | elapsed:   32.9s remaining:    3.7s
+[Parallel(n_jobs=19)]: Done 120 out of 120 | elapsed:   34.6s finished
+votes ready after 50 s, 396000 windows
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done   3 tasks      | elapsed:    7.3s
+[Parallel(n_jobs=19)]: Done  80 out of  80 | elapsed:   42.6s finished
+  model  shift  constrained                                                   chosen  effective  default_effective  correct_trial  default_correct_trial  wrong_per_min  default_wrong_per_min  latency_ms  default_latency_ms  rejected  default_rejected  effective_better  effective_p
+oneshot    0.0        False                               major7@0.0:17 major7@0.3:3     0.8377             0.6708         0.8402                 0.5192         8.2636                 0.9515    426.2881            405.7397    0.0029            0.5026                19       0.0000
+oneshot    0.0         True                 streak3@0.6:16 major7@0.6:3 major5@0.6:1     0.6709             0.6708         0.5198                 0.5192         0.9758                 0.9515    420.2931            405.7397    0.5026            0.5026                 1       0.7150
+oneshot    0.5        False                               major7@0.0:17 major7@0.3:3     0.7502             0.5052         0.7102                 0.2629        11.4939                 0.6000    454.6493            450.7193    0.0086            0.6776                19       0.0000
+oneshot    0.5         True                 streak3@0.6:16 major7@0.6:3 major5@0.6:1     0.5066             0.5052         0.2657                 0.2629         0.6364                 0.6000    465.1795            450.7193    0.6776            0.6776                 3       0.4652
+selfcal    0.0        False                               major7@0.3:16 major7@0.0:4     0.8623             0.7355         0.8562                 0.6167         6.7242                 1.1424    422.0254            375.9868    0.0060            0.3974                19       0.0000
+selfcal    0.0         True major5@0.65:15 streak5@0.55:2 major7@0.6:2 streak1@0.7:1     0.7130             0.7355         0.5805                 0.6167         1.0576                 1.1424    400.2811            375.9868    0.4617            0.3974                 2       0.0003
+selfcal    0.5        False                               major7@0.3:16 major7@0.0:4     0.7794             0.6021         0.7400                 0.4131         9.8455                 1.2000    435.5000            404.8094    0.0141            0.5460                19       0.0000
+selfcal    0.5         True major5@0.65:15 streak5@0.55:2 major7@0.6:2 streak1@0.7:1     0.5722             0.6021         0.3664                 0.4131         1.0485                 1.2000    425.3542            404.8094    0.6183            0.5460                 2       0.0000
+top settings (all subjects, selfcal, offset 0):
+  model  shift   rule  par  tau  rejected  acc_accepted  correct_trial  wrong_per_min  commands_per_min  latency_ms  effective
+selfcal    0.0  major    7 0.30    0.0082        0.8423         0.8558         6.6212           41.2818    422.1199     0.8631
+selfcal    0.0  major    7 0.00    0.0000        0.8387         0.8582         6.8576           41.6242    421.8933     0.8630
+selfcal    0.0  major    5 0.35    0.0317        0.8514         0.8585         7.1788           42.3364    323.1452     0.8609
+selfcal    0.0 streak    3 0.30    0.0082        0.8423         0.8546         6.7788           41.5091    324.6529     0.8606
+selfcal    0.0 streak    3 0.00    0.0000        0.8387         0.8569         7.0182           41.8667    324.5292     0.8605
+selfcal    0.0  major    7 0.35    0.0317        0.8514         0.8477         6.0818           40.3182    424.1384     0.8605
+selfcal    0.0  major    5 0.30    0.0082        0.8423         0.8632         7.8697           43.3909    319.4571     0.8604
+selfcal    0.0  major    5 0.00    0.0000        0.8387         0.8649         8.2121           43.8727    319.0529     0.8598
+top settings (all subjects, selfcal, offset 0.5):
+  model  shift   rule  par  tau  rejected  acc_accepted  correct_trial  wrong_per_min  commands_per_min  latency_ms  effective
+selfcal    0.5  major    7 0.00    0.0000        0.7474         0.7436        10.2636           40.6000    436.0407     0.7805
+selfcal    0.5  major    7 0.30    0.0165        0.7527         0.7395         9.7545           39.8697    435.7645     0.7794
+selfcal    0.5  major    5 0.00    0.0000        0.7474         0.7550        12.3758           44.0152    331.3996     0.7789
+selfcal    0.5  major    5 0.30    0.0165        0.7527         0.7514        11.7909           43.1515    333.1457     0.7782
+selfcal    0.5 streak    3 0.00    0.0000        0.7474         0.7414        10.4030           40.7545    339.4690     0.7777
+selfcal    0.5 streak    3 0.30    0.0165        0.7527         0.7376         9.9576           40.1061    340.2590     0.7768
+selfcal    0.5  major    5 0.35    0.0647        0.7674         0.7395        10.1970           40.8303    337.3566     0.7762
+selfcal    0.5  major    7 0.35    0.0647        0.7674         0.7245         8.5121           37.9091    438.3533     0.7741
+took 93 s

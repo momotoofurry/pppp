@@ -49,7 +49,7 @@
 | 新樹 | 每 block 20 棵、深度 10、≤ 32 葉，替換附加樹 | 第 3 節 |
 | z-score 更新 | 依預測類別分組（每類 ≥ 5 個視窗、≥ 2 類），6 類等權合併，a = 0.3 | 休息佔一半也有效（10.1） |
 | 開機對齊 | log RMS／MAV／WL 的通道輪廓，8 種整數轉法取相關最高 | 整格轉動 20／20 估對（8.1） |
-| 決策 | τ、k 用第 1 天資料選 | `eval_decision.py`（7.2） |
+| 決策 | 預設 τ 0.6、k 3（v2：有效準確率 73.6%、錯誤指令 1.14／分）；正式值依任務選 | `eval_decision.py`（7.2）、`decision_v2.py`（15） |
 
 ## 4. 韌體模組（`src/c/`）與記憶體
 
@@ -98,7 +98,7 @@ RAM 的變化（`results/ram_history.csv`）：253.2 KB（加上硬體層）→ 
 1. 上板：燒錄、量每個視窗的推論時間和每次自我校正的時間（RQ3）。
 2. v2 的即時迴圈串流回放測試（把 `check_rt.py` 擴充到新版）；PC 端送 `RT_ALIGN_START`／`RT_ALIGN_END` 的工具。
 3. 休息佔多數時整條流程（buffer 偽標籤會不會偏向 Rest）的模擬。
-4. 決策模組：報誤觸發率、拒絕率、延遲；「最近 N 筆多數決」變體。
+4. 決策模組：在 v2 上已做 τ × 平滑規則的取捨曲線（report 第 15 節，多數決變體沒有比較好）；要在先導實驗依任務能容忍的誤觸發率選定 τ、k。
 5. 用獨立資料（PhysioNet 86 人或先導資料）確認通道結論；先導實驗時用訊號比對論文通道的位置（第 9 節）。
 6. IRB；Kinova 任務與抓放遊戲；比較組（固定模型、不校正的預訓練模型、PCA 對齊）。
 
@@ -109,5 +109,5 @@ RAM 的變化（`results/ram_history.csv`）：253.2 KB（加上硬體層）→ 
 | 韌體 | `src/c/`：`features.c`、`adapt.c`、`selfcal.c`、`kmeans.c`、`rf_train.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board_h7.c`、`main_rt.c` |
 | 編譯與 RAM | `src/build_arm_selfcal.py` → `results/arm_selfcal_size.csv`；`src/ram_history.py` → `results/ram_history.csv` |
 | C 對照 Python | `src/check_adapt_c.py`（v2）、`check_selfcal_c.py`、`check_oneshot_c.py`、`check_rt.py`、`check_features_c.py`（舊版） |
-| 實驗 | `src/shift_sweep.py`（電極轉動、開機對齊）、`zscore_sweep.py`（z-score 更新）、`embed_sweep.py`（t-SNE／LDA／不嵌入、buffer 大小）、`aug_sweep.py`（校正資料轉動增強，不採用，第 13 節）、`pool_sweep.py`（從 100／200 棵挑 50 棵，不採用，第 14 節）、`channel_sweep.py`、`channel_order.py` |
+| 實驗 | `src/shift_sweep.py`（電極轉動、開機對齊）、`zscore_sweep.py`（z-score 更新）、`embed_sweep.py`（t-SNE／LDA／不嵌入、buffer 大小）、`aug_sweep.py`（校正資料轉動增強，不採用，第 13 節）、`pool_sweep.py`（從 100／200 棵挑 50 棵，不採用，第 14 節）、`decision_v2.py`（決策 τ × 平滑規則，第 15 節）、`channel_sweep.py`、`channel_order.py` |
 | 紀錄 | `report.md`；Notion「碩論實驗紀錄」（韌體修改紀錄、設計決定、文獻追蹤） |

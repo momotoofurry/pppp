@@ -1,0 +1,9 @@
+model,shift,constrained,chosen,effective,default_effective,correct_trial,default_correct_trial,wrong_per_min,default_wrong_per_min,latency_ms,default_latency_ms,rejected,default_rejected,effective_better,effective_p
+oneshot,0,False,major7@0.0:17 major7@0.3:3,0.8377,0.6708,0.8402,0.5192,8.264,0.9515,426.3,405.7,0.002869,0.5026,19,3.815e-06
+oneshot,0,True,streak3@0.6:16 major7@0.6:3 major5@0.6:1,0.6709,0.6708,0.5198,0.5192,0.9758,0.9515,420.3,405.7,0.5026,0.5026,1,0.715
+oneshot,0.5,False,major7@0.0:17 major7@0.3:3,0.7502,0.5052,0.7102,0.2629,11.49,0.6,454.6,450.7,0.008591,0.6776,19,3.815e-06
+oneshot,0.5,True,streak3@0.6:16 major7@0.6:3 major5@0.6:1,0.5066,0.5052,0.2657,0.2629,0.6364,0.6,465.2,450.7,0.6776,0.6776,3,0.4652
+selfcal,0,False,major7@0.3:16 major7@0.0:4,0.8623,0.7355,0.8562,0.6167,6.724,1.142,422,376,0.00597,0.3974,19,3.815e-06
+selfcal,0,True,major5@0.65:15 streak5@0.55:2 major7@0.6:2 streak1@0.7:1,0.713,0.7355,0.5805,0.6167,1.058,1.142,400.3,376,0.4617,0.3974,2,0.0003223
+selfcal,0.5,False,major7@0.3:16 major7@0.0:4,0.7794,0.6021,0.74,0.4131,9.845,1.2,435.5,404.8,0.01406,0.546,19,5.722e-06
+selfcal,0.5,True,major5@0.65:15 streak5@0.55:2 major7@0.6:2 streak1@0.7:1,0.5722,0.6021,0.3664,0.4131,1.048,1.2,425.4,404.8,0.6183,0.546,2,4.768e-05
