@@ -11,7 +11,8 @@ import subprocess
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STEPS = [('e6b1bcd', 'board layer added', 'board'), ('f15cf9e', 'octree 2.5 n cells', 'board'),
-         ('5519744', '16-bit P, shared workspace', 'board'), ('61b3544', 'v2: no t-SNE, adapt.c', 'board2')]
+         ('5519744', '16-bit P, shared workspace', 'board'), ('61b3544', 'v2: no t-SNE, adapt.c', 'board2'),
+         ('6fd9acd', 'R3: buffer mapped to the new z-score', 'board2')]
 GROUPS = {'tsne.c': 'tsne', 'selfcal.c': 'selfcal', 'features.c': 'features', 'oneshot.c': 'oneshot', 'adapt.c': 'adapt'}
 
 

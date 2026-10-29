@@ -3,3 +3,4 @@ e6b1bcd,board layer added,board,259224,253.15,121.84,90.72,20.32,0.0,0.0,20.26
 f15cf9e,octree 2.5 n cells,board,252456,246.54,115.23,90.72,20.32,0.0,0.0,20.26
 5519744,"16-bit P, shared workspace",board,229208,223.84,92.53,90.72,20.32,0.0,0.0,20.26
 61b3544,"v2: no t-SNE, adapt.c",board2,180076,175.86,0.0,88.2,20.32,40.0,5.0,22.33
+6fd9acd,R3: buffer mapped to the new z-score,board2,180716,176.48,0.0,88.2,20.32,40.0,5.0,22.96
