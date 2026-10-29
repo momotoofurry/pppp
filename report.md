@@ -993,39 +993,48 @@ arm-none-eabi-gcc 10.3.1，`-Os`，.bss 在 AXI SRAM，stack 在 DTCM，最後�
      而且 8 維、每種特徵分開做，排序和正負號的配對容易出錯。RF 也不像 [8] 的 MLP 是在主成分上訓練的。
 - 限制：這是改寫，不是 [8] 原文的完整重現（原文的 MLP、量化、UniBo-INAIL 資料都沒有用）；正式論文要說明這一點，最好也在先導資料上跑。
 
-## 18. 第一次上板：韌體 v2 在 NUCLEO-H753ZI 上的時間（實測，2026-10-29；`src/c/bench.c` → `results/bench_board_64mhz_nocache.txt`）
+## 18. 第一次上板：韌體 v2 在 NUCLEO-H753ZI 上的時間（實測，2026-10-29；`src/c/bench.c` → `results/bench_board_*.txt`）
 
 - 板子：NUCLEO-H753ZI（STM32H753ZI rev V，ST-LINK V3）。專案用 STM32CubeMX 產生（CMake、HAL），時脈和 USART3 用 CubeMX 的設定；
   韌體模組由 `src/export_stm32.py` 複製進去，硬體層用 `src/c/board_hal.c`（HAL 的 Flash 抹除／寫入，取代還沒對照手冊的 `board_h7.c`）。
   變數放 AXI SRAM（連結腳本的複製版）：RAM 168,848 B（AXI）＋ 1,536 B（DTCM，stack），Flash 529,716 B（其中 384 KB 是測試錄音）。
 - 編譯：gnu-tools-for-stm32 14.3.1，Release `-Os -g`（`-g` 不改變程式碼，大小逐位相同）。
-- **這一輪是最慢的設定：SYSCLK 64 MHz（HSI）、I-cache 和 D-cache 都關。** 正式數字要再量 480 MHz＋快取。
+- 量了兩種設定（同一份程式，只改 CubeMX 的時脈和快取）：
+  - 最慢：SYSCLK 64 MHz（HSI）、I-cache 和 D-cache 都關（`results/bench_board_64mhz_nocache.txt`）
+  - **正式：SYSCLK 480 MHz**（HSI → PLL1 M=4 N=60 P=2，HCLK 240 MHz，APB 120 MHz，VOS0，LDO，Flash latency 4），**I-cache、D-cache 開**
+    （`results/bench_board_480mhz_cache.txt`；用 STM32_Programmer_CLI 2.23.0 燒錄、ST-LINK 虛擬 COM port 115200 收結果）
 - 流程（`bench.c`，和 `rt.c` 同樣的步驟）：MCU 上 one-shot 校正（60 個校正特徵向量 → 剪枝 50 棵＋建 50 棵 → 寫進 Flash bank 2 sector 7）
   → 開機對齊（50 個視窗）→ 3 個 block × 300 個視窗（特徵 → 通道重排＋z-score → 100 棵投票 → 類別統計），每個 block 後自我校正＋z-score 更新。
   輸入是受試者 0 testing_block0 每個手勢第一段 2 秒錄音（`build/bench/raw_bench.h`），讓 buffer 有 6 類、走 K-Means 的路徑。每個呼叫用 DWT 計數器量。
 
-| 步驟 | 次數 | 平均 | 最大 | 備註 |
+| 步驟 | 次數 | 480 MHz＋快取：平均（最大） | 64 MHz 無快取：平均（最大） | 備註 |
 |---|---|---|---|---|
-| **每個 100 ms 視窗合計** | — | **46.0 ms** | — | 預算 100 ms 以內 |
-| 特徵（完成一個視窗的那次 `fe_push`：FFT、PSD、80 個特徵） | 950 | 37.5 ms | 37.6 ms | 佔一個視窗的 81% |
-| 濾波（其他 199 個樣本，每個） | 199,050 | 39 µs | 41 µs | 一個視窗 7.8 ms |
-| 通道重排＋z-score | 900 | 79 µs | 80 µs | |
-| 100 棵樹投票（`sc_push_votes`） | 900 | 0.61 ms | 0.75 ms | |
-| 類別統計（`ad_observe`） | 900 | 60 µs | 62 µs | |
-| **自我校正一次（`sc_end_block`）** | 3 | **1.65 s** | 1.98 s | 每 300 個視窗（30 s）一次，背景執行 |
-| z-score 更新（`ad_end_block`） | 3 | 1.0 ms | 1.0 ms | |
-| **one-shot 校正＋寫 Flash** | 1 | **2.0 s** | — | 每次配戴一次 |
-| 開機對齊（估轉法） | 1 | 0.14 ms | — | |
+| **每個 100 ms 視窗合計** | — | **2.75 ms**（預算的 2.8%） | 46.0 ms | 平均值相加 |
+| 特徵（完成一個視窗的那次 `fe_push`：FFT、PSD、80 個特徵） | 950 | 2.23 ms（2.24 ms） | 37.5 ms（37.6 ms） | 480 MHz 時佔一個視窗的 81% |
+| 濾波（其他 199 個樣本，每個） | 199,050 | 1,094 cycles ≈ 2.3 µs（2.9 µs） | 39 µs（41 µs） | 一個視窗 0.45 ms／7.8 ms |
+| 通道重排＋z-score | 900 | 8 µs（8 µs） | 79 µs（80 µs） | |
+| 100 棵樹投票（`sc_push_votes`） | 900 | 58 µs（74 µs） | 0.61 ms（0.75 ms） | |
+| 類別統計（`ad_observe`） | 900 | 6 µs（6 µs） | 60 µs（62 µs） | |
+| **自我校正一次（`sc_end_block`）** | 3 | **0.125 s**（0.150 s） | 1.65 s（1.98 s） | 每 300 個視窗（30 s）一次，背景執行 |
+| z-score 更新（`ad_end_block`） | 3 | 0.11 ms | 1.0 ms | |
+| **one-shot 校正＋寫 Flash** | 1 | **1.03 s** | 2.0 s | 每次配戴一次 |
+| 開機對齊（估轉法） | 1 | 15 µs | 0.14 ms | |
+
+（bench 印出的微秒是整數除法，濾波一列用 cycle 數換算：1,094 ÷ 480 MHz。）
 
 - 和 PC 對照（`results/bench_pc.txt`，同一份 `bench.c`、gcc -O2）：每類預測次數（142／92／191／100／128／247）、對的視窗數（568／900）、
   每個 block 的 K-Means、選用列數、新樹最大節點數、one-shot 模型大小（6,323 B）、剪枝節點數、新樹節點數**全部相同**；
   但 one-shot 模型的雜湊（板子 `577de879`、PC `d43d66c3`）和每個視窗票數的雜湊不同，表示有些視窗的票數有小差異，但沒有改變任何一個預測。
   可能的原因（未驗證）：ARM 編譯器把乘加合成 FMA 指令，模型檔裡的 z-score 平均和標準差（float）最後一位不同。要逐位元組比對模型檔才能確認。
+  兩種時脈／快取設定下，板子的兩個雜湊（`577de879`、`c0268fe1`）和所有統計**逐位相同**：板子上的結果是確定的，差異只在 PC 和板子之間。
 - 解讀：
-  1. 最慢的設定下，每個視窗只用掉 46% 的時間，即時分類已經跟得上；自我校正在背景跑，實際經過的時間約 1.65 s ÷（1 − 0.46）≈ 3 s（估算），遠短於 30 s 的 block。
-  2. 時間主要花在特徵擷取（81%），而且 FFT 是自己寫的 radix-2，換成 CMSIS-DSP 的 `arm_rfft_fast_f32` 是最直接的加速點。
-  3. 一個視窗內的 RF 推論只要 0.61 ms，模型本身不是瓶頸。
-- 尚未做：480 MHz＋I/D-cache 的正式數字；功耗；模型檔逐位元組比對；路線 B（PC 從 UART 送樣本）的即時測試。
+  1. **480 MHz＋快取：每個 100 ms 視窗 2.75 ms，只用掉 2.8% 的時間**；自我校正一次 0.125 s（最大 0.15 s），每 30 s 才做一次。
+     即時分類和自我校正都遠在時間預算內（RQ3 的時間部分）。最慢的設定（64 MHz、無快取）也只用掉 46%。
+  2. 從 64 MHz 無快取到 480 MHz＋快取：每個視窗快 16.7 倍、自我校正快 13 倍（時脈 7.5 倍，其餘來自快取：特徵擷取的 cycle 數從 2.40 M 降到 1.07 M）。
+  3. **one-shot 只快 2 倍**，而且 cycle 數反而從 128 M 變成 492 M：表示它的時間主要不是計算，而是 Flash 扇區抹除（固定的實際時間，不隨時脈變快）。
+     這是從 cycle 數推論的，抹除時間沒有單獨量。1 s 對「每次配戴一次」的步驟沒有影響。
+  4. 時間主要花在特徵擷取（81%），FFT 是自己寫的 radix-2，換成 CMSIS-DSP 的 `arm_rfft_fast_f32` 還能再快；RF 推論只要 58 µs，不是瓶頸。
+- 尚未做：功耗；模型檔逐位元組比對；路線 B（PC 從 UART 送 Trigno 樣本）的即時測試；用真正的 Trigno 資料在板子上跑準確率。
 
 ---
 

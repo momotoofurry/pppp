@@ -114,6 +114,32 @@ for c in list(tbl.rows)[-1].cells:                                       # wordi
             r.text = r.text.replace('；預測和 PC 相同', '；每類預測次數和 PC 相同')
             done.append('10/29 wording')
 
+# ------------------------------------------------------------------ 2026-10-29: 480 MHz + caches (the official numbers)
+F = bench('bench_board_480mhz_cache.txt')
+f_win, f_end, f_endmax, f_os = F['window'] / 1000, F['sc_end_block'][0] / 1e6, F['sc_end_block'][1] / 1e6, \
+    F['os_calibrate+flash'][0] / 1e6
+if '64 MHz' in lab.text_frame.text:
+    set_text(val, f"{f_win:.1f} ms／視窗")
+    set_text(lab, f"板子實測（480 MHz＋快取）：每 100 ms 視窗 {f_win:.2f} ms（預算的 {f_win / 100:.1%}）；"
+                  f"自我校正一次 {f_end:.3f} s、one-shot {f_os:.1f} s")
+    nf = s12.notes_slide.notes_text_frame
+    i = nf.text.index('板子到了以後')
+    nf.text = nf.text[:i] + (f"板子上實測：480 MHz 加快取時，每個 100 ms 的視窗只要 {f_win:.2f} ms，不到 3%；一次自我校正 "
+                             f"{f_end:.3f} 秒，最多 {f_endmax:.2f} 秒，而且 30 秒才做一次；one-shot 校正約 {f_os:.0f} 秒，"
+                             f"主要是抹除 Flash。最慢的 64 MHz、不開快取也只用掉一半的時間。")
+    done.append('slide 12 timing 480 MHz')
+row = [r for r in tbl.rows if r.cells[0].text == '10/29'][0]
+if '480 MHz' not in row.cells[1].text:
+    texts = ('10/29', '第一次上板：NUCLEO-H753ZI，CubeMX／HAL 專案跑整條韌體 v2（480 MHz＋快取；另量 64 MHz 無快取）',
+             f"每 100 ms 視窗 {f_win:.2f} ms（預算的 {f_win / 100:.1%}）；自我校正一次 {f_end:.3f} s；one-shot {f_os:.1f} s；"
+             f"64 MHz 無快取 {win_ms:.1f} ms；每類預測次數和 PC 相同")
+    for c, text_ in zip(row.cells, texts):
+        p = c.text_frame.paragraphs[0]
+        p.runs[0].text = text_
+        for r in p.runs[1:]:
+            r._r.getparent().remove(r._r)
+    done.append('work log 10/29 480 MHz')
+
 # ------------------------------------------------------------------ save
 for p_, sl in enumerate(prs.slides, start=1):
     for f in sl.shapes._spTree.iter(A_NS + 'fld'):
