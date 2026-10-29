@@ -90,6 +90,7 @@ RAM 的變化（`results/ram_history.csv`）：253.2 KB（加上硬體層）→ 
 | 特徵擷取、one-shot、自我校正、決策、序列協定（C） | PC 上和 Python 逐列或統計對照（6.x、7.x、12） |
 | 韌體 v2（不做 t-SNE＋adapt.c） | PC 上 C vs Python：轉法 60／60 相同、準確率差 ≤ 0.21（p ≥ 0.058） |
 | 即時迴圈 `rt.c` 串流回放 | 板子上實測（report 19）：PC 即時串流 1 人 2 個 block，和 PC 版逐視窗 100% 相同、端到端延遲中位 6.7 ms |
+| 實驗室電腦的轉送程式 | `lab_kit/`：`TrignoBridge.exe`（不用安裝任何東西）check／run／replay；接模擬 TCU 測過（88.00%）；真的 TCU、真的板子＋Trigno 還沒測 |
 | 硬體層 `board_h7.c` | 只編譯，還沒對照 RM0433／UM2407，也沒上板 |
 | MCU 上的時間、功耗 | 板子實測（report 18）：480 MHz＋I/D-cache 時每個 100 ms 視窗 2.75 ms（2.8%）、自我校正一次 0.125 s（最大 0.15 s）、one-shot＋寫 Flash 1.03 s；64 MHz 無快取 46.0 ms／1.65 s／2.0 s；功耗未量 |
 
