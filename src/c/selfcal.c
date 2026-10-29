@@ -267,6 +267,17 @@ int sc_push_votes(const int16_t *x, uint16_t *votes)
     return lab;
 }
 
+void sc_rescale(const float *scale, const float *offset, int with_cal)
+{
+    for (int j = 0; j < s_n + (with_cal ? s_ncal : 0); j++) {
+        int16_t *r = j < s_n ? s_buf[j] : s_cal[j - s_n];
+        for (int d = 0; d < SC_DIM; d++) {
+            float v = rintf((float)r[d] * scale[d] + offset[d]);
+            r[d] = (int16_t)(v > 32767.0f ? 32767 : v < -32768.0f ? -32768 : v);
+        }
+    }
+}
+
 /* first `m` rows (front first) of class c -> s_sel[at..] */
 static int take_class(int c, int m, int at)
 {
