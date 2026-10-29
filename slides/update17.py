@@ -140,6 +140,28 @@ if '480 MHz' not in row.cells[1].text:
             r._r.getparent().remove(r._r)
     done.append('work log 10/29 480 MHz')
 
+# ------------------------------------------------------------------ 2026-10-29: route B on the board (report 19)
+import pandas as pd  # noqa: E402
+RB = pd.read_csv(os.path.join(R, 'board_replay_windows.csv'))
+agree = (RB.board == RB.pc).mean()
+lat_med = RB.latency_ms.median()
+row = [r for r in tbl.rows if r.cells[0].text == '10/29'][0]
+if '路線 B' not in row.cells[1].text:
+    for c, add in zip(list(row.cells)[1:], ('；路線 B：PC 即時串流 2 個 block 到板子',
+                                      f"；路線 B 和 PC 逐視窗 {agree:.0%} 相同、端到端延遲中位 {lat_med:.1f} ms")):
+        r = c.text_frame.paragraphs[0].runs[-1]
+        r.text = r.text.replace('（480 MHz＋快取；另量 64 MHz 無快取）', '（480 MHz＋快取）') + add
+    done.append('work log 10/29 route B')
+for c in row.cells:                                                      # keep the row to two lines
+    r = c.text_frame.paragraphs[0].runs[-1]
+    t = r.text.replace('NUCLEO-H753ZI，CubeMX／HAL 專案跑整條韌體 v2', 'NUCLEO-H753ZI 跑整條韌體 v2') \
+              .replace('；路線 B：PC 即時串流 2 個 block 到板子', '；路線 B 即時串流') \
+              .replace(f"；64 MHz 無快取 {win_ms:.1f} ms", '') \
+              .replace('；每類預測次數和 PC 相同；路線 B 和 PC', '；路線 B 和 PC').replace('端到端延遲中位', '延遲中位')
+    if t != r.text:
+        r.text = t
+        done.append('10/29 shorter')
+
 # ------------------------------------------------------------------ save
 for p_, sl in enumerate(prs.slides, start=1):
     for f in sl.shapes._spTree.iter(A_NS + 'fld'):

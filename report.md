@@ -1040,13 +1040,51 @@ arm-none-eabi-gcc 10.3.1，`-Os`，.bss 在 AXI SRAM，stack 在 DTCM，最後�
   3. **one-shot 只快 2 倍**，而且 cycle 數反而從 128 M 變成 492 M：表示它的時間主要不是計算，而是 Flash 扇區抹除（固定的實際時間，不隨時脈變快）。
      這是從 cycle 數推論的，抹除時間沒有單獨量。1 s 對「每次配戴一次」的步驟沒有影響。
   4. 時間主要花在特徵擷取（81%），FFT 是自己寫的 radix-2，換成 CMSIS-DSP 的 `arm_rfft_fast_f32` 還能再快；RF 推論只要 58 µs，不是瓶頸。
-- 尚未做：功耗；模型檔逐位元組比對；路線 B（PC 從 UART 送 Trigno 樣本）的即時測試；用真正的 Trigno 資料在板子上跑準確率。
+- 尚未做：功耗（量法見 19.1）；用真正的 Trigno 資料在板子上跑準確率。（模型檔比對見上；路線 B 見第 19 節。）
+
+## 19. 路線 B 上板：PC 即時串流錄好的 EMG，板子跑整條即時迴圈（實測，2026-10-29；`src/board_replay.py` → `results/board_replay_*.csv`）
+
+- 韌體：`src/c/app_rt.c`（`rt.c` 接在 HAL 硬體層上，CMake `-DEMG_APP_RT=ON`），USART3 921600 baud。接收：USART3 中斷（最高優先）→ 4 KB 環形緩衝 →
+  TIM6 1 kHz 中斷把位元組交給 `rt_rx()`（特徵、投票、決策、送封包）；main loop 跑 `rt_idle()`（one-shot 校正、自我校正）。
+  main loop 送封包時會暫時遮掉 TIM6，兩個情境的封包不會交錯。warmup 9 個視窗（和上游同樣用每段 2 秒錄音的第 9–18 個視窗）。
+  RAM 173,996 B（AXI）＋ 1,536 B（DTCM），Flash 124,176 B。
+- PC 端：`board_replay.py make` 用 `protocol.py` 產生受試者 0 的串流：6 段校正錄音（RESET、CAL_START、4000 個樣本、CAL_END）→ CALIBRATE → 停 3 秒 →
+  testing_block0、1（每段 RESET＋樣本），int16 0.25 µV、每封包 20 個樣本，依 2 kHz 的時間送；`src/pc/serial_replay.ps1`（Windows 內建的
+  System.IO.Ports，不用裝 pyserial）照時間送出、記下收到的每個位元組和時間；`board_replay.py decode` 解碼，並把同一串流餵給 PC 版的
+  `rt.c`（v2：不嵌入、開機對齊、z-score 更新，同 seed、warmup 9）逐視窗比較。共 13,280 個封包、4.34 MB、135 秒。
+
+| | block 0 | block 1 |
+|---|---|---|
+| 板子的準確率（300 個視窗） | 88.00% | 86.67% |
+| PC 同一串流 | 88.00% | 86.67% |
+| **逐視窗和 PC 相同** | **100%** | **100%** |
+| 延遲：送出含視窗最後一個樣本的封包 → 收到板子的結果，中位數 6.7 ms（全部 600 個視窗）；p95 | 7.2 ms | 7.2 ms |
+| 延遲最大 | 101.6 ms（見下） | 8.2 ms |
+
+- 板子回報：校正視窗 60 個、one-shot 建立成功（0）、自我校正 2 次、遺失封包 0、CRC 錯誤 0；送出 27 個指令。
+- 最大延遲 101.6 ms 只發生在 block 0 第 27 段的連續 5 個視窗（101 → 65 → 29 → 36 → 18 ms）：PC 端的送出記錄在 70.0 s 有 960 ms 的空檔
+  （Windows 的排程），之後累積的約 96 個封包一次送出，以 921600 baud 要約 0.34 s 才傳完；板子的時間戳顯示這些視窗依位元組到達的速度
+  每 35 ms 處理一個，不是板子延遲。第一次自我校正在 75.1 s 才完成，和這段無關。其餘 595 個視窗的延遲都在 5.8–8.2 ms。
+- 解讀：PC → UART → 板子（特徵、100 棵樹、決策、z-score 統計、背景自我校正）→ UART → PC 的整條路在板子上可用，結果和 PC 模擬逐視窗相同；
+  端到端約 7 ms，其中板子的計算約 2.75 ms（第 18 節），其餘是兩個方向的 USB 虛擬序列埠。換成 Trigno 只要把 PC 端的資料來源換成
+  `trigno_bridge.py`（尚未在真的 TCU 上測）。
+- 限制：只用 1 位受試者、2 個 block；錄好的資料，不是即時配戴；PC 端用 USB 虛擬序列埠，Kinova 的指令轉送還沒接。
+
+### 19.1 功耗的量法（待做，要電流表）
+
+- NUCLEO-144 板上有一個標示 **IDD** 的跳線（依 UM2407 確認位置，Nucleo-144 通常是 JP5）：拔掉跳線，在兩個腳之間串一個電流表（mA 檔），
+  量到的就是 STM32 本身（不含 ST-LINK）的電流；電壓用板子的 3.3 V（燒錄時 CubeProgrammer 讀到 3.28 V）。
+- 三種情況各量一次（燒對應的程式，等數值穩定後讀）：
+  1. 閒置：路線 B 韌體開機後沒有資料（主迴圈 `__WFI()` 睡眠）
+  2. 即時分類：路線 B 串流中（`board_replay.py make` 的 test 部分）
+  3. 自我校正：bench 韌體跑 `sc_end_block` 時（約 0.125 s，電流表要能看最大值，或改成連續重複做）
+- 功率 = 3.3 V × 電流；每個 100 ms 視窗的能量 ≈ 功率 ×（2.75 ms 的計算時間），其餘時間是閒置功率。
 
 ---
 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`src/pc/*`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`board_replay.py`、`app_rt.c`、`src/pc/*`（含 `serial_replay.ps1`）、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
 | 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |

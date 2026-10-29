@@ -20,7 +20,7 @@
 | `build15.py` | v14（使用者未改動，2026-10-25 21:41）→ v15 | 韌體 v2：第 10 頁換成「偽標籤不需要 t-SNE」（`embed_sweep_summary*.csv`）、第 11 頁換成「類別平衡 z-score 更新」（`zscore_sweep_summary_bal.csv`）、第 12 頁換成 v2 的 RAM 175.9 KB 與 C 對照 83.87%（`ram_history.csv`、`adapt_c_check*.csv`）；第 2–6、13、16 頁的 223.8 KB／t-SNE／87% 跟著更新（19 頁，t-SNE 迭代那頁被取代） |
 | `build16.py` | v15（使用者未改動，2026-10-27 12:21）→ v16 | 參考文獻前加兩頁「工作紀錄」（10/17–10/24、10/25–10/27）：每天做了什麼與結果；10/24 之後的數字讀 `results/*.csv`，之前的數字是 report.md 摘要的數字（腳本檢查都出現在 report.md）；21 頁 |
 | `build17.py` | v16（2026-10-27）→ v17 | 「工作紀錄（2/2）」加一列：比較組 Zanghieri 2023 [8] PCA 對齊（`pca_baseline_summary.csv`）；第 3 頁貢獻②和備註加上同資料比較的結果（v2 比 [8] 高 3.6–32.9 點）；21 頁 |
-| `update17.py` | v17 → v17（直接修改，不再出新版） | 每次修改是一個會檢查是否已套用的步驟，可重跑；先寫暫存檔，全部成功才取代 v17。2026-10-29：第 12 頁的「MCU 時間：待上板」換成板子實測（`bench_board_64mhz_nocache.txt`）、工作紀錄（2/2）加 10/29 一列並改到 10/29、表頭改成含板子實測；同日再改成 480 MHz＋快取的正式數字（`bench_board_480mhz_cache.txt`） |
+| `update17.py` | v17 → v17（直接修改，不再出新版） | 每次修改是一個會檢查是否已套用的步驟，可重跑；先寫暫存檔，全部成功才取代 v17。2026-10-29：第 12 頁的「MCU 時間：待上板」換成板子實測（`bench_board_64mhz_nocache.txt`）、工作紀錄（2/2）加 10/29 一列並改到 10/29、表頭改成含板子實測；同日再改成 480 MHz＋快取的正式數字（`bench_board_480mhz_cache.txt`），並加上路線 B 上板（`board_replay_windows.csv`） |
 
 所有數字都從 `results/` 讀，不手打：
 

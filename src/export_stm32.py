@@ -1,8 +1,8 @@
 """Copy the bench firmware into a STM32CubeMX CMake project (NUCLEO-H753ZI) and make its linker script fit it.
 
-Copies to <project>/emg/: the portable modules of firmware v2 (selfcal, kmeans, rf_train, features, adapt, oneshot
-and their headers; tsne.h only for the declarations, SC_EMBED = 0 does not use it), board.h, board_hal.c (HAL board
-layer), bench.c / bench.h, and the data headers made by build_arm_selfcal.py (build/oneshot_dev/pre_model.h,
+Copies to <project>/emg/: the portable modules of firmware v2 (selfcal, kmeans, rf_train, features, adapt, oneshot,
+rt, decision, protocol and their headers; tsne.h only for the declarations, SC_EMBED = 0 does not use it), board.h,
+board_hal.c (HAL board layer), bench.c / bench.h, app_rt.c / app_rt.h (route B on the board), and the data headers made by build_arm_selfcal.py (build/oneshot_dev/pre_model.h,
 cal_feat.h; build/bench/raw_bench.h from check_bench.py). Existing files in emg/ are overwritten; nothing else in the project
 is touched except:
   <project>/<ld>_axi.ld   a copy of the CubeMX linker script with .data / .tdata / .tbss / .bss moved from the
@@ -18,7 +18,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 C = os.path.join(ROOT, 'src', 'c')
-SRC = ['selfcal', 'kmeans', 'rf_train', 'features', 'adapt', 'oneshot']
+SRC = ['selfcal', 'kmeans', 'rf_train', 'features', 'adapt', 'oneshot', 'rt', 'decision', 'protocol', 'app_rt']
 EXTRA = ['tsne.h', 'board.h', 'board_hal.c', 'bench.c', 'bench.h']
 DATA = [os.path.join(ROOT, 'build', 'oneshot_dev', 'pre_model.h'), os.path.join(ROOT, 'build', 'oneshot_dev', 'cal_feat.h'),
         os.path.join(ROOT, 'build', 'bench', 'raw_bench.h')]
