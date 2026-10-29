@@ -1,0 +1,21 @@
+# NUCLEO-H753ZI (STM32H753ZI rev V), CubeMX/HAL project D:\stm32\blink, Release (-Os -g), gnu-tools-for-stm32 14.3.1,
+# SYSCLK 64 MHz (HSI), I-cache off, D-cache off; src/c/bench.c via src/export_stm32.py; received on the ST-LINK VCP
+# at 115200 baud, 2026-10-29. PC reference: results/bench_pc.txt.
+=== bench v2 (STM32H7 HAL, SYSCLK 64 MHz, I-cache off, D-cache off) ===
+one-shot: image 6323 B, pruned leaves 412, app nodes 266, hash 577de879
+block 0: clustered 1, selected 156, new nodes max 15, z-score updated 1
+block 1: clustered 1, selected 300, new nodes max 20, z-score updated 1
+block 2: clustered 1, selected 288, new nodes max 19, z-score updated 1
+rotation k 0; predictions 142 92 191 100 128 247; votes hash c0268fe1
+replayed windows correct 568 / 900 (sanity only: 6 trials repeated)
+os_calibrate+flash   n=    1  mean 128288478 cyc  2004507 us   max 128288478 cyc  2004507 us
+ad_align_finish      n=    1  mean      9258 cyc      144 us   max      9258 cyc      144 us
+filter (1 sample)    n=199050  mean      2511 cyc       39 us   max      2633 cyc       41 us
+features (window)    n=  950  mean   2398779 cyc    37480 us   max   2407772 cyc    37621 us
+map+normalize        n=  900  mean      5096 cyc       79 us   max      5174 cyc       80 us
+sc_push_votes        n=  900  mean     38860 cyc      607 us   max     47717 cyc      745 us
+ad_observe           n=  900  mean      3878 cyc       60 us   max      3987 cyc       62 us
+sc_end_block         n=    3  mean 105409036 cyc  1647016 us   max 126816526 cyc  1981508 us
+ad_end_block         n=    3  mean     65500 cyc     1023 us   max     65525 cyc     1023 us
+per 100 ms window (mean): 2946302 cyc = 46035 us
+=== done ===

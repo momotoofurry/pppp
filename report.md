@@ -993,11 +993,45 @@ arm-none-eabi-gcc 10.3.1，`-Os`，.bss 在 AXI SRAM，stack 在 DTCM，最後�
      而且 8 維、每種特徵分開做，排序和正負號的配對容易出錯。RF 也不像 [8] 的 MLP 是在主成分上訓練的。
 - 限制：這是改寫，不是 [8] 原文的完整重現（原文的 MLP、量化、UniBo-INAIL 資料都沒有用）；正式論文要說明這一點，最好也在先導資料上跑。
 
+## 18. 第一次上板：韌體 v2 在 NUCLEO-H753ZI 上的時間（實測，2026-10-29；`src/c/bench.c` → `results/bench_board_64mhz_nocache.txt`）
+
+- 板子：NUCLEO-H753ZI（STM32H753ZI rev V，ST-LINK V3）。專案用 STM32CubeMX 產生（CMake、HAL），時脈和 USART3 用 CubeMX 的設定；
+  韌體模組由 `src/export_stm32.py` 複製進去，硬體層用 `src/c/board_hal.c`（HAL 的 Flash 抹除／寫入，取代還沒對照手冊的 `board_h7.c`）。
+  變數放 AXI SRAM（連結腳本的複製版）：RAM 168,848 B（AXI）＋ 1,536 B（DTCM，stack），Flash 529,716 B（其中 384 KB 是測試錄音）。
+- 編譯：gnu-tools-for-stm32 14.3.1，Release `-Os -g`（`-g` 不改變程式碼，大小逐位相同）。
+- **這一輪是最慢的設定：SYSCLK 64 MHz（HSI）、I-cache 和 D-cache 都關。** 正式數字要再量 480 MHz＋快取。
+- 流程（`bench.c`，和 `rt.c` 同樣的步驟）：MCU 上 one-shot 校正（60 個校正特徵向量 → 剪枝 50 棵＋建 50 棵 → 寫進 Flash bank 2 sector 7）
+  → 開機對齊（50 個視窗）→ 3 個 block × 300 個視窗（特徵 → 通道重排＋z-score → 100 棵投票 → 類別統計），每個 block 後自我校正＋z-score 更新。
+  輸入是受試者 0 testing_block0 每個手勢第一段 2 秒錄音（`build/bench/raw_bench.h`），讓 buffer 有 6 類、走 K-Means 的路徑。每個呼叫用 DWT 計數器量。
+
+| 步驟 | 次數 | 平均 | 最大 | 備註 |
+|---|---|---|---|---|
+| **每個 100 ms 視窗合計** | — | **46.0 ms** | — | 預算 100 ms 以內 |
+| 特徵（完成一個視窗的那次 `fe_push`：FFT、PSD、80 個特徵） | 950 | 37.5 ms | 37.6 ms | 佔一個視窗的 81% |
+| 濾波（其他 199 個樣本，每個） | 199,050 | 39 µs | 41 µs | 一個視窗 7.8 ms |
+| 通道重排＋z-score | 900 | 79 µs | 80 µs | |
+| 100 棵樹投票（`sc_push_votes`） | 900 | 0.61 ms | 0.75 ms | |
+| 類別統計（`ad_observe`） | 900 | 60 µs | 62 µs | |
+| **自我校正一次（`sc_end_block`）** | 3 | **1.65 s** | 1.98 s | 每 300 個視窗（30 s）一次，背景執行 |
+| z-score 更新（`ad_end_block`） | 3 | 1.0 ms | 1.0 ms | |
+| **one-shot 校正＋寫 Flash** | 1 | **2.0 s** | — | 每次配戴一次 |
+| 開機對齊（估轉法） | 1 | 0.14 ms | — | |
+
+- 和 PC 對照（`results/bench_pc.txt`，同一份 `bench.c`、gcc -O2）：每類預測次數（142／92／191／100／128／247）、對的視窗數（568／900）、
+  每個 block 的 K-Means、選用列數、新樹最大節點數、one-shot 模型大小（6,323 B）、剪枝節點數、新樹節點數**全部相同**；
+  但 one-shot 模型的雜湊（板子 `577de879`、PC `d43d66c3`）和每個視窗票數的雜湊不同，表示有些視窗的票數有小差異，但沒有改變任何一個預測。
+  可能的原因（未驗證）：ARM 編譯器把乘加合成 FMA 指令，模型檔裡的 z-score 平均和標準差（float）最後一位不同。要逐位元組比對模型檔才能確認。
+- 解讀：
+  1. 最慢的設定下，每個視窗只用掉 46% 的時間，即時分類已經跟得上；自我校正在背景跑，實際經過的時間約 1.65 s ÷（1 − 0.46）≈ 3 s（估算），遠短於 30 s 的 block。
+  2. 時間主要花在特徵擷取（81%），而且 FFT 是自己寫的 radix-2，換成 CMSIS-DSP 的 `arm_rfft_fast_f32` 是最直接的加速點。
+  3. 一個視窗內的 RF 推論只要 0.61 ms，模型本身不是瓶頸。
+- 尚未做：480 MHz＋I/D-cache 的正式數字；功耗；模型檔逐位元組比對；路線 B（PC 從 UART 送樣本）的即時測試。
+
 ---
 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`src/pc/*`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`src/pc/*`、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
 | 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
