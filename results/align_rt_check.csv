@@ -1,0 +1,8 @@
+rotation,align_recordings,rt_rescale,align_event,align_value,calibrated,selfcal_blocks,acc_block1,acc_block2
+0,1,1,short,10.000,0,1,79.333,85.333
+0,8,1,aligned,0.000,0,1,79.333,85.333
+1,8,1,aligned,-1.000,0,1,79.333,85.333
+2,8,1,aligned,-2.000,0,1,79.333,85.333
+-1,8,1,aligned,1.000,0,1,79.333,85.333
+1,0,1,none,,0,1,44.000,51.000
+0,8,0,aligned,0.000,0,1,79.333,84.000

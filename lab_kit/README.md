@@ -3,7 +3,8 @@
 實驗室電腦**不用安裝任何東西**（不用 Python、pyserial、PowerShell 權限）：`TrignoBridge.exe` 是用 Windows 內建的
 C# 編譯器編的（.NET Framework 4，Windows 10／11 都有）。原始碼：`src/pc/TrignoBridge.cs`。
 
-STM32（NUCLEO-H753ZI）裡已經燒好路線 B 的韌體（`app_rt.c`，921600 baud），**到實驗室不用重燒**。
+STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.c`，921600 baud；z-score 更新後 buffer 轉座標、
+開機對齊至少 60 個視窗，report 第 20 節）。燒好以後**到實驗室不用重燒**。
 
 ## 資料夾內容
 
@@ -25,7 +26,8 @@ STM32（NUCLEO-H753ZI）裡已經燒好路線 B 的韌體（`app_rt.c`，921600 
    replay.bat COM5
    ```
 4. **應該看到**（約 140 秒後）：`calibration windows 60`、`calibrated (0 = ok) 0`、`self-calibration blocks 1`、`2`，
-   最後 `block 0: accuracy 88.00%`、`block 1: accuracy 86.67%`（和在我電腦上的結果相同）。
+   最後 `block 0: accuracy 88.00%`、`block 1: accuracy 85.00%`（2026-10-30 韌體在我電腦上 PC 版的結果；
+   舊韌體是 88.00%／86.67%，看到這組代表板子還是舊韌體）。
 
 ## 第 2 步：只測 Trigno（約 2 分鐘，不用 STM32）
 
@@ -64,6 +66,16 @@ STM32（NUCLEO-H753ZI）裡已經燒好路線 B 的韌體（`app_rt.c`，921600 
 其他指令：`decision 600 3`（τ = 0.6、k = 3）、`report 0`（關掉每個視窗的回報）、`reset`（新的一段錄音）、
 `calend`（提早結束這個手勢的收集）、`status`。
 
+### 重新戴上感測器以後（例如第 2 天）：開機對齊
+
+板子不斷電、校正過的模型還在時，重新戴上束帶後先做開機對齊（估計束帶整圈轉了幾格）：
+
+1. 輸入 `align`，**接下來 8 秒依序做 6 個手勢，每個約 1 秒**：Power、Lateral、Tripod、Pointer、Open、Rest。
+2. 8 秒後程式自動結束，**應該看到** `MCU: status,...,rotation,<數字>`（−3～4，束帶轉了幾格）。
+   - 如果看到 `alignment too short, rotation unchanged`：收到的視窗不到 60 個（例如中途 `reset`），重新輸入 `align`。
+3. **不要只做一種手勢或一直休息**：只做 Power 時 20 人裡有 5 人估錯、只休息時 13 人估錯（report 第 20 節）。
+4. 之後照常使用（不用重新 `cal`／`calibrate`）。
+
 ## 收尾
 
 - 把 `emg.csv`（原始 EMG）、`mcu.csv`（板子的預測、指令、狀態）、`emg_check.csv` 複製回來。
@@ -78,6 +90,10 @@ STM32（NUCLEO-H753ZI）裡已經燒好路線 B 的韌體（`app_rt.c`，921600 
   1926 Hz 輸入＋`--rate 1925.926` 重新取樣也可用（86.67%），只當備案。
 - replay：板子上 block 0／1 準確率 88.00%／86.67%，和 PC 逐視窗相同（report 第 19 節）；2026-10-30 用這個資料夾的
   `TrignoBridge.exe replay` 接板子重跑兩次，結果相同（校正 60、one-shot 成功、自我校正 2 次、CRC 錯誤 0）。
+  以上是 2026-10-30 之前的韌體。
+- `align`（2026-10-30）：TrignoBridge.exe 接模擬的 TCU，校正後 `align` 送出 reset → ALIGN_START → 8 秒後 ALIGN_END，
+  位元組餵給 PC 版 `rt.c`：回 `rotation 0`（資料沒轉）、之後正常分類。`src/check_align_rt.py`：PC 版 `rt.c` 的開機對齊
+  在通道轉 0／1／2／−1 格時都估對，之後的預測和沒轉時逐視窗相同；只給 10 個視窗時回 `alignment too short`。
 
 ## 還沒在真機上確認的
 

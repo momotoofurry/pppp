@@ -89,11 +89,16 @@ def make(blocks):
 
 
 def pc_reference(blocks, delay):
+    return run_stream(packets(blocks)[0], delay)[0]
+
+
+def run_stream(pk, delay, lib_path=LIB, defines=()):
+    """pk ([(bytes, t)]) through the PC build of rt.c -> (PRED messages, STATUS messages) as DataFrame / list"""
     src = [os.path.join(R.CSRC, f) for f in SRC]
-    os.makedirs(os.path.dirname(LIB), exist_ok=True)
-    subprocess.run(['gcc', '-O2', '-std=c99', '-Wall', '-fPIC', '-shared', '-DSC_EMBED=0', '-DRT_ADAPT=1', '-o', LIB] + src
-                   + ['-lm'], check=True)
-    lib = ctypes.CDLL(LIB)
+    os.makedirs(os.path.dirname(lib_path), exist_ok=True)
+    subprocess.run(['gcc', '-O2', '-std=c99', '-Wall', '-fPIC', '-shared', '-DSC_EMBED=0', '-DRT_ADAPT=1', *defines,
+                    '-o', lib_path] + src + ['-lm'], check=True)
+    lib = ctypes.CDLL(lib_path)
     lib.rt_init.argtypes = [ctypes.POINTER(R.Config)]
     lib.rt_rx.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
     lib.rt_counters.restype = ctypes.POINTER(R.Counters)
@@ -106,19 +111,21 @@ def pc_reference(blocks, delay):
         return 0
     wcb = C.WRITE_FN(write)
     w = C.Writer(wcb, None, C.CAP)
-    dec, preds = PR.Decoder(), []
+    dec, preds, status = PR.Decoder(), [], []
 
     def tx(ptr, n):
         for t, _, p in dec.feed(ctypes.string_at(ptr, n)):
             m = PR.parse_mcu(t, p)
             if m['kind'] == 'pred':
                 preds.append(m)
+            elif m['kind'] == 'status':
+                status.append(m)
     txcb = R.TX(tx)
     cfg = R.Config(ctypes.addressof(tab), ctypes.addressof(w), flash.ctypes.data, R.ERASE(0), R.ERASE(0), txcb,
                    R.NOW(0), WARMUP, 600, 3, SEED)
     lib.rt_init(ctypes.byref(cfg))
     pending = None
-    for b, _ in packets(blocks)[0]:
+    for b, _ in pk:
         lib.rt_rx(ctypes.c_char_p(b), len(b))
         c = lib.rt_counters().contents
         if b[2] == PR.CONTROL and b[7] == PR.CALIBRATE:
@@ -129,7 +136,7 @@ def pc_reference(blocks, delay):
             if c.windows - pending >= delay:
                 lib.rt_idle()
                 pending = None
-    return pd.DataFrame(preds)
+    return pd.DataFrame(preds), status
 
 
 def decode(blocks, delay):

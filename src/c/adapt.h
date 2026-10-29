@@ -37,6 +37,7 @@ void ad_init(const float *mu, const float *inv_sd, const float *cal, int n_cal);
 /* start-up alignment: windows of a short recording (any gestures), then the rotation estimate */
 void ad_align_reset(void);
 void ad_align_push(const float *raw);
+int ad_align_count(void);       /* alignment windows pushed since ad_align_reset() */
 int ad_align_finish(void);      /* sets and returns k (-3..4); 0 if no window was pushed */
 int ad_rotation(void);
 void ad_set_rotation(int k);
@@ -48,6 +49,9 @@ void ad_normalize(const float *x, int16_t *q);
 void ad_observe(const float *x, int cls);
 /* end of block: update the statistics; resets the class accumulators */
 void ad_end_block(ad_stats_t *st);
+/* same; if updated, also scale / offset (SC_DIM each, may be 0): q_new = q_old * scale + offset maps a Q5.10 row
+ * normalised with the old statistics to the new ones (sc_rescale, report 20) */
+void ad_end_block_map(ad_stats_t *st, float *scale, float *offset);
 const float *ad_mean(void);     /* current statistics (for the PC check) */
 const float *ad_var(void);
 unsigned ad_static_bytes(void);

@@ -20,7 +20,13 @@
  * self-calibration block (class-balanced, rate AD_RATE). On a later session (sensors re-donned) RT_ALIGN_START ..
  * RT_ALIGN_END collects windows of any gestures (not classified) and estimates the ring rotation; from then on
  * every feature vector is re-ordered before the z-score. RT_ADAPT = 0: the one-shot statistics only, no alignment
- * (the earlier firmware).
+ * (the earlier firmware). The alignment needs >= RT_ALIGN_MIN windows (about 6 s, several gestures: with fewer
+ * windows or one gesture the estimate is often wrong, report 20); with fewer the rotation is left unchanged and
+ * RT_EV_ALIGN_SHORT is sent instead of RT_EV_ALIGNED.
+ * RT_RESCALE (default 1, report 20 'R3'): at the end of a block the z-score statistics are updated first, the
+ * buffer and the calibration rows are mapped to the new statistics (sc_rescale), then the new trees are trained,
+ * so that buffer, calibration rows and new trees share the statistics of the next block. RT_RESCALE = 0: firmware
+ * v2 order (sc_end_block, then ad_end_block, no mapping).
  *
  * Control sub-commands (PK_CONTROL payload[0], arguments follow):
  *   RT_STREAM_RESET            new recording / after a gap
@@ -33,7 +39,7 @@
  *   RT_ALIGN_END               estimate the rotation from them, back to classification
  * Status events (PK_STATUS): RT_EV_CALIBRATED value = os_calibrate() result, RT_EV_SELFCAL value = blocks done,
  *   RT_EV_LOST value = packets lost in the last gap, RT_EV_CAL_FULL value = calibration windows kept,
- *   RT_EV_ALIGNED value = estimated rotation (-3..4).
+ *   RT_EV_ALIGNED value = estimated rotation (-3..4), RT_EV_ALIGN_SHORT value = alignment windows received.
  */
 #pragma once
 #include <stdint.h>
@@ -48,10 +54,15 @@
 #ifndef RT_ADAPT
 #define RT_ADAPT 1
 #endif
+#ifndef RT_RESCALE
+#define RT_RESCALE 1
+#endif
+#define RT_ALIGN_MIN 60                 /* windows (6 s of continuous stream) */
 
 enum { RT_STREAM_RESET = 1, RT_CAL_START = 2, RT_CAL_END = 3, RT_CALIBRATE = 4, RT_SET_DECISION = 5, RT_SET_REPORT = 6,
        RT_ALIGN_START = 7, RT_ALIGN_END = 8 };
-enum { RT_EV_CALIBRATED = 1, RT_EV_SELFCAL = 2, RT_EV_LOST = 3, RT_EV_CAL_FULL = 4, RT_EV_ALIGNED = 5 };
+enum { RT_EV_CALIBRATED = 1, RT_EV_SELFCAL = 2, RT_EV_LOST = 3, RT_EV_CAL_FULL = 4, RT_EV_ALIGNED = 5,
+       RT_EV_ALIGN_SHORT = 6 };
 enum { RT_MODE_IDLE = 0, RT_MODE_CAL = 1, RT_MODE_RUN = 2, RT_MODE_ALIGN = 3 };
 
 typedef struct {

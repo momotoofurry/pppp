@@ -26,6 +26,9 @@ static float s_feat[FE_DIM];
 static int16_t s_q[FE_DIM];
 #if RT_ADAPT
 static float s_al[FE_DIM];                      /* feature vector after the channel alignment */
+#if RT_RESCALE
+static float s_map_scale[SC_DIM], s_map_offset[SC_DIM];
+#endif
 #endif
 
 static uint32_t now(void)
@@ -219,9 +222,12 @@ static void on_control(const uint8_t *p, uint16_t len)
         break;
     case RT_ALIGN_END:
         if (s_mode == RT_MODE_ALIGN) {
-            int k = ad_align_finish();
+            int n = ad_align_count();
             s_mode = RT_MODE_RUN;
-            status(RT_EV_ALIGNED, k);
+            if (n < RT_ALIGN_MIN)
+                status(RT_EV_ALIGN_SHORT, n);   /* rotation unchanged */
+            else
+                status(RT_EV_ALIGNED, ad_align_finish());
         }
         break;
 #endif
@@ -271,11 +277,20 @@ void rt_idle(void)
         sc_stats_t st;
         s_sc_running = 1;
         s_sc_request = 0;
-        sc_end_block(&st);
 #if RT_ADAPT
         ad_stats_t ast;                         /* the real-time context may read the statistics meanwhile: a
                                                    window then mixes old and new values of a few features */
+#if RT_RESCALE
+        ad_end_block_map(&ast, s_map_scale, s_map_offset);
+        if (ast.updated)
+            sc_rescale(s_map_scale, s_map_offset, 1);   /* buffer + calibration rows; sc_votes() reads neither */
+        sc_end_block(&st);
+#else
+        sc_end_block(&st);
         ad_end_block(&ast);
+#endif
+#else
+        sc_end_block(&st);
 #endif
         s_sc_running = 0;
         s_cnt.selfcal_blocks++;

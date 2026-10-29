@@ -104,6 +104,6 @@ int sc_votes(const int16_t *x, uint16_t *votes);
 /* end of block: pseudo-label the buffer, train SC_N_UPD trees, replace slots */
 void sc_end_block(sc_stats_t *st);
 /* after a z-score update: every buffered row q -> q * scale + offset (per feature, Q5.10), so that the buffer is
- * in the current statistics; with_cal: the calibration rows too. Not called by the firmware (src/causal_check.py) */
+ * in the current statistics; with_cal: the calibration rows too (rt.c with RT_RESCALE, report 20) */
 void sc_rescale(const float *scale, const float *offset, int with_cal);
 unsigned sc_static_bytes(void);

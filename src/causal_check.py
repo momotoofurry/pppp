@@ -12,7 +12,7 @@
      R1    as base, then the buffer is mapped to the new statistics (sc_rescale)
      R2    ad_end_block first, buffer mapped, then sc_end_block (new trees are trained in the statistics
            they will be used with)
-     R3    as R2, calibration rows mapped too
+     R3    as R2, calibration rows mapped too (= rt.c with RT_RESCALE = 1, the firmware from 2026-10-30)
 Per subject x seed x offset: the one-shot model is built once (as check_adapt_c.run_c), every variant restarts
 from sc_init / ad_init. Accuracy: blocks 1-10 (same windows for every variant) and all scored windows.
 Writes results/causal_check.csv and causal_check_summary.csv.
@@ -48,23 +48,8 @@ SHIFTS = [0, 0.5, 1]
 def build():
     lib = CA.build()
     lib.sc_rescale.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
-    lib.ad_mean.restype = ctypes.POINTER(ctypes.c_float)
-    lib.ad_var.restype = ctypes.POINTER(ctypes.c_float)
+    lib.ad_end_block_map.argtypes = [ctypes.POINTER(CA.AdStats), ctypes.c_void_p, ctypes.c_void_p]
     return lib
-
-
-def stats(lib):
-    mu = np.ctypeslib.as_array(lib.ad_mean(), (80,)).astype(np.float64)
-    var = np.ctypeslib.as_array(lib.ad_var(), (80,)).astype(np.float64)
-    return mu, np.where(var > 0, 1 / np.sqrt(np.where(var > 0, var, 1)), 0.0)
-
-
-def rescale(lib, old, with_cal):
-    (mu0, inv0), (mu1, inv1) = old, stats(lib)
-    scale = np.where(inv0 > 0, inv1 / np.where(inv0 > 0, inv0, 1), 0.0)
-    offset = (mu0 - mu1) * inv1 * 1024.0
-    s32, o32 = np.ascontiguousarray(scale, np.float32), np.ascontiguousarray(offset, np.float32)
-    lib.sc_rescale(s32.ctypes.data, o32.ctypes.data, int(with_cal))
 
 
 def run(subject, seed, shift):
@@ -93,6 +78,7 @@ def run(subject, seed, shift):
     rows = []
     al = np.zeros(80, np.float32)
     q = np.zeros(80, np.int16)
+    scale, offset = np.zeros(80, np.float32), np.zeros(80, np.float32)
     for align in ALIGN:
         if align == 'leak':
             a_idx, skip = np.arange(len(y0)), np.zeros(len(y0), bool)
@@ -124,15 +110,13 @@ def run(subject, seed, shift):
                 if upd in ('off', 'base', 'R1'):
                     lib.sc_end_block(ctypes.byref(st))
                     if upd != 'off':
-                        old = stats(lib)
-                        lib.ad_end_block(ctypes.byref(ast))
+                        lib.ad_end_block_map(ctypes.byref(ast), scale.ctypes.data, offset.ctypes.data)
                         if upd == 'R1' and ast.updated:
-                            rescale(lib, old, False)
-                else:
-                    old = stats(lib)
-                    lib.ad_end_block(ctypes.byref(ast))
+                            lib.sc_rescale(scale.ctypes.data, offset.ctypes.data, 0)
+                else:                                                # R3 = rt.c with RT_RESCALE = 1
+                    lib.ad_end_block_map(ctypes.byref(ast), scale.ctypes.data, offset.ctypes.data)
                     if ast.updated:
-                        rescale(lib, old, upd == 'R3')
+                        lib.sc_rescale(scale.ctypes.data, offset.ctypes.data, int(upd == 'R3'))
                     lib.sc_end_block(ctypes.byref(st))
                 rows.append(dict(subject=subject, seed=seed, shift=shift, align=align, upd=upd, block=b, k_est=k,
                                  n=int(keep.sum()), n_fixed_ok=int((pos == y)[keep].sum()),

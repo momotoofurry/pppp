@@ -9,8 +9,10 @@
 //                       [--script commands.txt]          (--port file:<path>: write the serial bytes to a file)
 //       TCU -> (resampled to 2000 Hz when --rate is not 2000) -> int16 0.25 uV -> packets -> COM port at 921600;
 //       MCU packets -> mcu.csv and the console. Commands typed while running:
-//         reset | cal <0-5> | calend | calibrate | decision <tau_permille> <k> | report <0|1> | status | quit
+//         reset | cal <0-5> | calend | calibrate | align | decision <tau_permille> <k> | report <0|1> | status | quit
 //       cal <g> = reset + CAL_START; CAL_END follows by itself after 2 s of samples (10 windows per gesture).
+//       align = reset + ALIGN_START; ALIGN_END follows by itself after 8 s (70 windows; the MCU needs >= 60 and
+//       several gestures, report 20): start-up alignment after the sensors were put on again.
 //       --script: lines "<seconds> <command>" run at those times after START (for tests).
 //   TrignoBridge replay --port COM5 --dir <board_replay folder>
 //       board test without the Trigno: the recorded stream of src/board_replay.py (stream.bin, schedule.csv,
@@ -29,7 +31,8 @@ using System.Threading;
 static class Proto
 {
     public const byte SAMPLES = 0x01, CONTROL = 0x02, COMMAND = 0x81, STATUS = 0x82, PRED = 0x83;
-    public const byte STREAM_RESET = 1, CAL_START = 2, CAL_END = 3, CALIBRATE = 4, SET_DECISION = 5, SET_REPORT = 6;
+    public const byte STREAM_RESET = 1, CAL_START = 2, CAL_END = 3, CALIBRATE = 4, SET_DECISION = 5, SET_REPORT = 6,
+                      ALIGN_START = 7, ALIGN_END = 8;
     public const int CH = 8, FRAMES_PER_PACKET = 20, MAX_PAYLOAD = 512, OVERHEAD = 9;
     public const double LSB_VOLT = 2.5e-7;
     public static readonly string[] GESTURES = { "Power", "Lateral", "Tripod", "Pointer", "Open", "Rest" };
@@ -317,8 +320,21 @@ static class Program
     static int mcuPackets, preds;
     // cal <g> = reset + CAL_START, then CAL_END by itself after CAL_FRAMES samples have gone out (2 s: windows 9..18
     // after the reset = 10 windows per gesture, as the data set; rt.c caps the total at 60, not per gesture)
-    const long CAL_FRAMES = 4000;
-    static long framesSent, calStart = -1;
+    // align = reset + ALIGN_START, then ALIGN_END by itself after ALIGN_FRAMES (8 s: 79 windows - 9 warmup = 70)
+    const long CAL_FRAMES = 4000, ALIGN_FRAMES = 16000;
+    static long framesSent, autoStart = -1, autoFrames;
+    static byte autoEnd;                                          // CAL_END or ALIGN_END while one is pending
+    static string autoMsg;
+
+    static void StartAuto(byte start, int arg, byte end, long frames, string msg)
+    {
+        lock (txLock) {
+            if (autoStart >= 0) Send(Proto.Control(autoEnd));      // the previous gesture / alignment was not finished
+            Send(Proto.Control(Proto.STREAM_RESET));
+            Send(arg >= 0 ? Proto.Control(start, arg) : Proto.Control(start));
+            autoStart = framesSent; autoFrames = frames; autoEnd = end; autoMsg = msg;
+        }
+    }
 
     static FileStream fileOut;                                    // --port file:<path> (test without the MCU)
 
@@ -340,22 +356,23 @@ static class Program
         else if (c == "cal" && p.Length == 2) {
             int g = int.Parse(p[1]);
             if (g < 0 || g > 5) { Console.WriteLine("gesture 0-5: 0 Power, 1 Lateral, 2 Tripod, 3 Pointer, 4 Open, 5 Rest"); return false; }
-            lock (txLock) {
-                if (calStart >= 0) Send(Proto.Control(Proto.CAL_END));   // the previous gesture was not finished
-                Send(Proto.Control(Proto.STREAM_RESET));
-                Send(Proto.Control(Proto.CAL_START, g));
-                calStart = framesSent;
-            }
+            StartAuto(Proto.CAL_START, g, Proto.CAL_END, CAL_FRAMES, "calend (auto, 2 s): you can relax");
             Console.WriteLine(string.Format(IC, "[{0:F1} s] cal {1} ({2}): do the gesture now and hold it; calend comes by itself after 2 s",
                                             clock.Elapsed.TotalSeconds, g, Proto.GESTURES[g]));
             return true;
         }
-        else if (c == "calend") { lock (txLock) { Send(Proto.Control(Proto.CAL_END)); calStart = -1; } }
+        else if (c == "calend") { lock (txLock) { Send(Proto.Control(Proto.CAL_END)); autoStart = -1; } }
+        else if (c == "align") {
+            StartAuto(Proto.ALIGN_START, -1, Proto.ALIGN_END, ALIGN_FRAMES, "alignend (auto, 8 s): the MCU answers with 'rotation'");
+            Console.WriteLine(string.Format(IC, "[{0:F1} s] align: for 8 s do each gesture about 1 s: Power, Lateral, Tripod, Pointer, Open, Rest",
+                                            clock.Elapsed.TotalSeconds));
+            return true;
+        }
         else if (c == "calibrate") Send(Proto.Control(Proto.CALIBRATE));
         else if (c == "decision" && p.Length == 3) Send(Proto.Control(Proto.SET_DECISION, int.Parse(p[1]), int.Parse(p[2])));
         else if (c == "report" && p.Length == 2) Send(Proto.Control(Proto.SET_REPORT, int.Parse(p[1])));
         else if (c == "status") return true;
-        else { Console.WriteLine("? reset | cal <0-5> | calend | calibrate | decision <tau_permille> <k> | report <0|1> | status | quit"); return false; }
+        else { Console.WriteLine("? reset | cal <0-5> | calend | calibrate | align | decision <tau_permille> <k> | report <0|1> | status | quit"); return false; }
         Console.WriteLine(string.Format(IC, "[{0:F1} s] sent: {1}", clock.Elapsed.TotalSeconds, line.Trim()));
         return true;
     }
@@ -393,7 +410,8 @@ static class Program
         }
         if (type == Proto.STATUS && p.Length >= 8) {
             int ev = p[0], v = BitConverter.ToInt32(p, 4);
-            string[] names = { "", "calibrated (0 = ok)", "self-calibration blocks", "packets lost", "calibration windows", "rotation" };
+            string[] names = { "", "calibrated (0 = ok)", "self-calibration blocks", "packets lost", "calibration windows", "rotation",
+                               "alignment too short, rotation unchanged (windows)" };
             return string.Format(IC, "status,,,,,,,,{0},{1}", ev < names.Length ? names[ev] : ev.ToString(), v);
         }
         return "unknown,type " + type + ",len " + p.Length + ",,,,,,,";
@@ -433,7 +451,7 @@ static class Program
             var input = new Thread(() => { string l; while (!stop && (l = Console.ReadLine()) != null) DoCommand(l); });
             input.IsBackground = true;
             input.Start();
-            Console.WriteLine("commands: reset | cal <0-5> | calend | calibrate | decision <tau> <k> | report <0|1> | status | quit");
+            Console.WriteLine("commands: reset | cal <0-5> | calend | calibrate | align | decision <tau> <k> | report <0|1> | status | quit");
         }
 
         Console.WriteLine("START -> " + tcu.Command("START"));
@@ -481,10 +499,10 @@ static class Program
                     lock (txLock) {
                         Send(Proto.Build(Proto.SAMPLES, pl));
                         framesSent += Proto.FRAMES_PER_PACKET;
-                        if (calStart >= 0 && framesSent - calStart >= CAL_FRAMES) {
-                            Send(Proto.Control(Proto.CAL_END));
-                            calStart = -1;
-                            Console.WriteLine(string.Format(IC, "[{0:F1} s] calend (auto, 2 s): you can relax", clock.Elapsed.TotalSeconds));
+                        if (autoStart >= 0 && framesSent - autoStart >= autoFrames) {
+                            Send(Proto.Control(autoEnd));
+                            autoStart = -1;
+                            Console.WriteLine(string.Format(IC, "[{0:F1} s] {1}", clock.Elapsed.TotalSeconds, autoMsg));
                         }
                     }
                 }

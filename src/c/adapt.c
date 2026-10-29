@@ -67,7 +67,9 @@ void ad_init(const float *mu, const float *inv_sd, const float *cal, int n_cal)
     standardise_channels(p, s_cal_prof);
     s_k = 0;
     ad_align_reset();
-    memset(s_cn, 0, sizeof s_cn);
+    memset(s_cn, 0, sizeof s_cn);               /* all three: a re-calibration may come in the middle of a block */
+    memset(s_cm, 0, sizeof s_cm);
+    memset(s_cm2, 0, sizeof s_cm2);
 }
 
 void ad_align_reset(void)
@@ -82,6 +84,11 @@ void ad_align_push(const float *raw)
         for (int c = 0; c < AD_CH; c++)
             s_al_sum[a][c] += logf_clip(raw[AMP[a] * AD_CH + c]);
     s_al_n++;
+}
+
+int ad_align_count(void)
+{
+    return s_al_n;
 }
 
 int ad_align_finish(void)
@@ -150,6 +157,11 @@ void ad_observe(const float *x, int cls)
 
 void ad_end_block(ad_stats_t *st)
 {
+    ad_end_block_map(st, 0, 0);
+}
+
+void ad_end_block_map(ad_stats_t *st, float *scale, float *offset)
+{
     int used = 0;
     for (int k = 0; k < SC_CLASSES; k++)
         used += s_cn[k] >= AD_MIN_CLASS;
@@ -166,8 +178,14 @@ void ad_end_block(ad_stats_t *st)
                 }
             m /= used;
             v = v / used + (m2 / used - m * m);  /* mean of class variances + variance of class means */
+            float mu_old = s_mu[j], inv_old = s_inv[j];
             s_mu[j] = (1.0f - AD_RATE) * s_mu[j] + AD_RATE * (float)m;
             s_var[j] = (1.0f - AD_RATE) * s_var[j] + AD_RATE * (float)(v > 0.0 ? v : 0.0);
+            if (scale) {                        /* q_old -> q_new of the same raw value, Q5.10 */
+                float inv_new = s_var[j] > 0.0f ? 1.0f / sqrtf(s_var[j]) : 0.0f;
+                scale[j] = inv_old > 0.0f ? inv_new / inv_old : 0.0f;
+                offset[j] = 1024.0f * (mu_old - s_mu[j]) * inv_new;
+            }
         }
         refresh_inv();
         st->updated = 1;

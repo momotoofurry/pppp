@@ -1,7 +1,7 @@
 [Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
-[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:  1.0min
-[Parallel(n_jobs=19)]: Done 124 tasks      | elapsed:  2.6min
-[Parallel(n_jobs=19)]: Done 180 out of 180 | elapsed:  3.4min finished
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:   57.9s
+[Parallel(n_jobs=19)]: Done 124 tasks      | elapsed:  2.5min
+[Parallel(n_jobs=19)]: Done 180 out of 180 | elapsed:  3.3min finished
  shift align  upd  adapt_1_10  adapt_all  fixed_1_10  k_same_as_leak  vs_leak_base  vs_leak_base_better  vs_leak_base_worse  vs_leak_base_p  vs_same_align_base  vs_same_align_base_better  vs_same_align_base_worse  vs_same_align_base_p
    0.0  leak  off      83.097     83.201      79.224              20        -0.741                    8                  12           0.330              -0.741                          8                        12                 0.330
    0.0  leak base      83.838     83.875      81.142              20         0.000                    0                   0           1.000               0.000                          0                         0                 1.000
@@ -57,7 +57,7 @@
    0.5    g0 base      66.491     66.008      62.857              10        -8.885                    5                  15           0.058               0.000                          0                         0                 1.000
    0.5    g0   R1      66.775     66.270      62.856              10        -8.601                    8                  12           0.231               0.284                         11                         9                 0.165
    0.5    g0   R2      67.199     66.662      62.912              10        -8.177                   10                  10           0.674               0.708                         15                         4                 0.009
-   0.5    g0   R3      67.419     66.865      62.947              10        -7.956                   12                   8           0.729               0.929                         16                         4                 0.005
+   0.5    g0   R3      67.417     66.863      62.947              10        -7.959                   12                   8           0.729               0.926                         16                         4                 0.006
    0.5    g5  off      55.809     54.958      53.586               8       -19.567                    2                  18           0.000              -2.583                          6                        14                 0.040
    0.5    g5 base      58.392     57.342      55.943               8       -16.984                    2                  18           0.000               0.000                          0                         0                 1.000
    0.5    g5   R1      58.970     57.876      55.916               8       -16.406                    6                  13           0.005               0.578                         14                         6                 0.058

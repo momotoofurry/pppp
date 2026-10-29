@@ -1129,13 +1129,39 @@ buffer 座標（括號是和同一種對齊的 `base` 比：差、變好／變�
      比韌體 v2 高 0.78（沒偏移，15／20 人變好）和 1.36 個百分點（偏半格，17／20 人）。不用多佔記憶體，只多一次 375＋60 筆 × 80 維的乘加。
   4. 只更新 z-score 不自我校正、只自我校正不更新 z-score 的拆解見 `results/adapt_c_check_summary.csv`（79.68／81.42／83.20／83.87%）。
 - 限制：這些組合（N、R1–R3）都是在同一批 20 人上比較、挑選的，挑出來的 R3＋6 秒算是開發結果，要用獨立受試者（先導資料）確認；
-  `g0`／`g5` 只是 block 0 裡現成的那一種手勢的視窗（約 50 個），不是真的開機流程。韌體還沒改（`rt.c` 沒有呼叫 `sc_rescale`）。
+  `g0`／`g5` 只是 block 0 裡現成的那一種手勢的視窗（約 50 個），不是真的開機流程。
+
+### 20.1 放進韌體（2026-10-30；`src/check_align_rt.py` → `results/align_rt_check.csv`）
+
+- `rt.c`：`RT_RESCALE = 1`（預設）時 block 結束的順序改成 R3：`ad_end_block_map()`（更新 z-score，同時算出舊→新座標的
+  scale／offset）→ `sc_rescale(…, 1)`（buffer＋校正資料）→ `sc_end_block()`。`RT_RESCALE = 0` 是韌體 v2 的順序。
+  `causal_check.py` 的 R1–R3 也改用同一個 C 函式算 scale／offset，重跑結果和用 Python 算的到小數第 2 位相同（上表）。
+- 開機對齊：`RT_ALIGN_END` 時視窗少於 `RT_ALIGN_MIN = 60`，轉法不變，改送 `RT_EV_ALIGN_SHORT`（值＝收到的視窗數）。
+  TrignoBridge 新增 `align`：reset＋`ALIGN_START`，8 秒後自動 `ALIGN_END`（79 − 9 warmup = 70 個視窗），請使用者依序做 6 個手勢。
+- 順便修了一個 bug：`ad_init()` 只清了每類的視窗數，沒清平均和平方和。一個 block 還沒結束就重新校正時，上一段的平方和會混進
+  第一次 z-score 更新（板子上就是沒斷電重新 `calibrate`）。PC 測試時同一個 library 跑第二次結果會不同，才發現的。
+  `causal_check.py` 不受影響（每個組合最後都有 `ad_end_block()`，會清掉）。
+- 即時迴圈測試（PC 版 `rt.c`，走真的序列協定；受試者 0：校正 → 開機對齊用 block 0 前 8 段錄音連續串流 → block 1、2，
+  每段錄音的 8 個通道都轉 r 格）：
+
+| 情況 | 對齊結果 | block 1 | block 2 |
+|---|---|---|---|
+| 只給 1 段錄音（10 個視窗） | too short（10），轉法不變 | 79.33% | 85.33% |
+| 8 段錄音，r = 0／1／2／−1 | 轉法 0／−1／−2／+1（全對） | 79.33% | 85.33%（4 種逐視窗相同） |
+| r = 1，不對齊 | — | 44.00% | 51.00% |
+| r = 0，`RT_RESCALE = 0`（v2 的順序） | 0 | 79.33% | 84.00% |
+
+- Cortex-M7（`build_arm_selfcal.py`，`board2`，-Os）：RAM 176.5 KB（.data 116＋.bss 178,104＋stack 2,496 B；多了 scale／offset 640 B），
+  餘裕 79.5 KB。CubeMX 專案（`build/rt`）：Flash 124.6 KB、AXI SRAM 174.6 KB＋DTCM 1.5 KB。
+- lab_kit 的 replay 預期值（PC 版 `rt.c`，受試者 0）：新韌體 88.00%／85.00%，舊韌體 88.00%／86.67%（和之前板子上的結果相同，
+  所以修 bug 沒有改到正常流程）。這個受試者的 block 1 用 R3 低 1.67 個百分點；20 人平均是 +0.78（15 人變好、5 人變差），他是變差的 5 人之一。
+- 還沒做：燒進板子、replay 確認板子和 PC 逐視窗相同。
 
 ---
 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`causal_check.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`board_replay.py`、`app_rt.c`、`src/pc/*`（含 `serial_replay.ps1`）、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`causal_check.py`、`check_align_rt.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`board_replay.py`、`app_rt.c`、`src/pc/*`（含 `serial_replay.ps1`）、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
-| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`causal_check*.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
+| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`causal_check*.csv`、`align_rt_check.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
