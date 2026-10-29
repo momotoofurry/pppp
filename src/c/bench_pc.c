@@ -77,8 +77,15 @@ const char *bench_platform(void)
     return "PC";
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     bench_run(0);
+    if (argc > 1) {                          /* bench_pc <file>: the one-shot image (to compare with the board's) */
+        FILE *f = fopen(argv[1], "wb");
+        if (!f)
+            return 1;
+        fwrite(s_flash, 1, sizeof s_flash, f);
+        fclose(f);
+    }
     return 0;
 }

@@ -1,0 +1,20 @@
+# As bench_board_480mhz_cache_fixed.txt, emg/ built with -ffp-contract=off (CMake -DEMG_NO_FMA=ON, build/nofma):
+# image hash and votes hash identical to results/bench_pc.txt, 2026-10-29.
+=== bench v2 (STM32H7 HAL, SYSCLK 480 MHz, I-cache on, D-cache on) ===
+one-shot: image 6323 B, pruned leaves 412, app nodes 266, hash d43d66c3
+block 0: clustered 1, selected 156, new nodes max 15, z-score updated 1
+block 1: clustered 1, selected 300, new nodes max 20, z-score updated 1
+block 2: clustered 1, selected 288, new nodes max 19, z-score updated 1
+rotation k 0; predictions 142 92 191 100 128 247; votes hash 302aed91
+replayed windows correct 568 / 900 (sanity only: 6 trials repeated)
+os_calibrate+flash   n=    1  mean 485444119 cyc  1011341 us   max 485444119 cyc  1011341 us
+ad_align_finish      n=    1  mean      7781 cyc       16 us   max      7781 cyc       16 us
+filter (1 sample)    n=199050  mean      1094 cyc        2 us   max      1344 cyc        2 us
+features (window)    n=  950  mean   1048910 cyc     2185 us   max   1053890 cyc     2195 us
+map+normalize        n=  900  mean      3946 cyc        8 us   max      4041 cyc        8 us
+sc_push_votes        n=  900  mean     28039 cyc       58 us   max     35806 cyc       74 us
+ad_observe           n=  900  mean      2976 cyc        6 us   max      3099 cyc        6 us
+sc_end_block         n=    3  mean  60634176 cyc   126321 us   max  72805735 cyc   151678 us
+ad_end_block         n=    3  mean     55135 cyc      114 us   max     55152 cyc      114 us
+per 100 ms window (mean): 1301577 cyc = 2711 us
+=== done ===

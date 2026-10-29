@@ -64,7 +64,7 @@ int board_flash_write(uint32_t addr, const void *src, uint32_t n)
         if (base != s_word_addr) {                    /* another Flash word: program the buffered one */
             if (board_flash_flush() != 0)
                 return -1;
-            memset(s_word, 0xFF, sizeof s_word);
+            memset(s_word_w, 0xFF, sizeof s_word_w);       /* the whole 32-byte word (s_word is a pointer) */
             s_word_addr = base;
         }
         uint32_t off = addr - base, take = FLASH_WORD - off;

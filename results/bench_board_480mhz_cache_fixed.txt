@@ -1,0 +1,20 @@
+# Same as bench_board_480mhz_cache.txt, after the fix of the Flash word buffer reset in src/c/board_hal.c
+# (memset(s_word, 0xFF, sizeof s_word) cleared 4 bytes, not 32: stale bytes in the gaps of the image), 2026-10-29.
+=== bench v2 (STM32H7 HAL, SYSCLK 480 MHz, I-cache on, D-cache on) ===
+one-shot: image 6323 B, pruned leaves 412, app nodes 266, hash d43d66c3
+block 0: clustered 1, selected 156, new nodes max 15, z-score updated 1
+block 1: clustered 1, selected 300, new nodes max 20, z-score updated 1
+block 2: clustered 1, selected 288, new nodes max 19, z-score updated 1
+rotation k 0; predictions 142 92 191 100 128 247; votes hash c0268fe1
+replayed windows correct 568 / 900 (sanity only: 6 trials repeated)
+os_calibrate+flash   n=    1  mean 459517548 cyc   957328 us   max 459517548 cyc   957328 us
+ad_align_finish      n=    1  mean      7526 cyc       15 us   max      7526 cyc       15 us
+filter (1 sample)    n=199050  mean      1094 cyc        2 us   max      1376 cyc        2 us
+features (window)    n=  950  mean   1069302 cyc     2227 us   max   1074312 cyc     2238 us
+map+normalize        n=  900  mean      3946 cyc        8 us   max      4068 cyc        8 us
+sc_push_votes        n=  900  mean     28019 cyc       58 us   max     35848 cyc       74 us
+ad_observe           n=  900  mean      3055 cyc        6 us   max      3185 cyc        6 us
+sc_end_block         n=    3  mean  59849173 cyc   124685 us   max  71889911 cyc   149770 us
+ad_end_block         n=    3  mean     54908 cyc      114 us   max     54976 cyc      114 us
+per 100 ms window (mean): 1322028 cyc = 2754 us
+=== done ===
