@@ -1,0 +1,19 @@
+
+=== bench v2 (PC) ===
+one-shot: image 6323 B, pruned leaves 412, app nodes 266, hash d43d66c3
+block 0: clustered 1, selected 156, new nodes max 15, z-score updated 1
+block 1: clustered 1, selected 300, new nodes max 20, z-score updated 1
+block 2: clustered 1, selected 288, new nodes max 19, z-score updated 1
+rotation k 0; predictions 142 92 191 100 128 247; votes hash 302aed91
+replayed windows correct 568 / 900 (sanity only: 6 trials repeated)
+os_calibrate+flash   n=    1  mean         0 cyc        0 us   max         0 cyc        0 us
+ad_align_finish      n=    1  mean         0 cyc        0 us   max         0 cyc        0 us
+filter (1 sample)    n=199050  mean         0 cyc        0 us   max         0 cyc        0 us
+features (window)    n=  950  mean         0 cyc        0 us   max         0 cyc        0 us
+map+normalize        n=  900  mean         0 cyc        0 us   max         0 cyc        0 us
+sc_push_votes        n=  900  mean         0 cyc        0 us   max         0 cyc        0 us
+ad_observe           n=  900  mean         0 cyc        0 us   max         0 cyc        0 us
+sc_end_block         n=    3  mean         0 cyc        0 us   max         0 cyc        0 us
+ad_end_block         n=    3  mean         0 cyc        0 us   max         0 cyc        0 us
+per 100 ms window (mean): 0 cyc = 0 us
+=== done ===
