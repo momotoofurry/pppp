@@ -90,7 +90,7 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
   1926 Hz 輸入＋`--rate 1925.926` 重新取樣也可用（86.67%），只當備案。
 - replay：板子上 block 0／1 準確率 88.00%／86.67%，和 PC 逐視窗相同（report 第 19 節）；2026-10-30 用這個資料夾的
   `TrignoBridge.exe replay` 接板子重跑兩次，結果相同（校正 60、one-shot 成功、自我校正 2 次、CRC 錯誤 0）。
-  以上是 2026-10-30 之前的韌體。
+  以上是 2026-10-30 之前的韌體。新韌體燒進去後用 `serial_replay.ps1` 重跑：88.00%／85.00%，和 PC 逐視窗 100% 相同、CRC 錯誤 0。
 - `align`（2026-10-30）：TrignoBridge.exe 接模擬的 TCU，校正後 `align` 送出 reset → ALIGN_START → 8 秒後 ALIGN_END，
   位元組餵給 PC 版 `rt.c`：回 `rotation 0`（資料沒轉）、之後正常分類。`src/check_align_rt.py`：PC 版 `rt.c` 的開機對齊
   在通道轉 0／1／2／−1 格時都估對，之後的預測和沒轉時逐視窗相同；只給 10 個視窗時回 `alignment too short`。
