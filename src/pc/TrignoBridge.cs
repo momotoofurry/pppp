@@ -230,6 +230,16 @@ static class Program
 
     static string Get(Dictionary<string, string> d, string k, string def) { return d.ContainsKey(k) ? d[k] : def; }
 
+    // --port must name a serial port (COMx) or file:<path>; anything else (e.g. an empty %1 in a .bat) stops here
+    static string PortArg(Dictionary<string, string> d)
+    {
+        string p = Get(d, "port", "");
+        if (p.StartsWith("COM", StringComparison.OrdinalIgnoreCase) || p.StartsWith("file:")) return p;
+        Console.WriteLine("請指定 STM32 的 COM port，例如 --port COM5（裝置管理員 → 連接埠 → STMicroelectronics STLink Virtual COM Port）");
+        Console.WriteLine("ports on this PC: " + string.Join(" ", SerialPort.GetPortNames()));
+        return null;
+    }
+
     static int Main(string[] argv)
     {
         if (argv.Length < 1) { Console.WriteLine("usage: TrignoBridge check|run|replay [options] (see the top of TrignoBridge.cs)"); return 1; }
@@ -392,8 +402,8 @@ static class Program
     static int Run(Dictionary<string, string> a)
     {
         double rate = double.Parse(Get(a, "rate", "2000"), IC);
-        string portName = Get(a, "port", null);
-        if (portName == null) { Console.WriteLine("--port COMx is required"); return 1; }
+        string portName = PortArg(a);
+        if (portName == null) return 1;
         var tcu = new Tcu(Get(a, "tcu", "127.0.0.1"));
         Console.WriteLine("TCU banner: " + tcu.Banner);
         mcuCsv = new StreamWriter(Get(a, "mcu-csv", "mcu.csv"));
@@ -502,6 +512,8 @@ static class Program
     static int Replay(Dictionary<string, string> a)
     {
         string dir = Get(a, "dir", "board_replay");
+        string portName = PortArg(a);
+        if (portName == null || portName.StartsWith("file:")) return 1;
         byte[] stream = File.ReadAllBytes(Path.Combine(dir, "stream.bin"));
         var ends = new List<int>(); var times = new List<double>();
         foreach (var l in File.ReadAllLines(Path.Combine(dir, "schedule.csv"))) {
@@ -518,8 +530,8 @@ static class Program
         var dec = new Decoder();
         var predCls = new List<int>(); var events = new List<string>();
         var buf = new byte[65536];
-        Console.WriteLine(string.Format(IC, "replaying {0} packets ({1:F0} s) to {2}...", ends.Count, times[times.Count - 1], Get(a, "port", "COM5")));
-        using (var sp = new SerialPort(Get(a, "port", "COM5"), 921600, Parity.None, 8, StopBits.One)) {
+        Console.WriteLine(string.Format(IC, "replaying {0} packets ({1:F0} s) to {2}...", ends.Count, times[times.Count - 1], portName));
+        using (var sp = new SerialPort(portName, 921600, Parity.None, 8, StopBits.One)) {
             sp.ReadTimeout = 1; sp.WriteTimeout = 2000; sp.ReadBufferSize = 1 << 20;
             sp.Open(); sp.DiscardInBuffer();
             var sw = Stopwatch.StartNew();
