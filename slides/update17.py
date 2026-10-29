@@ -194,8 +194,10 @@ PCA = pd.read_csv(os.path.join(R, 'pca_baseline_summary.csv'))
 ram = pd.read_csv(os.path.join(R, 'ram_history.csv')).ram_KB.iloc[-1]
 RS = pd.read_csv(os.path.join(R, 'board_replay_summary.csv'))
 rep = PC.loc['self-cal, all blocks (mean)']
-a0, f0 = AD.loc[(0, 1), 'c_adapt'], AD.loc[(0, 0), 'c_fixed']
-a5, f5 = AD.loc[(0.5, 1), 'c_adapt'], AD.loc[(0.5, 0), 'c_fixed']
+CC = pd.read_csv(os.path.join(R, 'causal_check_summary.csv')).set_index(['shift', 'align', 'upd'])
+f0, f5 = AD.loc[(0, 0), 'c_fixed'], AD.loc[(0.5, 0), 'c_fixed']          # fixed model (no alignment needed)
+a0, a5 = CC.loc[(0, 'c60', 'R3'), 'adapt_all'], CC.loc[(0.5, 'c60', 'R3'), 'adapt_all']   # firmware of 10/30, causal
+v0, v5 = AD.loc[(0, 1), 'c_adapt'], AD.loc[(0.5, 1), 'c_adapt']           # report 12 (alignment saw block 0)
 d_lo, d_hi = PCA.v2_vs_pca_cum_diff.min(), PCA.v2_vs_pca_cum_diff.max()
 
 GOAL_TITLE = '目前完成的目標：方法和板子都驗證了，剩真人實驗'
@@ -206,7 +208,7 @@ GOAL_ROWS = [
     ('完成', '整套程式要塞進板子的 256 KB 記憶體',
      f"只用 {ram:.1f} KB，還剩 {256 - ram:.1f} KB"),
     ('完成', '不用重新標記，模型自己適應使用者（RQ2）',
-     f"電腦模擬：準確率 {f0:.2f}% → {a0:.2f}%；電極偏掉半格時 {f5:.2f}% → {a5:.2f}%"),
+     f"電腦模擬（不偷看的評估）：準確率 {f0:.2f}% → {a0:.2f}%；電極偏掉半格時 {f5:.2f}% → {a5:.2f}%"),
     ('完成', '比另一種免標籤方法好（PCA 對齊 [8]，RQ2）',
      f"電腦模擬：{len(PCA)} 種電極偏移情況都比它高 {d_lo:.1f}～{d_hi:.1f} 個百分點"),
     ('完成', '板子算得夠快（RQ3）',
@@ -220,7 +222,7 @@ GOAL_ROWS = [
 GOAL_FOOT = '電腦模擬：20 人 × 11 段資料 × 3 次；板子：NUCLEO-H753ZI。截至 10/30，細節：report.md'
 GOAL_NOTES = (
     f"這頁整理目前做到哪裡。在電腦上重現論文、把程式塞進 256 KB、免標籤自我校正和 PCA 比較組都完成了，"
-    f"不過準確率還是電腦模擬的數字。板子上已經量到速度：每 0.1 秒的資料只要 {f_win:.2f} 毫秒，自我校正一次約 "
+    f"不過準確率還是電腦模擬的數字；10/30 照審查意見把評估改成不偷看 block 0、buffer 轉到新座標，數字是改過以後的。板子上已經量到速度：每 0.1 秒的資料只要 {f_win:.2f} 毫秒，自我校正一次約 "
     f"{f_end:.2f} 秒；把錄好的資料即時送進板子，板子上的每一個判斷都和電腦一樣。實驗室電腦的轉送程式也準備好了。"
     f"還沒做的是接真的 Trigno、真人跨日實驗和 Kinova 任務，要等 IRB；功耗要等電流表。")
 
@@ -241,7 +243,11 @@ if not goal:
     ids.insert(list(prs.slides).index(find('工作紀錄（1/2）')), el)       # before the work logs
     goal = [new]
 gs = goal[0]
-if title_shape(gs).text_frame.text != GOAL_TITLE:
+def rows_text(t):
+    return [tuple(c.text for c in r.cells) for r in list(t.rows)[1:]]
+
+
+if title_shape(gs).text_frame.text != GOAL_TITLE or rows_text(named(gs, 'Table log').table) != GOAL_ROWS:
     set_text(title_shape(gs), GOAL_TITLE)
     fill(named(gs, 'Table log').table, GOAL_HDR, GOAL_ROWS)
     for r in list(named(gs, 'Table log').table.rows)[1:]:
@@ -282,8 +288,9 @@ LOG2 = [
      f"我們的 v2 在 {len(PCA)} 種偏移都比它高 {d_lo:.1f}–{d_hi:.1f} 個百分點"),
     ('10/29', '第一次上板（480 MHz）；用錄好的資料即時串流到板子（路線 B）',
      f"每 0.1 秒資料只花 {f_win:.2f} ms；自我校正一次 {f_end:.3f} s；每個判斷都和電腦相同、延遲 {lat_med:.1f} ms"),
-    ('10/30', '實驗室電腦的轉送程式（不用安裝）',
-     f"接板子重跑兩次結果相同（{RS.board_acc[0]:.2f}%／{RS.board_acc[1]:.2f}%），傳輸錯誤 {int(RS.crc_errors.sum())} 次"),
+    ('10/30', '實驗室電腦的轉送程式；照審查修正評估（開機對齊不偷看、buffer 轉座標），放進韌體',
+     f"轉送程式傳輸錯誤 {int(RS.crc_errors.sum())} 次；修正後 {a0:.2f}%、偏半格 {a5:.2f}%（原報 {v0:.2f}／{v5:.2f}）；"
+     '開機只做一種手勢會估錯 → 規定 8 秒做 6 種'),
 ]
 LOG_FOOT = '電腦模擬：20 人 × 11 段資料 × 3 次；「個百分點」是準確率相差多少；p < 0.05 才算真的有差別。細節：report.md、Notion'
 lg1 = find('工作紀錄（1/2）')
@@ -292,7 +299,7 @@ if t1.rows[0].cells[2].text != LOG_HDR[2]:
     fill(t1, LOG_HDR, LOG1)
     set_text(named(lg1, 'Text 2'), LOG_FOOT)
     done.append('log 1 plain')
-if tbl.rows[0].cells[2].text != LOG_HDR[2]:
+if tbl.rows[0].cells[2].text != LOG_HDR[2] or rows_text(tbl) != LOG2:
     fill(tbl, LOG_HDR, LOG2)
     set_text(named(lg, 'Text 2'), LOG_FOOT)
     set_text(title_shape(lg), '工作紀錄（2/2）：10/25–10/30')
@@ -300,11 +307,17 @@ if tbl.rows[0].cells[2].text != LOG_HDR[2]:
 
 # slide 2: the "done" / "to do" cards were written before the board arrived
 s2 = find('我想做的事')
-if not named(s2, 'Col 0 head').text_frame.text.startswith('已經做到（電腦'):
+S2_DONE = (f"重現論文：{rep['ours (seed-avg)']:.2f}%（論文 {rep['paper']:.1f}%）",
+           f"韌體：{a0:.1f}%，只用 {ram:.1f} KB 記憶體",
+           f"電極偏半格：{f5:.1f}% → {a5:.1f}%",
+           f"比 PCA 對齊 [8] 高 {d_lo:.1f}～{d_hi:.1f} 點",
+           f"板子上每 0.1 秒算 {f_win:.2f} ms，判斷和電腦相同")
+if (not named(s2, 'Col 0 head').text_frame.text.startswith('已經做到（電腦') or
+        [p.text.lstrip('• ') for p in named(s2, 'Col 0 list').text_frame.paragraphs] != list(S2_DONE)):
     set_text(named(s2, 'Col 0 head'), '已經做到（電腦＋板子）')
     for sh, items in ((named(s2, 'Col 0 list'),
-                       (f"重現論文：{rep['ours (seed-avg)']:.2f}%（論文 {rep['paper']:.1f}%）",
-                        f"韌體 v2：{a0:.1f}%，只用 {ram:.1f} KB 記憶體",
+                       (S2_DONE[0],
+                        S2_DONE[1],
                         f"電極偏半格：{f5:.1f}% → {a5:.1f}%",
                         f"比 PCA 對齊 [8] 高 {d_lo:.1f}～{d_hi:.1f} 點",
                         f"板子上每 0.1 秒算 {f_win:.2f} ms，判斷和電腦相同")),
