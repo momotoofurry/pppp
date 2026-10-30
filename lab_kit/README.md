@@ -4,7 +4,7 @@
 C# 編譯器編的（.NET Framework 4，Windows 10／11 都有）。原始碼：`src/pc/TrignoBridge.cs`。
 
 STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.c`，921600 baud；z-score 更新後 buffer 轉座標、
-開機對齊至少 60 個視窗，report 第 20 節）。燒好以後**到實驗室不用重燒**。
+開機對齊至少 60 個視窗，report 第 20 節；預測少於 5 類就不更新，第 22.1 節）。燒好以後**到實驗室不用重燒**。
 
 ## 資料夾內容
 
@@ -59,6 +59,10 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
      6 個手勢共 60 個。不用自己輸入 `calend`，也不會因為手勢維持太久而把名額用完
      （板子的上限是「總共 60 個」，不是每個手勢 10 個）
 5. 輸入 `calibrate`。**應該看到** `MCU: status,...,calibration windows,60` 和 `calibrated (0 = ok),0`（約 1 秒）。
+   **接著做校正檢查**：輸入 `verify 0`，馬上做 Power 並維持約 2 秒，畫面出現 `verify 0 (Power): x/10 right` 才放鬆；
+   `verify 1`～`verify 5` 照做。6 個都做完會出現 `verify total: ... -> PASS` 或 `FAIL`。
+   **FAIL（< 70%）就重做校正**（`cal 0`～`cal 5`、`calibrate`，再 `verify` 一次）。正常校正約 5% 會 FAIL 一次；
+   出力太弱的校正約 9 成會被擋下來（report 第 22.1 節）。校正時要用平常使用的力氣，不要太輕。
 6. 之後板子自動即時分類，指令會顯示在畫面上（`MCU: command,...`）；每 10 秒有一行狀態（收到幾個樣本、實測取樣率、
    有沒有被截掉的樣本）。
 7. 結束輸入 `quit`。

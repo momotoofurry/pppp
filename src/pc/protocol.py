@@ -19,6 +19,7 @@ STREAM_RESET, CAL_START, CAL_END, CALIBRATE, SET_DECISION, SET_REPORT, ALIGN_STA
 # status events
 EV_CALIBRATED, EV_SELFCAL, EV_LOST, EV_CAL_FULL, EV_ALIGNED, EV_ALIGN_SHORT, EV_SC_BEGIN, EV_SC_END = 1, 2, 3, 4, 5, 6, 7, 8
 EV_DIAG_RX_HW, EV_DIAG_STACK, EV_DIAG_RX_OVF, EV_DIAG_RX_ERR = 9, 10, 11, 12   # board main loop (app_rt.c)
+EV_SC_SKIP = 13                                      # update skipped: too few predicted classes (RT_MIN_CLASSES)
 COMMANDS = {0: 'none', 1: 'pose_A', 2: 'grip', 3: 'pose_B', 4: 'release'}
 GESTURES = ['Power', 'Lateral', 'Tripod', 'Pointer', 'Open', 'Rest']
 

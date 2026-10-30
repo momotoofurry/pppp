@@ -11,6 +11,8 @@
 //       MCU packets -> mcu.csv and the console. Commands typed while running:
 //         reset | cal <0-5> | calend | calibrate | align | decision <tau_permille> <k> | report <0|1> | status | quit
 //       cal <g> = reset + CAL_START; CAL_END follows by itself after 2 s of samples (10 windows per gesture).
+//       verify <g> = reset, then the next 10 predictions are scored against gesture g (needs report 1); after all
+//       6 gestures: PASS if >= 70 % of the 60 windows are right, else redo the calibration (report 22).
 //       align = reset + ALIGN_START; ALIGN_END follows by itself after 8 s (70 windows; the MCU needs >= 60 and
 //       several gestures, report 20): start-up alignment after the sensors were put on again.
 //       --script: lines "<seconds> <command>" run at those times after START (for tests).
@@ -318,6 +320,29 @@ static class Program
     static StreamWriter mcuCsv;
     static Stopwatch clock = Stopwatch.StartNew();
     static int mcuPackets, preds;
+    // day-1 calibration check (report 22): 10 predictions per gesture, pass at >= 70 % of the 60
+    const int VERIFY_WINDOWS = 10, VERIFY_PASS_PCT = 70;
+    static int verifyG = -1, verifyLeft;
+    static readonly int[] vOk = new int[6], vN = new int[6];
+    static readonly object vLock = new object();
+
+    static void VerifyPred(int cls)
+    {
+        lock (vLock) {
+            if (verifyG < 0 || verifyLeft <= 0) return;
+            vN[verifyG]++;
+            if (cls == verifyG) vOk[verifyG]++;
+            if (--verifyLeft > 0) return;
+            Console.WriteLine(string.Format(IC, "[{0:F1} s] verify {1} ({2}): {3}/{4} right; you can relax",
+                                            clock.Elapsed.TotalSeconds, verifyG, Proto.GESTURES[verifyG], vOk[verifyG], vN[verifyG]));
+            verifyG = -1;
+            int ok = 0, n = 0, done = 0;
+            for (int g = 0; g < 6; g++) { ok += vOk[g]; n += vN[g]; done += vN[g] > 0 ? 1 : 0; }
+            if (done == 6)
+                Console.WriteLine(string.Format(IC, "verify total: {0}/{1} = {2:F0} % -> {3}", ok, n, 100.0 * ok / n,
+                                                100 * ok >= VERIFY_PASS_PCT * n ? "PASS" : "FAIL: redo the calibration (cal 0-5, calibrate)"));
+        }
+    }
     // cal <g> = reset + CAL_START, then CAL_END by itself after CAL_FRAMES samples have gone out (2 s: windows 9..18
     // after the reset = 10 windows per gesture, as the data set; rt.c caps the total at 60, not per gesture)
     // align = reset + ALIGN_START, then ALIGN_END by itself after ALIGN_FRAMES (8 s: 79 windows - 9 warmup = 70)
@@ -362,6 +387,15 @@ static class Program
             return true;
         }
         else if (c == "calend") { lock (txLock) { Send(Proto.Control(Proto.CAL_END)); autoStart = -1; } }
+        else if (c == "verify" && p.Length == 2) {
+            int g = int.Parse(p[1]);
+            if (g < 0 || g > 5) { Console.WriteLine("gesture 0-5: 0 Power, 1 Lateral, 2 Tripod, 3 Pointer, 4 Open, 5 Rest"); return false; }
+            lock (vLock) { vOk[g] = 0; vN[g] = 0; verifyG = g; verifyLeft = VERIFY_WINDOWS; }
+            Send(Proto.Control(Proto.STREAM_RESET));
+            Console.WriteLine(string.Format(IC, "[{0:F1} s] verify {1} ({2}): do the gesture now and hold it (about 2 s)",
+                                            clock.Elapsed.TotalSeconds, g, Proto.GESTURES[g]));
+            return true;
+        }
         else if (c == "align") {
             StartAuto(Proto.ALIGN_START, -1, Proto.ALIGN_END, ALIGN_FRAMES, "alignend (auto, 8 s): the MCU answers with 'rotation'");
             Console.WriteLine(string.Format(IC, "[{0:F1} s] align: for 8 s do each gesture about 1 s: Power, Lateral, Tripod, Pointer, Open, Rest",
@@ -372,7 +406,7 @@ static class Program
         else if (c == "decision" && p.Length == 3) Send(Proto.Control(Proto.SET_DECISION, int.Parse(p[1]), int.Parse(p[2])));
         else if (c == "report" && p.Length == 2) Send(Proto.Control(Proto.SET_REPORT, int.Parse(p[1])));
         else if (c == "status") return true;
-        else { Console.WriteLine("? reset | cal <0-5> | calend | calibrate | align | decision <tau_permille> <k> | report <0|1> | status | quit"); return false; }
+        else { Console.WriteLine("? reset | cal <0-5> | calend | calibrate | verify <0-5> | align | decision <tau_permille> <k> | report <0|1> | status | quit"); return false; }
         Console.WriteLine(string.Format(IC, "[{0:F1} s] sent: {1}", clock.Elapsed.TotalSeconds, line.Trim()));
         return true;
     }
@@ -388,7 +422,7 @@ static class Program
                 mcuPackets++;
                 string line = Describe(pk.Key, pk.Value);
                 lock (mcuCsv) mcuCsv.WriteLine(clock.Elapsed.TotalMilliseconds.ToString("F1", IC) + "," + line);
-                if (pk.Key == Proto.PRED) preds++;
+                if (pk.Key == Proto.PRED) { preds++; if (pk.Value.Length >= 13) VerifyPred(pk.Value[8]); }
                 else Console.WriteLine(string.Format(IC, "[{0:F1} s] MCU: {1}", clock.Elapsed.TotalSeconds, line));
             }
         }
@@ -413,7 +447,8 @@ static class Program
             string[] names = { "", "calibrated (0 = ok)", "self-calibration blocks", "packets lost", "calibration windows", "rotation",
                                "alignment too short, rotation unchanged (windows)",
                                "self-calibration start (windows so far)", "self-calibration took (us)", "receive ring high-water (bytes)",
-                               "stack peak (bytes)", "UART bytes dropped", "UART errors" };
+                               "stack peak (bytes)", "UART bytes dropped", "UART errors",
+                               "self-calibration skipped: too few gestures (classes)" };
             return string.Format(IC, "status,,,,,,,,{0},{1}", ev < names.Length ? names[ev] : ev.ToString(), v);
         }
         return "unknown,type " + type + ",len " + p.Length + ",,,,,,,";
@@ -453,7 +488,7 @@ static class Program
             var input = new Thread(() => { string l; while (!stop && (l = Console.ReadLine()) != null) DoCommand(l); });
             input.IsBackground = true;
             input.Start();
-            Console.WriteLine("commands: reset | cal <0-5> | calend | calibrate | align | decision <tau> <k> | report <0|1> | status | quit");
+            Console.WriteLine("commands: reset | cal <0-5> | calend | calibrate | verify <0-5> | align | decision <tau> <k> | report <0|1> | status | quit");
         }
 
         Console.WriteLine("START -> " + tcu.Command("START"));

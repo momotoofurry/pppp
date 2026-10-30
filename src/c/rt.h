@@ -41,7 +41,8 @@
  *   RT_EV_LOST value = packets lost in the last gap, RT_EV_CAL_FULL value = calibration windows kept,
  *   RT_EV_ALIGNED value = estimated rotation (-3..4), RT_EV_ALIGN_SHORT value = alignment windows received,
  *   RT_EV_SC_BEGIN value = windows so far when a self-calibration starts, RT_EV_SC_END value = its duration (us);
- *   the PRED packets between the two are the windows classified while it ran (test A, VALIDATION_PLAN.md).
+ *   the PRED packets between the two are the windows classified while it ran (test A, VALIDATION_PLAN.md);
+ *   RT_EV_SC_SKIP value = predicted classes in the block, when the update was skipped (RT_MIN_CLASSES).
  */
 #pragma once
 #include <stdint.h>
@@ -60,13 +61,19 @@
 #define RT_RESCALE 1
 #endif
 #define RT_ALIGN_MIN 60                 /* windows (6 s of continuous stream) */
+#ifndef RT_MIN_CLASSES
+#define RT_MIN_CLASSES 5                /* skip a block's update when fewer predicted classes have >= AD_MIN_CLASS
+                                           windows (report 22: only Rest + 2 gestures made self-calibration -6.4 points);
+                                           0 = never skip */
+#endif
 
 enum { RT_STREAM_RESET = 1, RT_CAL_START = 2, RT_CAL_END = 3, RT_CALIBRATE = 4, RT_SET_DECISION = 5, RT_SET_REPORT = 6,
        RT_ALIGN_START = 7, RT_ALIGN_END = 8 };
 enum { RT_EV_CALIBRATED = 1, RT_EV_SELFCAL = 2, RT_EV_LOST = 3, RT_EV_CAL_FULL = 4, RT_EV_ALIGNED = 5,
        RT_EV_ALIGN_SHORT = 6, RT_EV_SC_BEGIN = 7, RT_EV_SC_END = 8,
        /* diagnostics sent by the board main loop (app_rt.c), not by rt.c */
-       RT_EV_DIAG_RX_HW = 9, RT_EV_DIAG_STACK = 10, RT_EV_DIAG_RX_OVF = 11, RT_EV_DIAG_RX_ERR = 12 };
+       RT_EV_DIAG_RX_HW = 9, RT_EV_DIAG_STACK = 10, RT_EV_DIAG_RX_OVF = 11, RT_EV_DIAG_RX_ERR = 12,
+       RT_EV_SC_SKIP = 13 };
 enum { RT_MODE_IDLE = 0, RT_MODE_CAL = 1, RT_MODE_RUN = 2, RT_MODE_ALIGN = 3 };
 
 typedef struct {

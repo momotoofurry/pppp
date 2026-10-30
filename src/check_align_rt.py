@@ -7,7 +7,8 @@ recording rotated by r channels (np.roll of the 8 raw channels: sensor c now rec
           no reset in between, as a real start-up), ALIGN_END
   test    blocks 1 and 2, per recording STREAM_RESET + samples (2 self-calibration blocks)
 Cases: n = 1 (10 windows: must give ALIGN_SHORT and keep the rotation), n = 8 (71 windows) for r = 0, 1, 2, -1;
-r = 1 without alignment; r = 0 with RT_RESCALE = 0 (firmware v2 block end). Accuracy from the PRED packets.
+r = 1 without alignment; r = 0 with RT_RESCALE = 0 (firmware v2 block end); blocks 1-4 with only Rest, Tripod and Open (the update must be
+skipped: RT_MIN_CLASSES, report 22). Accuracy from the PRED packets.
 Writes results/align_rt_check.csv. Usage (in the container): python src/check_align_rt.py
 """
 import os
@@ -25,7 +26,7 @@ import protocol as PR  # noqa: E402
 OUT = os.path.join(BR.P.ROOT, 'results')
 
 
-def stream(r, n_align, blocks=(1, 2)):
+def stream(r, n_align, blocks=(1, 2), keep=None):
     enc = PR.Encoder()
     pk, labels = [(enc.control(PR.SET_REPORT, 1), 0.0)], []
 
@@ -46,6 +47,8 @@ def stream(r, n_align, blocks=(1, 2)):
     for b in blocks:
         recs, lab = R.recordings(BR.SUBJECT, f'testing_block{b}')
         for frames, y in zip(recs, lab):
+            if keep is not None and int(y) not in keep:
+                continue
             pk.append((enc.control(PR.STREAM_RESET), 0.0))
             samples(np.ascontiguousarray(np.roll(frames, r, axis=1)))
             labels += [int(y)] * ((len(frames) - 400) // 200 + 1 - BR.WARMUP)
@@ -53,18 +56,20 @@ def stream(r, n_align, blocks=(1, 2)):
 
 
 def main():
-    cases = [(0, 1, 1), (0, 8, 1), (1, 8, 1), (2, 8, 1), (-1, 8, 1), (1, 0, 1), (0, 8, 0)]
+    cases = [(0, 1, 1, None), (0, 8, 1, None), (1, 8, 1, None), (2, 8, 1, None), (-1, 8, 1, None), (1, 0, 1, None),
+             (0, 8, 0, None), (0, 8, 1, (5, 2, 4))]
     rows = []
-    for r, n, rescale in cases:
-        pk, y = stream(r, n)
+    for r, n, rescale, keep in cases:
+        pk, y = stream(r, n, (1, 2, 3, 4) if keep else (1, 2), keep)
         lib = os.path.join(BR.P.ROOT, 'build', 'c', f'librt_align_{rescale}.so')
         preds, status = BR.run_stream(pk, 1, lib, [f'-DRT_RESCALE={rescale}'])
         assert len(preds) == len(y), (len(preds), len(y))
         ev = [(m['event'], m['value']) for m in status]
         al = [v for e, v in ev if e in (PR.EV_ALIGNED, PR.EV_ALIGN_SHORT)]
         hit = preds.class_id.values == y
-        acc = [hit[k * 300:(k + 1) * 300].mean() * 100 for k in range(len(y) // 300)]
-        rows.append(dict(rotation=r, align_recordings=n, rt_rescale=rescale,
+        acc = [hit[k * 300:(k + 1) * 300].mean() * 100 for k in range(max(2, len(y) // 300))]
+        rows.append(dict(rotation=r, align_recordings=n, rt_rescale=rescale, gestures='5,2,4' if keep else 'all',
+                         skipped=sum(e == PR.EV_SC_SKIP for e, _ in ev),
                          align_event={PR.EV_ALIGNED: 'aligned', PR.EV_ALIGN_SHORT: 'short'}.get(
                              next((e for e, _ in ev if e in (PR.EV_ALIGNED, PR.EV_ALIGN_SHORT)), None), 'none'),
                          align_value=al[0] if al else None, calibrated=dict(ev).get(PR.EV_CALIBRATED),

@@ -277,6 +277,16 @@ void rt_idle(void)
         sc_stats_t st;
         s_sc_running = 1;
         s_sc_request = 0;
+#if RT_ADAPT && RT_MIN_CLASSES
+        int classes = ad_classes();
+        if (classes < RT_MIN_CLASSES) {         /* too few gestures in this block: no z-score update, no new trees */
+            sc_skip_block();
+            ad_skip_block();
+            s_sc_running = 0;
+            status(RT_EV_SC_SKIP, classes);
+            return;
+        }
+#endif
         uint32_t t0 = now();
         status(RT_EV_SC_BEGIN, (int32_t)s_cnt.windows);
 #if RT_ADAPT

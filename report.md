@@ -1219,11 +1219,34 @@ buffer 座標（括號是和同一種對齊的 `base` 比：差、變好／變�
   4. 所以兩者互斥：要嘛靠 cls5 防止少數手勢時越學越差，同時在第 1 天確認校正品質（不合格就重做校正）；要嘛維持現狀、把 rest2 寫成限制。
 - 限制：開發資料（同一批 20 人），規則和門檻都在這裡挑；`rest2`、`absent` 是把錄音挑掉一部分，不是真的休息時的訊號；`low` 只模擬整體振幅變小。
 
+### 22.1 採用：cls5 放進韌體＋第 1 天的校正檢查（2026-10-30；`src/verify_check.py` → `results/verify_check*.csv`）
+
+- 韌體（`rt.c`）：`RT_MIN_CLASSES = 5`。block 結束時，預測裡 ≥ 5 個視窗的類別（`ad_classes()`，只算進了 buffer 的視窗）少於 5 類，
+  就整次不更新（`sc_skip_block()`／`ad_skip_block()`：不更新 z-score、不訓練新樹，這個 block 的資料留在 buffer），並送
+  `RT_EV_SC_SKIP`（值＝類別數）。和 `stress_check.py` 的 `cls5` 同一條規則。
+- cls5 在第 1 天校正很差時會拉不回來，所以第 1 天加校正檢查：校正完後每個手勢再做一次（有標籤，2 秒，TrignoBridge `verify <手勢>`），
+  第 1 天的模型認對的比例 < 70%（60 個視窗中 < 42 個）就重做校正。門檻在開發資料上模擬（驗證＝block 0 裡每個手勢的第一段錄音，
+  和校正同一天、同一個手臂姿勢；20 人 × 3 seed）：
+
+| 校正 | 驗證準確率 平均（5 百分位，最低） | 門檻 65% 通過 | **門檻 70% 通過** | 門檻 75% 通過 |
+|---|---|---|---|---|
+| 正常 | 85.8%（69.5，55.0） | 95.0% | **95.0%** | 81.7% |
+| 每個手勢只用一半視窗 | 83.2%（64.9，58.3） | 95.0% | 85.0% | 80.0% |
+| 出力弱（原始 EMG × 0.5） | 46.9%（16.7，16.7） | 20.0% | **8.3%** | 5.0% |
+
+  → 70%：正常校正 5% 要重做一次，出力弱的校正 92% 會被擋下來。
+- 驗證：
+  - PC 版 `rt.c`：一般的 2 個 block 回放預測和之前逐視窗相同（6 類都在，不會跳過）；`check_align_rt.py` 原本的 7 個情況結果不變；
+    新加的情況（block 1–4 只有 Rest、Tripod、Open）跳過 2 次、沒有做自我校正。
+  - 板子：燒進去重跑 2 個 block 的回放，88.00%／85.00%，和 PC 逐視窗 100% 相同，CRC 錯誤 0。
+  - Cortex-M7 RAM 176.5 KB（`board2`：.data 116＋.bss 178,104＋stack 2,488 B），和之前一樣。
+- 這兩條是在開發資料上訂的；凍結成 `pilot-freeze-2`，先導資料只驗證。
+
 ---
 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`causal_check.py`、`check_align_rt.py`、`stress_check.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`board_replay.py`、`app_rt.c`、`src/pc/*`（含 `serial_replay.ps1`）、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`causal_check.py`、`check_align_rt.py`、`stress_check.py`、`verify_check.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`board_replay.py`、`app_rt.c`、`src/pc/*`（含 `serial_replay.ps1`）、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
-| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`causal_check*.csv`、`align_rt_check.csv`、`stress_check*.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
+| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`causal_check*.csv`、`align_rt_check.csv`、`stress_check*.csv`、`verify_check*.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |

@@ -195,13 +195,12 @@ void ad_end_block_map(ad_stats_t *st, float *scale, float *offset)
     memset(s_cm2, 0, sizeof s_cm2);
 }
 
-#if SC_ROLLBACK
-static float s_mu_bak[SC_DIM], s_var_bak[SC_DIM];
-
-void ad_save(void)
+int ad_classes(void)
 {
-    memcpy(s_mu_bak, s_mu, sizeof s_mu);
-    memcpy(s_var_bak, s_var, sizeof s_var);
+    int used = 0;
+    for (int k = 0; k < SC_CLASSES; k++)
+        used += s_cn[k] >= AD_MIN_CLASS;
+    return used;
 }
 
 void ad_skip_block(void)
@@ -209,6 +208,15 @@ void ad_skip_block(void)
     memset(s_cn, 0, sizeof s_cn);
     memset(s_cm, 0, sizeof s_cm);
     memset(s_cm2, 0, sizeof s_cm2);
+}
+
+#if SC_ROLLBACK
+static float s_mu_bak[SC_DIM], s_var_bak[SC_DIM];
+
+void ad_save(void)
+{
+    memcpy(s_mu_bak, s_mu, sizeof s_mu);
+    memcpy(s_var_bak, s_var, sizeof s_var);
 }
 
 void ad_restore(void)
