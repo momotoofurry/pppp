@@ -5,6 +5,8 @@ from results/. Writes to a temporary file first and replaces v17 only if every s
 2026-10-29 first board run (results/bench_board_64mhz_nocache.txt, report 18):
   - 「韌體 v2：Cortex-M7 RAM ...」: the "MCU 時間：待上板" card and the speaker-notes sentence -> the measured times
   - 「工作紀錄（2/2）」: title up to 10/29, one more row (copy of the last row's XML), row heights re-split
+2026-10-30 (restructure): main deck = claim, questions, architecture, 4 key results, done / not done, answers to
+  the reviews, stop rules, study design; the other slides go to the appendix (nothing deleted)
 2026-10-30 (review): claims limited to the evidence (slides 2, 3, 5, 6, 12, 16, 17), version tags on the
   evidence slides, new slide 「失敗條件與停止規則」 after the goals slide
 2026-10-30: new slide 「目前完成的目標」 before the work logs (copy of the work-log slide; status / goal / result);
@@ -387,6 +389,8 @@ def put_list(sh, items):
 def version_tag(s, text_):
     hits = [sh for sh in s.shapes if sh.name == 'Version tag']
     if hits:
+        if hits[0].text_frame.text == '附錄｜' + text_:       # moved to the appendix later (restructure step)
+            return 0
         return put(hits[0], text_)
     tb = s.shapes.add_textbox(Inches(7.7), Inches(0.08), Inches(5.0), Inches(0.3))
     tb.name = 'Version tag'
@@ -524,6 +528,266 @@ if title_shape(ss).text_frame.text != STOP_TITLE or rows_text(st_t) != STOP_ROWS
     n_rev += 1
 if n_rev:
     done.append(f'review fixes ({n_rev})')
+
+# ------------------------------------------------------------------ 2026-10-30: restructure (main deck + appendix)
+# main deck: claim, questions, architecture, 4 key results, done / not done, answers to the reviews, stop rules,
+# study design; the other result slides and the work logs move to the appendix (nothing is deleted)
+LR = pd.read_csv(os.path.join(R, 'board_replay_longrun_phases.csv')).set_index('phase')
+SM = pd.read_csv(os.path.join(R, 'stress_check_summary.csv')).set_index(['scen', 'var'])
+VC = pd.read_csv(os.path.join(R, 'verify_check_summary.csv')).set_index('cal')
+PW = pd.read_csv(os.path.join(R, 'power_calc.csv'))
+dz = PW[PW.kind == 'dev effect'].set_index('scen').dz
+mdz = PW[PW.kind == 'min detectable dz'].set_index('n').dz
+la, ld = LR.loc['all'], LR.loc['during']
+AS = pd.read_csv(os.path.join(R, 'arm_selfcal_size.csv'))
+stack_static = AS[(AS.variant == 'board2') & (AS.opt == '-Os')].worst_stack_bytes.iloc[0]
+
+
+def put_any(sh, text_):
+    """put() that also works on an empty placeholder (no run yet)"""
+    p = sh.text_frame.paragraphs[0]
+    if not p.runs:
+        if not text_:
+            return 0
+        p.add_run().text = text_
+        return 1
+    return put(sh, text_)
+
+
+def ttl(s):
+    """title of any slide (content slides: top Text 0; dark dividers: the first Text 0)"""
+    for sh in s.shapes:
+        if sh.name == 'Text 0' and sh.has_text_frame and sh.text_frame.text.strip():
+            return sh.text_frame.text
+    return ''
+
+
+def by_title(pred):
+    hits = [s for s in prs.slides if pred(ttl(s))]
+    return hits[0] if hits else None
+
+
+def new_from(src):
+    new = prs.slides.add_slide(src.slide_layout)
+    for sh in list(new.shapes):
+        sh._element.getparent().remove(sh._element)
+    for sh in src.shapes:
+        if sh.name != 'Version tag':
+            new.shapes._spTree.append(copy.deepcopy(sh._element))
+    return new
+
+
+def notes(s, text_):
+    ns = s.notes_slide
+    if ns.notes_text_frame is None:
+        ns.shapes._spTree.append(copy.deepcopy(find('我想做的事').notes_slide.notes_placeholder._element))
+    if ns.notes_text_frame.text != text_:
+        ns.notes_text_frame.text = text_
+        return 1
+    return 0
+
+
+def table_slide(key, title_, hdr, rows, foot, note, colour=False):
+    """a work-log-style table slide whose title starts with key; created once, content kept up to date"""
+    s = by_title(lambda t: t.startswith(key))
+    n = 0
+    if s is None:
+        s = new_from(lg)
+        n = 1
+    t = named(s, 'Table log').table
+    if ttl(s) != title_ or rows_text(t) != rows or t.rows[0].cells[2].text != hdr[2]:
+        set_text(title_shape(s), title_)
+        fill(t, hdr, rows)
+        n = 1
+    if colour:
+        for r in list(t.rows)[1:]:
+            run = r.cells[0].text_frame.paragraphs[0].runs[0]
+            run.font.bold = True
+            run.font.color.rgb = STATUS_COLOR.get(run.text, RGBColor(0x33, 0x33, 0x33))
+    n += put(named(s, 'Text 2'), foot)
+    n += notes(s, note)
+    return s, n
+
+
+n_rs = 0
+# dividers and title slide
+div = by_title(lambda t: t in ('重現與前置結果', '主要結果'))
+dsh = [sh for sh in div.shapes if sh.name == 'Text 0']
+n_rs += put_any(dsh[0], '主要結果')
+n_rs += put_any(dsh[1], '公開資料（開發集）上的方法驗證與板子實測；其餘結果在附錄')
+app = by_title(lambda t: t == '附錄')
+if app is None:
+    app = new_from(div)
+    n_rs += 1
+ash = [sh for sh in app.shapes if sh.name == 'Text 0']
+n_rs += put_any(ash[0], '附錄')
+n_rs += put_any(ash[1], '前置實驗與工作紀錄（主簡報的數字都在 report.md 有來源）')
+cover = prs.slides[0] if ttl(prs.slides[0]) == '研究方向' else by_title(lambda t: t == '研究方向')
+csh = [sh for sh in cover.shapes if sh.name == 'Text 0']
+n_rs += put_any(csh[1], '一次初始校正後、在 256 KB RAM 內免標籤適應的隨機森林肌電控制（STM32H7）；預計用 Kinova 閉迴路驗證')
+old_rq = by_title(lambda t: t in ('研究問題', '舊版研究問題（RQ1–RQ3）'))
+n_rs += put(title_shape(old_rq), '舊版研究問題（RQ1–RQ3）')
+
+# new main slides
+_, k = table_slide(
+    '研究問題：', '研究問題：一個主問題，其他是解釋與可行性', ('層級', '問題', '怎麼回答／現在'),
+    [('主問題', '第 2 天重新配戴後，完整系統是否比固定的第 1 天模型好？（閉迴路任務成功率）',
+      f"先導＋正式實驗（兩天 AB／BA 交叉）；公開資料模擬 {f0:.2f}% → {a0:.2f}%（開發集）"),
+     ('機制', '改善來自開機對齊、z-score 更新，還是換樹？',
+      '公開資料拆解：固定 79.68 → 只 z-score 81.42 → 只自我校正 83.20 → 兩者 83.87%；真人用錄下的 EMG 離線回放'),
+     ('工程', '能否在 256 KB RAM 與即時限制內運行？',
+      f"已在板子上驗證：RAM {ram:.1f} KB、每視窗 {f_win:.2f} ms、33 分鐘串流不掉資料"),
+     ('安全', '會不會把非控制動作當成指令？',
+      '非控制動作段（8 項 × 60 秒）的誤觸發／分鐘：先導時收'),
+     ('應用', '能不能用來控制 Kinova？', '第 2 天閉迴路任務；Kinova 不可用時改抓放遊戲（同一組離散指令）')],
+    '主張：一次初始校正後，記憶體受限的 STM32H7 能否透過免標籤適應，改善重新配戴後的離散肌電控制，而不犧牲即時性與安全性？',
+    '這頁把研究問題收斂成一個主問題：第二天重新戴上之後，完整系統是不是比只用第一天模型好，用閉迴路任務成功率回答。'
+    '機制、工程、安全、應用都是用來解釋或支持這個主問題的。工程問題已經在板子上回答了；主問題和安全問題要等真人實驗。')
+n_rs += k
+_, k = table_slide(
+    '韌體架構：', '韌體架構：中斷做即時分類，主迴圈做自我校正', ('執行時機', '做什麼', '板子實測'),
+    [('UART 中斷', '最高優先：每個 byte 放進 4 KB 環形緩衝', f"33 分鐘最多用 {la.rx_ring_highwater_B:.0f} B（6%）、遺失 0"),
+     ('1 kHz 中斷', '解封包 → 每 100 ms 算 80 維特徵 → 通道重排＋z-score → 100 棵樹投票 → 決策（τ、k）→ 回傳',
+      f"每個視窗 {f_win:.2f} ms（預算的 {f_win / 100:.1%}）"),
+     ('主迴圈', '每 300 個視窗：預測少於 5 類就跳過；否則更新 z-score → buffer 轉座標 → K-Means 偽標籤 → 換 20 棵樹',
+      f"一次平均 {la.selfcal_ms_mean / 1000:.2f} s；更新期間延遲最大 {ld.latency_max:.1f} ms"),
+     ('Flash', '程式＋50 棵預訓練樹；第 1 天的模型與校正資料（load 還原，學到的樹不寫回）',
+      '板子重置後 load，和 PC 逐視窗 100% 相同'),
+     ('RAM', 'buffer 375 筆＋RAM 樹 88 KB、校正工作區 40 KB、特徵 20 KB、建樹＋K-Means 12 KB、對齊 5 KB',
+      f"{ram:.1f} KB（預算 256 KB）；stack 峰值 {la.stack_peak_B / 1024:.1f} KB")],
+    'PC 只轉送 Trigno 樣本（TCP → UART）和 Kinova 指令；同一份 C 碼也編成 PC 版，用來和板子逐視窗比對。凍結版本 pilot-freeze-3',
+    '韌體分三層執行時機。UART 中斷只收資料，不會掉 byte；一千赫茲的中斷做即時分類，每個視窗不到三毫秒；'
+    '自我校正放在主迴圈，更新期間新進來的視窗照樣分類，只是不進 buffer。第一天的模型存在 Flash，斷電後可以還原；學到的樹只在 RAM。')
+n_rs += k
+_, k = table_slide(
+    '板子上 33 分鐘', '板子上 33 分鐘連續串流：更新時不掉資料、不變慢', ('指標', '結果', '事先訂的門檻'),
+    [('自我校正', f"{la.selfcal_n:.0f} 次；平均 {la.selfcal_ms_mean:.0f} ms、最長 {la.selfcal_ms_max:.0f} ms", '—'),
+     ('遺失', f"封包 {la.lost_packets:.0f}、CRC 錯誤 {la.crc_errors:.0f}、UART 丟掉 {la.uart_overflow:.0f}；"
+              f"{la.windows:.0f} 個視窗全部有輸出", '0'),
+     ('更新期間', f"{ld.windows:.0f} 個視窗：全部有分類、有決策（不進 buffer）", '每個視窗都有輸出'),
+     ('延遲', f"P50 {la.latency_p50:.1f}、P99 {la.latency_p99:.1f}、最大 {la.latency_max:.1f} ms；"
+              f"更新期間最大 {ld.latency_max:.1f} ms", '< 100 ms'),
+     ('緩衝', f"接收緩衝最多 {la.rx_ring_highwater_B:.0f} B（4 KB 的 {la.rx_ring_highwater_B / 4096:.0%}）", '< 50%'),
+     ('stack', f"執行期峰值 {la.stack_peak_B:.0f} B（靜態上界 {stack_static:,.0f} B）", '—'),
+     ('和 PC 一致', f"回放 2 個 block：{RS.board_acc[0]:.2f}%／{RS.board_acc[1]:.2f}%，逐視窗 100% 相同；關 FMA 逐位相同", '—')],
+    '受試者 0 的錄音，11 個 block 重複 3 次、中間不 reset（像真實使用一樣連續），PC 照錄音時間即時送進板子。延遲＝傳輸＋運算，不是使用者反應時間',
+    '這頁回答「背景更新會不會傷到即時控制」。三十三分鐘、六十五次更新，沒有掉任何資料，每個視窗都有輸出，'
+    '更新期間最大延遲不到十毫秒，接收緩衝只用到百分之六。限制是只有一位受試者的錄音、重複三次。')
+n_rs += k
+s_ = SM
+_, k = table_slide(
+    '壓力測試：', '壓力測試：只出現少數手勢時會越學越差，所以加了停止規則', ('情況', '固定模型 → 韌體', '加「少於 5 類不更新」後'),
+    [('正常', f"{s_.loc[('base', 'fixed'), 'focus']:.1f} → {s_.loc[('base', 'fw'), 'focus']:.1f}%",
+      f"{s_.loc[('base', 'cls5'), 'focus']:.1f}%（不受影響）"),
+     ('少數手勢', f"只有 Rest＋2 種：{s_.loc[('rest2', 'fixed'), 'focus']:.1f} → {s_.loc[('rest2', 'fw'), 'focus']:.1f}%"
+                  f"（{s_.loc[('rest2', 'fw'), 'vs_fixed']:+.1f}，18／20 人變差）",
+      f"{s_.loc[('rest2', 'cls5'), 'focus']:.1f}%（{s_.loc[('rest2', 'cls5'), 'vs_fixed']:+.1f}，不顯著）"),
+     ('缺席再回來', f"Power 消失 6 個 block 後的召回率：{s_.loc[('absent', 'fixed'), 'focus']:.1f} → "
+                    f"{s_.loc[('absent', 'fw'), 'focus']:.1f}%", f"{s_.loc[('absent', 'cls5'), 'focus']:.1f}%"),
+     ('束帶滑掉', f"滑掉 4 個 block 再戴回：{s_.loc[('wrong', 'fixed'), 'focus']:.1f} → {s_.loc[('wrong', 'fw'), 'focus']:.1f}%"
+                  f"，平均 {s_.loc[('wrong', 'fw'), 'recover_blocks_mean']:.1f} 個 block 恢復",
+      f"{s_.loc[('wrong', 'cls5'), 'focus']:.1f}%"),
+     ('校正一半', f"每個手勢只用一半視窗：{s_.loc[('half', 'fixed'), 'focus']:.1f} → {s_.loc[('half', 'fw'), 'focus']:.1f}%",
+      f"{s_.loc[('half', 'cls5'), 'focus']:.1f}%"),
+     ('出力弱', f"校正出力弱：{s_.loc[('low', 'fixed'), 'focus']:.1f} → {s_.loc[('low', 'fw'), 'focus']:.1f}%",
+      f"{s_.loc[('low', 'cls5'), 'focus']:.1f}%（變差）→ 第 1 天 verify < 70% 重做：擋下 {100 - VC.loc['low', 'pass_70']:.0f}%")],
+    '開發資料 20 人 × 3 seed，韌體 C 碼；用校正資料檢查的回退規則幾乎不觸發、沒有用（report 22）。規則和門檻都在這批資料上訂，先導只驗證',
+    '最重要的發現是：一段時間只出現少數手勢時，自我校正會比不更新還差六點多，這正是真實使用會發生的情況。'
+    '所以加了「預測少於五類就不更新」；它在第一天校正很差時會拉不回來，所以再加第一天的校正檢查。')
+n_rs += k
+_, k = table_slide(
+    '還沒完成：', '還沒完成：接真機、定案實驗設計、送 IRB', ('狀態', '項目', '為什麼還沒／下一步'),
+    [('未做', '接真的 Trigno（check、run 整條路）', 'TCU 協定照 pytrigno 寫、沒接過 → 先去實驗室跑 check.bat、run.bat'),
+     ('未做', 'PROTOCOL 的待定值、任務定義', '成功判準、誤觸發界線、試次數、樣本數、問卷 → 和老師定案'),
+     ('未做', 'IRB 送審', '定案後送；審查要幾個月，正式實驗排在之後'),
+     ('未做', '先導 3–4 人（凍結版本，只驗證）', 'IRB 通過後；不合格就回開發資料改，新受試者重收'),
+     ('未做', '正式 16 人：兩天交叉＋Kinova、非控制動作', '先導通過後'),
+     ('部分', '開機對齊沒做完時，PC 提示重做、對齊前不送指令', '韌體會回 ALIGN_SHORT；PC 端還要補'),
+     ('未做', '功耗', '要電流表（量法在 report 19.1）')],
+    '已完成的事項在上一頁；細節：PROTOCOL.md、VALIDATION_PLAN.md',
+    '還沒完成的事情，大多要等真的器材和 IRB。最急的是先去實驗室接真的 Trigno，確認資料能送進板子；'
+    '同時和老師定案實驗設計裡的待定數值，然後送 IRB。', colour=True)
+n_rs += k
+QHDR = ('#', '審查問題', '回應與證據')
+_, k = table_slide(
+    '回答審查（1/2）', '回答審查（1/2）：評估有效性與方法', QHDR,
+    [('1', '開機對齊是不是偷看了 block 0？', '是。改成前 6 秒只對齊、不計分：83.87 → 83.91%，偏半格 74.74 → 74.04%（report 20）'),
+     ('2', 'z-score 更新後，buffer 和樹還在同一個座標嗎？', '不在。改成先更新、buffer 轉座標、再訓練：+0.78／偏半格 +1.36 點（20）'),
+     ('3', '缺席類別或休息很多時，會不會越學越差？', '會（−6.4 點）。加「少於 5 類不更新」→ −1.3、不顯著（22）'),
+     ('4', '開機隨便做幾個動作就能對齊嗎？', '不能：只做 Power 5／20 人估錯、只休息 13／20。規定 8 秒做 6 種手勢，少於 60 個視窗不轉（20）'),
+     ('5', '更新期間會不會掉資料、變慢？', f"板子 33 分鐘 {la.selfcal_n:.0f} 次更新：遺失 0、更新期間最大延遲 {ld.latency_max:.1f} ms（21）"),
+     ('6', '「免標籤」到底免了什麼？', '第 1 天一次有標籤校正（每個手勢 2 秒）＋校正檢查；之後免標籤；每次戴上 8 秒的開機流程'),
+     ('7', '斷電後第 1 天的模型還在嗎？', '原本不在。現在存 Flash、load 還原；板子重置後和 PC 逐視窗 100% 相同（23）')],
+    '括號是 report.md 的節號；全部是開發資料或板子實測，沒有真人資料',
+    '這兩頁逐條回應兩輪審查。第一頁是評估與方法：審查指出的兩個漏洞，偷看 block 0 和座標不一致，都成立而且已經修正；'
+    '少數手勢會越學越差也是真的，已經加了停止規則。')
+n_rs += k
+_, k = table_slide(
+    '回答審查（2/2）', '回答審查（2/2）：統計、主張與實驗設計', QHDR,
+    [('8', '同一批 20 人反覆調參？', f"是：{a0:.2f}% 是開發集結果。凍結 pilot-freeze-3，先導只驗證、不再調"),
+     ('9', 'p ≥ 0.05 當作「一樣」？', '不再這樣用。移植正確看逐位比對；等效要事先訂界線做非劣性／TOST'),
+     ('10', '系統邊界？', 'MCU 做所有 EMG 運算與更新；PC 只橋接 Trigno 與 Kinova。定位：wearable-ready 演算法原型'),
+     ('11', '新穎性？', '不說「沒人做」：單核 Cortex-M7、256 KB 預算、分群偽標籤＋換樹、不靠任務目標（[8] 只對齊、[12] 靠任務目標）'),
+     ('12', '人學會了還是模型學會了？', 'AB／BA 交叉；每個條件前 load 回到同一個第 1 天模型；練習段不分析（PROTOCOL）'),
+     ('13', '主終點太多？', '只有一個：第 2 天閉迴路任務成功率；安全主終點：非控制動作誤觸發／分；其他是次要'),
+     ('14', '樣本數？', f"開發資料效果 dz {dz.min():.2f}–{dz.max():.2f}（上限）；16 人可偵測 dz ≥ {mdz.loc[16]:.2f}；先導 3–4 人")],
+    '健常受試者的技術驗證，不推論到截肢者；細節：PROTOCOL.md',
+    '第二頁是統計、主張和實驗設計。主要的改變是：承認目前的數字是開發集結果、把版本凍結；'
+    '主張收斂到單核 M7、記憶體預算和不靠任務目標；實驗用兩天交叉設計，每個條件都從同一個第一天模型開始。')
+n_rs += k
+_, k = table_slide(
+    '正式實驗：', '正式實驗：兩天交叉、一個主終點（PROTOCOL.md 草案）', ('項目', '設計', '待老師確認'),
+    [('對象', '健常受試者；先導 3–4 人，正式 16 人', '樣本數'),
+     ('條件', 'F＝固定的第 1 天模型（adapt 0）；A＝完整系統（adapt 1＋開機對齊）；每個條件前 load', '—'),
+     ('順序', '每天兩個條件，AB 或 BA，第 2 天相反；目標順序隨機；受試者單盲；練習不分析', '—'),
+     ('主終點', '第 2 天閉迴路任務成功率（A − F，配對）', '成功判準、試次數、任務定義'),
+     ('安全終點', '非控制動作段（8 項 × 60 秒）的誤觸發／分鐘', '非劣性界線（0.5／分？）、停止上限（3／分？）'),
+     ('次要', '完成時間、延遲、離線準確率、開機對齊成功率與重試、同日重戴、主觀負擔', '問卷'),
+     ('紀錄', '每次戴上：記號偏差、周長、孔位、照片、姿勢；EMG 與板子的所有輸出', '—')],
+    '分析：配對差與 95% CI（主）、Wilcoxon（敏感度）、順序效果；機制用錄下的 EMG 離線回放。排除條件事先訂好（PROTOCOL.md 第 8 節）',
+    '正式實驗是兩天的交叉設計，每天兩個條件都做、順序平衡，每個條件開始前都還原成同一個第一天模型。'
+    '只有一個主終點，第二天閉迴路任務成功率，加上一個安全終點。右邊一欄是要請老師確認的數值。')
+n_rs += k
+
+# order: main deck, then the appendix
+ORDER = [lambda t: t == '研究方向', lambda t: t == '我想做的事', lambda t: t.startswith('研究問題：'),
+         lambda t: t.startswith('和最接近的研究'), lambda t: t.startswith('STM32 做'), lambda t: t.startswith('韌體架構：'),
+         lambda t: t == '主要結果', lambda t: t.startswith('束帶情境'), lambda t: t.startswith('韌體 v2：'),
+         lambda t: t.startswith('板子上 33 分鐘'), lambda t: t.startswith('壓力測試：'), lambda t: t.startswith('目前完成的目標'),
+         lambda t: t.startswith('還沒完成：'), lambda t: t.startswith('回答審查（1/2）'), lambda t: t.startswith('回答審查（2/2）'),
+         lambda t: t.startswith('失敗條件'), lambda t: t.startswith('正式實驗：'), lambda t: t.startswith('參考文獻（1/2）'),
+         lambda t: t.startswith('參考文獻（2/2）'),
+         lambda t: t == '附錄', lambda t: t.startswith('Flash 存預訓練'), lambda t: t.startswith('PC 基準'),
+         lambda t: t.startswith('壓縮到'), lambda t: t.startswith('偽標籤不需要'), lambda t: t.startswith('z-score 跟著'),
+         lambda t: '跨兩天 demo' in t, lambda t: t.startswith('6 個通道'), lambda t: t.startswith('電極轉一格'),
+         lambda t: t.startswith('舊版研究問題'), lambda t: t.startswith('核心是嵌入式'), lambda t: t.startswith('工作紀錄（1/2）'),
+         lambda t: t.startswith('工作紀錄（2/2）')]
+slides = list(prs.slides)
+ids = prs.slides._sldIdLst
+els = list(ids)
+order, used = [], set()
+for pred in ORDER:
+    hit = [i for i, s in enumerate(slides) if i not in used and pred(ttl(s))]
+    assert len(hit) == 1, ('order', len(hit))
+    used.add(hit[0])
+    order.append(hit[0])
+assert len(order) == len(slides), ('unplaced slides', [ttl(slides[i]) for i in range(len(slides)) if i not in used])
+if order != list(range(len(slides))):
+    for el in els:
+        ids.remove(el)
+    for i in order:
+        ids.append(els[i])
+    n_rs += 1
+first_app = [ttl(s) for s in prs.slides].index('附錄')
+for s in list(prs.slides)[first_app + 1:]:
+    tags = [sh for sh in s.shapes if sh.name == 'Version tag']
+    base = tags[0].text_frame.text.split('附錄｜')[-1] if tags else ''
+    want = '附錄｜' + base if base and base != '附錄' else '附錄'
+    if not tags or tags[0].text_frame.text != want:
+        version_tag(s, want)
+        n_rs += 1
+if n_rs:
+    done.append(f'restructure ({n_rs})')
 
 # ------------------------------------------------------------------ save
 for p_, sl in enumerate(prs.slides, start=1):
