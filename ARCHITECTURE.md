@@ -117,4 +117,5 @@ RAM 的變化（`results/ram_history.csv`）：253.2 KB（加上硬體層）→ 
 | 編譯與 RAM | `src/build_arm_selfcal.py` → `results/arm_selfcal_size.csv`；`src/ram_history.py` → `results/ram_history.csv` |
 | C 對照 Python | `src/check_adapt_c.py`（v2）、`check_selfcal_c.py`、`check_oneshot_c.py`、`check_rt.py`、`check_features_c.py`（舊版） |
 | 實驗 | `src/shift_sweep.py`（電極轉動、開機對齊）、`zscore_sweep.py`（z-score 更新）、`embed_sweep.py`（t-SNE／LDA／不嵌入、buffer 大小）、`aug_sweep.py`（校正資料轉動增強，不採用，第 13 節）、`pool_sweep.py`（從 100／200 棵挑 50 棵，不採用，第 14 節）、`decision_v2.py`（決策 τ × 平滑規則，第 15 節）、`filt_sweep.py`（偽標籤篩選，不採用，第 16 節）、`pca_baseline.py`（比較組 [8] PCA 對齊，第 17 節）、`channel_sweep.py`、`channel_order.py` |
-| 紀錄 | `report.md`；Notion「碩論實驗紀錄」（韌體修改紀錄、設計決定、文獻追蹤） |
+| 實驗（評估有效性） | `causal_check.py`（因果開機對齊、buffer 座標，第 20 節）、`check_align_rt.py`（開機對齊走即時迴圈，20.1） |
+| 紀錄 | `report.md`；`VALIDATION_PLAN.md`（凍結版本 `pilot-freeze-1`、驗收實驗、失敗條件與停止規則）；Notion「碩論實驗紀錄」（韌體修改紀錄、設計決定、文獻追蹤） |
