@@ -17,7 +17,8 @@ SAMPLES, CONTROL, COMMAND, STATUS, PRED = 0x01, 0x02, 0x81, 0x82, 0x83
 # control sub-commands (rt.h)
 STREAM_RESET, CAL_START, CAL_END, CALIBRATE, SET_DECISION, SET_REPORT, ALIGN_START, ALIGN_END = 1, 2, 3, 4, 5, 6, 7, 8
 # status events
-EV_CALIBRATED, EV_SELFCAL, EV_LOST, EV_CAL_FULL, EV_ALIGNED, EV_ALIGN_SHORT = 1, 2, 3, 4, 5, 6
+EV_CALIBRATED, EV_SELFCAL, EV_LOST, EV_CAL_FULL, EV_ALIGNED, EV_ALIGN_SHORT, EV_SC_BEGIN, EV_SC_END = 1, 2, 3, 4, 5, 6, 7, 8
+EV_DIAG_RX_HW, EV_DIAG_STACK, EV_DIAG_RX_OVF, EV_DIAG_RX_ERR = 9, 10, 11, 12   # board main loop (app_rt.c)
 COMMANDS = {0: 'none', 1: 'pose_A', 2: 'grip', 3: 'pose_B', 4: 'release'}
 GESTURES = ['Power', 'Lateral', 'Tripod', 'Pointer', 'Open', 'Rest']
 

@@ -12,3 +12,7 @@ void app_rt_run(void);                       /* never returns */
 void board_rx_start(uint32_t baud);
 uint32_t board_rx_overflow(void);
 uint32_t board_rx_errors(void);
+uint32_t board_rx_highwater(void);           /* largest fill of the 4 KB receive ring (bytes) */
+uint32_t board_stack_peak(void);             /* deepest stack use since board_init (bytes, stack painting) */
+
+#define APP_RT_DIAG_US 10000000u             /* diagnostics (RT_EV_DIAG_*) every 10 s */

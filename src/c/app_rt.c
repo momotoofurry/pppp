@@ -39,8 +39,16 @@ void app_rt_run(void)
     rt_init(&cfg);
     board_set_rx_handler(rt_rx);
     board_rx_start(APP_RT_BAUD);
+    uint32_t last = board_time_us();
     for (;;) {
         rt_idle();
+        if (board_time_us() - last >= APP_RT_DIAG_US) {     /* test A (VALIDATION_PLAN.md): buffer, stack, UART */
+            last = board_time_us();
+            rt_status(RT_EV_DIAG_RX_HW, (int32_t)board_rx_highwater());
+            rt_status(RT_EV_DIAG_STACK, (int32_t)board_stack_peak());
+            rt_status(RT_EV_DIAG_RX_OVF, (int32_t)board_rx_overflow());
+            rt_status(RT_EV_DIAG_RX_ERR, (int32_t)board_rx_errors());
+        }
         board_wait();
     }
 }

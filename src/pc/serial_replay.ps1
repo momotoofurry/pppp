@@ -16,6 +16,8 @@ using System.IO.Ports;
 using System.Threading;
 
 public static class SerialReplay {
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    static extern uint SetThreadExecutionState(uint flags);    // keep the display and the system on while streaming
     public static string Run(string dir, string port, int baud, double tailS) {
         byte[] stream = File.ReadAllBytes(Path.Combine(dir, "stream.bin"));
         var ends = new List<int>(); var times = new List<double>();
@@ -27,11 +29,15 @@ public static class SerialReplay {
         }
         var rx = new MemoryStream(); var rxLog = new List<string>(); var txLog = new List<string>();
         var buf = new byte[65536];
+        string err = "";
+        int start = 0, i = 0;
+        var sw = new Stopwatch();
+        SetThreadExecutionState(0x80000000u | 0x00000002u | 0x00000001u);   // ES_CONTINUOUS | DISPLAY | SYSTEM
+        try {
         using (var sp = new SerialPort(port, baud, Parity.None, 8, StopBits.One)) {
             sp.ReadTimeout = 1; sp.WriteTimeout = 2000; sp.ReadBufferSize = 1 << 20; sp.WriteBufferSize = 1 << 16;
             sp.Open(); sp.DiscardInBuffer();
-            var sw = Stopwatch.StartNew();
-            int start = 0, i = 0;
+            sw.Start();
             double endT = times[times.Count - 1] + tailS;
             while (sw.Elapsed.TotalSeconds < endT) {
                 double now = sw.Elapsed.TotalSeconds;
@@ -50,12 +56,18 @@ public static class SerialReplay {
                 }
             }
         }
+        } catch (Exception e) {                              // keep what was received (the port may vanish)
+            err = string.Format(CultureInfo.InvariantCulture, "ERROR at {0:F1} s after packet {1}: {2}",
+                                sw.Elapsed.TotalSeconds, i, e.Message.Trim());
+            File.WriteAllText(Path.Combine(dir, "error.txt"), err + Environment.NewLine);
+        }
+        SetThreadExecutionState(0x80000000u);
         File.WriteAllBytes(Path.Combine(dir, "rx.bin"), rx.ToArray());
         File.WriteAllLines(Path.Combine(dir, "rx_log.csv"), new[] { "end,ms" });
         File.AppendAllLines(Path.Combine(dir, "rx_log.csv"), rxLog);
         File.WriteAllLines(Path.Combine(dir, "tx_log.csv"), new[] { "packet,ms" });
         File.AppendAllLines(Path.Combine(dir, "tx_log.csv"), txLog);
-        return string.Format("sent {0} packets ({1} bytes), received {2} bytes", ends.Count, stream.Length, rx.Length);
+        return string.Format("sent {0} of {1} packets ({2} bytes), received {3} bytes {4}", i, ends.Count, start, rx.Length, err);
     }
 }
 '@

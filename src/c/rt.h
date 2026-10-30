@@ -39,7 +39,9 @@
  *   RT_ALIGN_END               estimate the rotation from them, back to classification
  * Status events (PK_STATUS): RT_EV_CALIBRATED value = os_calibrate() result, RT_EV_SELFCAL value = blocks done,
  *   RT_EV_LOST value = packets lost in the last gap, RT_EV_CAL_FULL value = calibration windows kept,
- *   RT_EV_ALIGNED value = estimated rotation (-3..4), RT_EV_ALIGN_SHORT value = alignment windows received.
+ *   RT_EV_ALIGNED value = estimated rotation (-3..4), RT_EV_ALIGN_SHORT value = alignment windows received,
+ *   RT_EV_SC_BEGIN value = windows so far when a self-calibration starts, RT_EV_SC_END value = its duration (us);
+ *   the PRED packets between the two are the windows classified while it ran (test A, VALIDATION_PLAN.md).
  */
 #pragma once
 #include <stdint.h>
@@ -62,7 +64,9 @@
 enum { RT_STREAM_RESET = 1, RT_CAL_START = 2, RT_CAL_END = 3, RT_CALIBRATE = 4, RT_SET_DECISION = 5, RT_SET_REPORT = 6,
        RT_ALIGN_START = 7, RT_ALIGN_END = 8 };
 enum { RT_EV_CALIBRATED = 1, RT_EV_SELFCAL = 2, RT_EV_LOST = 3, RT_EV_CAL_FULL = 4, RT_EV_ALIGNED = 5,
-       RT_EV_ALIGN_SHORT = 6 };
+       RT_EV_ALIGN_SHORT = 6, RT_EV_SC_BEGIN = 7, RT_EV_SC_END = 8,
+       /* diagnostics sent by the board main loop (app_rt.c), not by rt.c */
+       RT_EV_DIAG_RX_HW = 9, RT_EV_DIAG_STACK = 10, RT_EV_DIAG_RX_OVF = 11, RT_EV_DIAG_RX_ERR = 12 };
 enum { RT_MODE_IDLE = 0, RT_MODE_CAL = 1, RT_MODE_RUN = 2, RT_MODE_ALIGN = 3 };
 
 typedef struct {
@@ -90,4 +94,5 @@ void rt_rx(const uint8_t *bytes, uint32_t n);    /* real-time context */
 void rt_idle(void);                              /* thread context */
 int rt_mode(void);
 const rt_counters_t *rt_counters(void);
+void rt_status(uint8_t ev, int32_t value);       /* send a PK_STATUS (thread context: the board's diagnostics) */
 const pk_parser_t *rt_parser(void);

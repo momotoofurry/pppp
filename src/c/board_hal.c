@@ -32,8 +32,15 @@ static uint8_t *const s_word = (uint8_t *)s_word_w;
 static uint32_t s_word_addr = 0xFFFFFFFFu;
 static void (*s_rx_handler)(const uint8_t *p, uint32_t n);
 static volatile uint8_t s_rx[RX_RING];
-static volatile uint32_t s_rx_head, s_rx_tail, s_rx_overflow, s_rx_errors;
+static volatile uint32_t s_rx_head, s_rx_tail, s_rx_overflow, s_rx_errors, s_rx_hw;
 static int s_rx_on;
+/* stack painting: the stack grows down from _estack (top of DTCM, nothing else up there); board_init() fills
+ * STACK_PAINT bytes below the current stack pointer with a pattern, board_stack_peak() finds the deepest word
+ * that was overwritten (main loop + all interrupts share the MSP) */
+#define STACK_PAINT 0x8000u
+#define STACK_PATTERN 0xC0FFEE11u
+extern uint32_t _estack[];
+static uint32_t *s_paint_lo;
 
 int board_flash_erase_sector(uint32_t addr)
 {
@@ -94,6 +101,23 @@ void board_init(void)
     DWT->LAR = 0xC5ACCE55u;                           /* unlock the DWT (Cortex-M7) */
     DWT->CYCCNT = 0;
     DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+    uint32_t *top = (uint32_t *)(__get_MSP() & ~3u) - 16;  /* leave this frame alone */
+    s_paint_lo = (uint32_t *)((uintptr_t)_estack - STACK_PAINT);
+    for (uint32_t *p = s_paint_lo; p < top; p++)
+        *p = STACK_PATTERN;
+}
+
+uint32_t board_stack_peak(void)
+{
+    const uint32_t *p = s_paint_lo;
+    while (p < _estack && *p == STACK_PATTERN)
+        p++;
+    return (uint32_t)((const uint8_t *)_estack - (const uint8_t *)p);
+}
+
+uint32_t board_rx_highwater(void)
+{
+    return s_rx_hw;
 }
 
 uint32_t board_time_us(void)
@@ -175,6 +199,9 @@ void USART3_IRQHandler(void)
         } else {
             s_rx[s_rx_head] = b;
             s_rx_head = next;
+            uint32_t depth = (next - s_rx_tail) & (RX_RING - 1u);
+            if (depth > s_rx_hw)
+                s_rx_hw = depth;
         }
     }
 }

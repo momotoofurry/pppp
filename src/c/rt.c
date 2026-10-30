@@ -277,8 +277,10 @@ void rt_idle(void)
         sc_stats_t st;
         s_sc_running = 1;
         s_sc_request = 0;
+        uint32_t t0 = now();
+        status(RT_EV_SC_BEGIN, (int32_t)s_cnt.windows);
 #if RT_ADAPT
-        ad_stats_t ast;                         /* the real-time context may read the statistics meanwhile: a
+        ad_stats_t ast;                       /* the real-time context may read the statistics meanwhile: a
                                                    window then mixes old and new values of a few features */
 #if RT_RESCALE
         ad_end_block_map(&ast, s_map_scale, s_map_offset);
@@ -293,9 +295,15 @@ void rt_idle(void)
         sc_end_block(&st);
 #endif
         s_sc_running = 0;
+        status(RT_EV_SC_END, (int32_t)(now() - t0));
         s_cnt.selfcal_blocks++;
         status(RT_EV_SELFCAL, (int32_t)s_cnt.selfcal_blocks);
     }
+}
+
+void rt_status(uint8_t ev, int32_t value)
+{
+    status(ev, value);
 }
 
 int rt_mode(void)

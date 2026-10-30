@@ -411,7 +411,9 @@ static class Program
         if (type == Proto.STATUS && p.Length >= 8) {
             int ev = p[0], v = BitConverter.ToInt32(p, 4);
             string[] names = { "", "calibrated (0 = ok)", "self-calibration blocks", "packets lost", "calibration windows", "rotation",
-                               "alignment too short, rotation unchanged (windows)" };
+                               "alignment too short, rotation unchanged (windows)",
+                               "self-calibration start (windows so far)", "self-calibration took (us)", "receive ring high-water (bytes)",
+                               "stack peak (bytes)", "UART bytes dropped", "UART errors" };
             return string.Format(IC, "status,,,,,,,,{0},{1}", ev < names.Length ? names[ev] : ev.ToString(), v);
         }
         return "unknown,type " + type + ",len " + p.Length + ",,,,,,,";
