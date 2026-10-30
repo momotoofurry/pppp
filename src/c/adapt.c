@@ -195,6 +195,30 @@ void ad_end_block_map(ad_stats_t *st, float *scale, float *offset)
     memset(s_cm2, 0, sizeof s_cm2);
 }
 
+#if SC_ROLLBACK
+static float s_mu_bak[SC_DIM], s_var_bak[SC_DIM];
+
+void ad_save(void)
+{
+    memcpy(s_mu_bak, s_mu, sizeof s_mu);
+    memcpy(s_var_bak, s_var, sizeof s_var);
+}
+
+void ad_skip_block(void)
+{
+    memset(s_cn, 0, sizeof s_cn);
+    memset(s_cm, 0, sizeof s_cm);
+    memset(s_cm2, 0, sizeof s_cm2);
+}
+
+void ad_restore(void)
+{
+    memcpy(s_mu, s_mu_bak, sizeof s_mu);
+    memcpy(s_var, s_var_bak, sizeof s_var);
+    refresh_inv();
+}
+#endif
+
 const float *ad_mean(void)
 {
     return s_mu;

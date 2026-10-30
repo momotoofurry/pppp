@@ -187,6 +187,40 @@ int sc_predict(const int16_t *x)
     return votes_sc(x, v);
 }
 
+#if SC_ROLLBACK
+/* candidate rollback rule (report 22, PC only): keep the previous trees, check the updated model on the stored
+ * calibration rows, restore if it got worse */
+static ram_tree_t s_tree_bak[SC_N_APP];
+static uint8_t s_ram_bak[SC_N_APP];
+
+void sc_save(void)
+{
+    memcpy(s_tree_bak, s_tree, sizeof s_tree);
+    for (int s = 0; s < SC_N_APP; s++)
+        s_ram_bak[s] = s_ram[s];
+}
+
+void sc_restore(void)
+{
+    memcpy(s_tree, s_tree_bak, sizeof s_tree);
+    for (int s = 0; s < SC_N_APP; s++)
+        s_ram[s] = s_ram_bak[s];
+}
+
+void sc_skip_block(void)
+{
+    s_in_block = 0;                             /* the block's rows stay in the buffer; no pseudo-labels, no trees */
+}
+
+int sc_cal_correct(void)
+{
+    int ok = 0;
+    for (int i = 0; i < s_ncal; i++)
+        ok += sc_predict(s_cal[i]) == s_cal_y[i];
+    return ok;
+}
+#endif
+
 int sc_votes_oneshot(const int16_t *x, uint16_t *v)
 {
     memset(v, 0, sizeof(uint16_t) * SC_CLASSES);

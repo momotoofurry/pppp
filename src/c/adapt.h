@@ -52,6 +52,11 @@ void ad_end_block(ad_stats_t *st);
 /* same; if updated, also scale / offset (SC_DIM each, may be 0): q_new = q_old * scale + offset maps a Q5.10 row
  * normalised with the old statistics to the new ones (sc_rescale, report 20) */
 void ad_end_block_map(ad_stats_t *st, float *scale, float *offset);
+#if SC_ROLLBACK
+void ad_save(void);             /* stress tests (report 22): keep / restore the z-score statistics */
+void ad_restore(void);
+void ad_skip_block(void);       /* drop the block's class accumulators without an update */
+#endif
 const float *ad_mean(void);     /* current statistics (for the PC check) */
 const float *ad_var(void);
 unsigned ad_static_bytes(void);

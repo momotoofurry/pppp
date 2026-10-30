@@ -41,6 +41,9 @@
 #ifndef SC_EMBED
 #define SC_EMBED 0
 #endif
+#ifndef SC_ROLLBACK
+#define SC_ROLLBACK 0           /* 1: sc_save / sc_restore / sc_cal_correct (stress tests, report 22; not in the firmware) */
+#endif
 #ifndef SC_TSNE_ITER
 #define SC_TSNE_ITER 500
 #endif
@@ -106,4 +109,10 @@ void sc_end_block(sc_stats_t *st);
 /* after a z-score update: every buffered row q -> q * scale + offset (per feature, Q5.10), so that the buffer is
  * in the current statistics; with_cal: the calibration rows too (rt.c with RT_RESCALE, report 20) */
 void sc_rescale(const float *scale, const float *offset, int with_cal);
+#if SC_ROLLBACK
+void sc_save(void);                 /* copy the RAM trees and slot flags */
+void sc_restore(void);              /* back to the last sc_save() */
+int sc_cal_correct(void);           /* calibration rows the current model classifies correctly */
+void sc_skip_block(void);           /* end the block without an update */
+#endif
 unsigned sc_static_bytes(void);

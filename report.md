@@ -1191,11 +1191,39 @@ buffer 座標（括號是和同一種對齊的 `base` 比：差、變好／變�
 - 限制：只有 1 位受試者的錄音、同一批資料重複 3 次（準確率 91% 不能當泛化效能，後面的重複已經看過前面的資料）；
   PC 只送資料，沒有同時接 Trigno 與 Kinova；量的是傳輸＋運算延遲，不是使用者的反應時間。
 
+## 22. 驗收 B：壓力測試與回退規則（開發資料，Docker，2026-10-30；`src/stress_check.py` → `results/stress_check*.csv`）
+
+- C 版韌體（6 秒因果開機對齊＋R3），20 人 × 3 seed（每人先平均 3 seed，p 是 20 人配對 Wilcoxon）。情況：
+  `base` 照錄的 block；`rest2` 每個 block 只留 Rest、Tripod、Open（約 150 個視窗）；`absent` Power 在 block 1–6 消失、7–10 回來；
+  `wrong` block 1–4 用電極整圈轉 1 格的錄音（開機對齊後束帶滑掉，沒有重新對齊）、5–10 恢復；`half` 校正每個手勢只用前 5 個視窗；
+  `low` 校正的原始 EMG × 0.5 再算特徵（出力弱；ZC／SSC 的門檻作用在縮小後的訊號上）。
+- 候選規則：`abs90`／`abs80` 更新後的模型在存著的校正資料上準確率 < 90%／80% 就退回（樹、z-score、buffer 座標都還原）；
+  `drop05`／`drop10` 比更新前低 > 5／10 點就退回；`cls4`／`cls5` 這個 block 的預測裡 ≥ 5 個視窗的類別少於 4／5 類就整次不更新。
+- 「重點」欄：`absent` 是 Power 回來後（block 7–10）的召回率，`wrong` 是恢復後（block 5–10）的準確率，其他是 block 1–10。
+
+| 情況（重點） | 固定模型 | 韌體 | abs90 | drop05 | cls4 | cls5 |
+|---|---|---|---|---|---|---|
+| base | 79.22 | **84.71** | 84.71 | 84.71 | 84.71 | 84.73 |
+| rest2 | **87.71** | 81.29（−6.42，18／20 人變差，最差 −24.0） | 81.29 | 81.36 | 83.18 | **86.40**（−1.31，p = 0.38） |
+| absent（Power 召回） | 74.07 | 76.43（+2.37，p = 0.29；最差 −25.7） | 76.43 | 76.43 | 76.43 | 77.62 |
+| wrong（恢復後） | 78.69 | 81.64（+2.94，p = 0.027；平均 2.1 個 block 回到正常的 2 點內，20／20 都回得來） | 81.64 | 81.81 | 81.89 | 81.80 |
+| half | 79.22 | 84.84（+5.62） | 84.84 | 84.84 | 84.84 | 84.88 |
+| low | 42.23 | **72.66**（+30.42，20／20） | 71.04 | 68.41 | 70.95 | 62.77（比韌體 −9.89，12／20 人變差） |
+
+- `rest2` 時韌體把沒出現的手勢（Power、Lateral、Pointer）預測出來的比例從 10.6%（固定模型）升到 18.0%；cls5 降到 12.6%。
+- 結論：
+  1. **最嚴重的失敗模式是「一段時間只出現少數手勢」**：自我校正比不更新還差 6.4 點、有人差 24 點。這正是真實使用（大多休息、只夾放）會發生的情況。
+  2. **用校正資料檢查的回退規則沒有用**：在 rest2 幾乎不觸發（模型在校正資料上仍然很準），在 low 反而把該做的更新退回去（drop05 −4.25）。不採用。
+  3. **cls5（少於 5 類就不更新）擋住了 rest2**（−6.42 → −1.31，不顯著），base／half／wrong 不受影響、absent 小幅變好；
+     但第 1 天校正很差（low）時，一開始預測集中在少數類，更新一直被跳過，拉不回來（比韌體低 9.9 點）。
+  4. 所以兩者互斥：要嘛靠 cls5 防止少數手勢時越學越差，同時在第 1 天確認校正品質（不合格就重做校正）；要嘛維持現狀、把 rest2 寫成限制。
+- 限制：開發資料（同一批 20 人），規則和門檻都在這裡挑；`rest2`、`absent` 是把錄音挑掉一部分，不是真的休息時的訊號；`low` 只模擬整體振幅變小。
+
 ---
 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`causal_check.py`、`check_align_rt.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`board_replay.py`、`app_rt.c`、`src/pc/*`（含 `serial_replay.ps1`）、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`causal_check.py`、`check_align_rt.py`、`stress_check.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`board_replay.py`、`app_rt.c`、`src/pc/*`（含 `serial_replay.ps1`）、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
-| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`causal_check*.csv`、`align_rt_check.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
+| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`causal_check*.csv`、`align_rt_check.csv`、`stress_check*.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
