@@ -11,6 +11,10 @@
 //       MCU packets -> mcu.csv and the console. Commands typed while running:
 //         reset | cal <0-5> | calend | calibrate | align | decision <tau_permille> <k> | report <0|1> | status | quit
 //       cal <g> = reset + CAL_START; CAL_END follows by itself after 2 s of samples (10 windows per gesture).
+//       adapt 0|1 = study condition: 0 fixed day-1 model (no adaptation, no alignment), 1 full system (default);
+//       start every condition with 'load' so that both begin from the same day-1 model (PROTOCOL.md).
+//       load = restore the day-1 model from the board's Flash (after the board was off, e.g. on day 2; the
+//       board answers 'day-1 model loaded (calibration rows)', a negative value = no valid model: calibrate).
 //       verify <g> = reset, then the next 10 predictions are scored against gesture g (needs report 1); after all
 //       6 gestures: PASS if >= 70 % of the 60 windows are right, else redo the calibration (report 22).
 //       align = reset + ALIGN_START; ALIGN_END follows by itself after 8 s (70 windows; the MCU needs >= 60 and
@@ -34,7 +38,7 @@ static class Proto
 {
     public const byte SAMPLES = 0x01, CONTROL = 0x02, COMMAND = 0x81, STATUS = 0x82, PRED = 0x83;
     public const byte STREAM_RESET = 1, CAL_START = 2, CAL_END = 3, CALIBRATE = 4, SET_DECISION = 5, SET_REPORT = 6,
-                      ALIGN_START = 7, ALIGN_END = 8;
+                      ALIGN_START = 7, ALIGN_END = 8, LOAD = 9, SET_ADAPT = 10;
     public const int CH = 8, FRAMES_PER_PACKET = 20, MAX_PAYLOAD = 512, OVERHEAD = 9;
     public const double LSB_VOLT = 2.5e-7;
     public static readonly string[] GESTURES = { "Power", "Lateral", "Tripod", "Pointer", "Open", "Rest" };
@@ -67,7 +71,7 @@ static class Proto
 
     public static byte[] Control(byte sub, params int[] args)
     {
-        if (sub == CAL_START || sub == SET_REPORT) return Build(CONTROL, new byte[] { sub, (byte)args[0] });
+        if (sub == CAL_START || sub == SET_REPORT || sub == SET_ADAPT) return Build(CONTROL, new byte[] { sub, (byte)args[0] });
         if (sub == SET_DECISION)
             return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)(args[0] >> 8), (byte)args[1] });
         return Build(CONTROL, new byte[] { sub });
@@ -403,10 +407,12 @@ static class Program
             return true;
         }
         else if (c == "calibrate") Send(Proto.Control(Proto.CALIBRATE));
+        else if (c == "load") Send(Proto.Control(Proto.LOAD));
+        else if (c == "adapt" && p.Length == 2 && (p[1] == "0" || p[1] == "1")) Send(Proto.Control(Proto.SET_ADAPT, int.Parse(p[1])));
         else if (c == "decision" && p.Length == 3) Send(Proto.Control(Proto.SET_DECISION, int.Parse(p[1]), int.Parse(p[2])));
         else if (c == "report" && p.Length == 2) Send(Proto.Control(Proto.SET_REPORT, int.Parse(p[1])));
         else if (c == "status") return true;
-        else { Console.WriteLine("? reset | cal <0-5> | calend | calibrate | verify <0-5> | align | decision <tau_permille> <k> | report <0|1> | status | quit"); return false; }
+        else { Console.WriteLine("? reset | cal <0-5> | calend | calibrate | load | adapt <0|1> | verify <0-5> | align | decision <tau_permille> <k> | report <0|1> | status | quit"); return false; }
         Console.WriteLine(string.Format(IC, "[{0:F1} s] sent: {1}", clock.Elapsed.TotalSeconds, line.Trim()));
         return true;
     }
@@ -448,7 +454,8 @@ static class Program
                                "alignment too short, rotation unchanged (windows)",
                                "self-calibration start (windows so far)", "self-calibration took (us)", "receive ring high-water (bytes)",
                                "stack peak (bytes)", "UART bytes dropped", "UART errors",
-                               "self-calibration skipped: too few gestures (classes)" };
+                               "self-calibration skipped: too few gestures (classes)",
+                               "day-1 model loaded (calibration rows; < 0 = none, calibrate)" };
             return string.Format(IC, "status,,,,,,,,{0},{1}", ev < names.Length ? names[ev] : ev.ToString(), v);
         }
         return "unknown,type " + type + ",len " + p.Length + ",,,,,,,";
@@ -488,7 +495,7 @@ static class Program
             var input = new Thread(() => { string l; while (!stop && (l = Console.ReadLine()) != null) DoCommand(l); });
             input.IsBackground = true;
             input.Start();
-            Console.WriteLine("commands: reset | cal <0-5> | calend | calibrate | verify <0-5> | align | decision <tau> <k> | report <0|1> | status | quit");
+            Console.WriteLine("commands: reset | cal <0-5> | calend | calibrate | load | adapt <0|1> | verify <0-5> | align | decision <tau> <k> | report <0|1> | status | quit");
         }
 
         Console.WriteLine("START -> " + tcu.Command("START"));

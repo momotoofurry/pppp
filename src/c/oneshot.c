@@ -401,12 +401,17 @@ int os_calibrate(const os_table_t *pre, const uint8_t *y, int n, uint32_t seed, 
             st->app_leaves_max = leaves;
     }
     st->app_nodes = (int)h->n_nodes;
-    /* 4. bitmap, then the header (last: an image without a valid header is ignored) */
+    /* 4. bitmap, the calibration (features, labels), then the header (last: an image without a valid header is
+     *    ignored) */
     h->off_bits = align(off);
-    h->bytes = h->off_bits + h->bits_bytes;
+    h->off_feat = align(h->off_bits + h->bits_bytes);
+    h->off_y = align(h->off_feat + (uint32_t)n * SC_DIM * (uint32_t)sizeof(float));
+    h->bytes = h->off_y + (uint32_t)n;
     if (h->bytes > w->capacity)
         return -4;
-    if (w->write(w->ctx, h->off_bits, sc->bits, h->bits_bytes) != 0 || w->write(w->ctx, 0, h, sizeof *h) != 0)
+    if (w->write(w->ctx, h->off_bits, sc->bits, h->bits_bytes) != 0 ||
+        w->write(w->ctx, h->off_feat, sc->feat, (uint32_t)n * SC_DIM * (uint32_t)sizeof(float)) != 0 ||
+        w->write(w->ctx, h->off_y, y, (uint32_t)n) != 0 || w->write(w->ctx, 0, h, sizeof *h) != 0)
         return -3;
     st->image_bytes = h->bytes;
     return 0;
@@ -429,4 +434,15 @@ int os_model(const void *image, const os_table_t *pre, sc_model_t *m)
     m->app_nodes = (const sc_node_t *)(base + h->off_nodes);
     m->app_roots = h->app_roots;
     return 0;
+}
+
+int os_cal_data(const void *image, const float **feat, const uint8_t **y)
+{
+    const os_header_t *h = image;
+    if (h->magic != OS_MAGIC || h->version != OS_VERSION || h->n_cal < 2 || h->n_cal > OS_CAL_MAX)
+        return -1;
+    const uint8_t *base = image;
+    *feat = (const float *)(base + h->off_feat);
+    *y = base + h->off_y;
+    return (int)h->n_cal;
 }

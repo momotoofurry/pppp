@@ -37,12 +37,18 @@
  *   RT_SET_REPORT flags u8     bit 0: send PK_PRED for every classified window
  *   RT_ALIGN_START             (RT_ADAPT, after calibration) the following windows are alignment windows
  *   RT_ALIGN_END               estimate the rotation from them, back to classification
+ *   RT_LOAD                    restore the day-1 state from the one-shot image in Flash (model, z-score, calibration
+ *                              rows, alignment profile; adaptation starts again): after a reboot, or to start a
+ *                              study condition from the same initial model. Adapted trees are never written to Flash.
+ *   RT_SET_ADAPT on u8          1 (default after reset): full system; 0: fixed day-1 model, windows are classified but
+ *                              never buffered, so there is no z-score update, no self-calibration and no alignment
  * Status events (PK_STATUS): RT_EV_CALIBRATED value = os_calibrate() result, RT_EV_SELFCAL value = blocks done,
  *   RT_EV_LOST value = packets lost in the last gap, RT_EV_CAL_FULL value = calibration windows kept,
  *   RT_EV_ALIGNED value = estimated rotation (-3..4), RT_EV_ALIGN_SHORT value = alignment windows received,
  *   RT_EV_SC_BEGIN value = windows so far when a self-calibration starts, RT_EV_SC_END value = its duration (us);
  *   the PRED packets between the two are the windows classified while it ran (test A, VALIDATION_PLAN.md);
- *   RT_EV_SC_SKIP value = predicted classes in the block, when the update was skipped (RT_MIN_CLASSES).
+ *   RT_EV_SC_SKIP value = predicted classes in the block, when the update was skipped (RT_MIN_CLASSES),
+ *   RT_EV_LOADED value = calibration rows restored by RT_LOAD (> 0), or -1 no valid image / -5 bad model.
  */
 #pragma once
 #include <stdint.h>
@@ -68,12 +74,12 @@
 #endif
 
 enum { RT_STREAM_RESET = 1, RT_CAL_START = 2, RT_CAL_END = 3, RT_CALIBRATE = 4, RT_SET_DECISION = 5, RT_SET_REPORT = 6,
-       RT_ALIGN_START = 7, RT_ALIGN_END = 8 };
+       RT_ALIGN_START = 7, RT_ALIGN_END = 8, RT_LOAD = 9, RT_SET_ADAPT = 10 };
 enum { RT_EV_CALIBRATED = 1, RT_EV_SELFCAL = 2, RT_EV_LOST = 3, RT_EV_CAL_FULL = 4, RT_EV_ALIGNED = 5,
        RT_EV_ALIGN_SHORT = 6, RT_EV_SC_BEGIN = 7, RT_EV_SC_END = 8,
        /* diagnostics sent by the board main loop (app_rt.c), not by rt.c */
        RT_EV_DIAG_RX_HW = 9, RT_EV_DIAG_STACK = 10, RT_EV_DIAG_RX_OVF = 11, RT_EV_DIAG_RX_ERR = 12,
-       RT_EV_SC_SKIP = 13 };
+       RT_EV_SC_SKIP = 13, RT_EV_LOADED = 14 };
 enum { RT_MODE_IDLE = 0, RT_MODE_CAL = 1, RT_MODE_RUN = 2, RT_MODE_ALIGN = 3 };
 
 typedef struct {

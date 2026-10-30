@@ -47,6 +47,7 @@ WARMUP = 9
 FS = 2000.0
 SUBJECT = 0
 REC_FRAMES = 4000                                       # every recording of the data set: 2 s
+REBOOT, WIPE_HEADER, IDLE = b"REBOOT", b"WIPE_HEADER", b"IDLE"   # run_stream test markers
 
 
 def packets(blocks, repeat=1, continuous=False):
@@ -97,19 +98,36 @@ def packets(blocks, repeat=1, continuous=False):
     return out, pd.DataFrame(wins)
 
 
-def make(blocks, repeat=1, continuous=False):
-    pk, wins = packets(blocks, repeat, continuous)
-    os.makedirs(D, exist_ok=True)
-    off = 0
-    with open(os.path.join(D, 'stream.bin'), 'wb') as fh:
-        rows = []
+def write_stream(d, pk, wins=None):
+    os.makedirs(d, exist_ok=True)
+    off, rows = 0, []
+    with open(os.path.join(d, 'stream.bin'), 'wb') as fh:
         for b, t in pk:
             fh.write(b)
             off += len(b)
             rows.append((off, t))
-    pd.DataFrame(rows, columns=['end', 't_s']).to_csv(os.path.join(D, 'schedule.csv'), index=False, float_format='%.4f')
-    wins.to_csv(os.path.join(D, 'windows.csv'), index=False)
-    print(f'{len(pk)} packets, {off} bytes, {rows[-1][1]:.1f} s; {len(wins)} test windows; {D}')
+    pd.DataFrame(rows, columns=['end', 't_s']).to_csv(os.path.join(d, 'schedule.csv'), index=False, float_format='%.4f')
+    if wins is not None:
+        wins.to_csv(os.path.join(d, 'windows.csv'), index=False)
+    print(f'{len(pk)} packets, {off} bytes, {rows[-1][1]:.1f} s; {0 if wins is None else len(wins)} test windows; {d}')
+
+
+def make(blocks, repeat=1, continuous=False, split_load=False):
+    pk, wins = packets(blocks, repeat, continuous)
+    if not split_load:
+        write_stream(D, pk, wins)
+        return
+    # report 23: <D>/cal = calibration only; then the board is reset; <D> = SET_REPORT 1 + RT_LOAD + the test blocks
+    cal = next(i for i, (b, _) in enumerate(pk) if b[2] == PR.CONTROL and b[7] == PR.CALIBRATE)
+    write_stream(os.path.join(D, 'cal'), pk[:cal + 1] + [(PR.build(PR.CONTROL, 0, PR.control_payload(PR.SET_REPORT, 0)),
+                                                          pk[cal][1] + 3.0)])
+    enc = PR.Encoder()
+    t0 = pk[cal + 1][1]
+    head = [(enc.control(PR.SET_REPORT, 1), 0.0), (enc.control(PR.LOAD), 0.0)]
+    tail = [(b, t - t0 + 1.0) for b, t in pk[cal + 1:]]
+    wins = wins.copy()
+    wins['packet'] = wins.packet - (cal + 1) + len(head)
+    write_stream(D, head + tail, wins)
 
 
 def pc_reference(blocks, delay, repeat=1, continuous=False):
@@ -150,9 +168,18 @@ def run_stream(pk, delay, lib_path=LIB, defines=()):
     lib.rt_init(ctypes.byref(cfg))
     pending = None
     for b, _ in pk:
+        if b == REBOOT:                                         # test markers (check_load_rt.py), not sent
+            lib.rt_init(ctypes.byref(cfg))
+            continue
+        if b == WIPE_HEADER:                                    # the image header was never written (power cut)
+            flash[:512] = 0xFF
+            continue
+        if b == IDLE:                                           # the main loop runs (a pending self-calibration)
+            lib.rt_idle()
+            continue
         lib.rt_rx(ctypes.c_char_p(b), len(b))
         c = lib.rt_counters().contents
-        if b[2] == PR.CONTROL and b[7] == PR.CALIBRATE:
+        if b[2] == PR.CONTROL and b[7] in (PR.CALIBRATE, PR.LOAD):
             lib.rt_idle()
         elif c.pushed and c.pushed // 300 > c.selfcal_blocks:   # a self-calibration is due
             if pending is None:
@@ -163,7 +190,7 @@ def run_stream(pk, delay, lib_path=LIB, defines=()):
     return pd.DataFrame(preds), status
 
 
-def decode(blocks, delay, repeat=1, tag='', until_s=None, continuous=False):
+def decode(blocks, delay, repeat=1, tag='', until_s=None, continuous=False, split_load=False):
     """until_s: keep only the windows (and status events) up to that send time (the rest of a run that broke off)"""
     wins = pd.read_csv(os.path.join(D, 'windows.csv'))
     rx = open(os.path.join(D, 'rx.bin'), 'rb').read()
@@ -211,7 +238,8 @@ def decode(blocks, delay, repeat=1, tag='', until_s=None, continuous=False):
     assert len(ref) >= len(wins), (len(ref), len(wins))
     wins['pc'] = ref['class_id'].values[:len(wins)]
     wins['pc_window'] = ref['window'].values[:len(wins)]
-    assert (wins.board_window == wins.pc_window).all()
+    if not split_load:                                        # after a reboot the board counts windows from 0
+        assert (wins.board_window == wins.pc_window).all()
     if until_s:
         wins = wins[wins.packet.map(sent) <= cut_ms].copy()
         print(f'kept the {len(wins)} windows sent in the first {until_s} s')
@@ -265,15 +293,16 @@ def main():
     ap.add_argument('--continuous', action='store_true', help='no reset between test recordings (test A)')
     ap.add_argument('--dir', default=None, help='stream folder (default build/board_replay)')
     ap.add_argument('--tag', default='', help='suffix of the results files')
+    ap.add_argument('--split-load', action='store_true', help='calibration, reset, RT_LOAD + test (report 23)')
     ap.add_argument('--until-s', type=float, default=None, help='decode: only the first seconds of a broken-off run')
     args = ap.parse_args()
     global D
     if args.dir:
         D = os.path.join(P.ROOT, args.dir)
     if args.mode == 'make':
-        make(args.blocks, args.repeat, args.continuous)
+        make(args.blocks, args.repeat, args.continuous, args.split_load)
     else:
-        decode(args.blocks, args.delay, args.repeat, args.tag, args.until_s, args.continuous)
+        decode(args.blocks, args.delay, args.repeat, args.tag, args.until_s, args.continuous, args.split_load)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,6 @@
+case,preds,loaded,selfcal,same_as_A,fixed_differs_from_A
+A,600,,1,,
+B,600,60.0,1,True,
+C,0,-1.0,0,,
+D,1200,60.0,3,True,
+E,1200,60.0,1,True,36.0

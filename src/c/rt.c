@@ -13,13 +13,14 @@ static pk_parser_t s_pk;
 static rt_counters_t s_cnt;
 static dc_state_t s_dc;
 static volatile int s_mode;
-static volatile uint8_t s_sc_request, s_sc_running, s_cal_request;
+static volatile uint8_t s_sc_request, s_sc_running, s_cal_request, s_load_request;
 static uint8_t s_cal_y[OS_CAL_MAX];
 static int s_cal_label = -1;
 static uint16_t s_rx_seq;
 static int s_have_seq;
 static uint32_t s_win_since_reset, s_in_block;
 static uint8_t s_report;
+static uint8_t s_adapt = 1;                     /* 0: fixed day-1 model (study condition), nothing buffered or updated */
 static const os_header_t *s_hdr;
 static uint16_t s_tx_seq[3];                    /* COMMAND, PRED, STATUS */
 static float s_feat[FE_DIM];
@@ -76,11 +77,12 @@ void rt_init(const rt_config_t *cfg)
     fe_init();
     stream_reset();
     s_mode = RT_MODE_IDLE;
-    s_sc_request = s_sc_running = s_cal_request = 0;
+    s_sc_request = s_sc_running = s_cal_request = s_load_request = 0;
     s_cal_label = -1;
     s_have_seq = 0;
     s_in_block = 0;
     s_report = 0;
+    s_adapt = 1;
     s_hdr = 0;
 }
 
@@ -117,7 +119,7 @@ static void on_window(void)
 #else
     os_normalize(s_hdr, s_feat, s_q);
 #endif
-    if (!s_sc_request && !s_sc_running) {
+    if (s_adapt && !s_sc_request && !s_sc_running) {
         int lab = sc_push_votes(s_q, votes);
 #if RT_ADAPT
         ad_observe(s_al, lab);                  /* not while self-calibration runs: ad_end_block() follows it */
@@ -205,6 +207,12 @@ static void on_control(const uint8_t *p, uint16_t len)
         if (s_mode == RT_MODE_CAL)
             s_cal_request = 1;
         break;
+    case RT_LOAD:                               /* back to the day-1 model in Flash (after a reboot / between conditions) */
+        if ((s_mode == RT_MODE_IDLE || s_mode == RT_MODE_RUN) && !s_sc_running && !s_sc_request && !s_cal_request) {
+            s_mode = RT_MODE_IDLE;              /* nothing is classified until rt_idle() has loaded it */
+            s_load_request = 1;
+        }
+        break;
     case RT_SET_DECISION:
         if (len >= 4)
             dc_init(&s_dc, (uint16_t)(p[1] | (p[2] << 8)), p[3]);
@@ -213,9 +221,13 @@ static void on_control(const uint8_t *p, uint16_t len)
         if (len >= 2)
             s_report = p[1];
         break;
+    case RT_SET_ADAPT:                          /* study condition: 1 full system, 0 fixed day-1 model */
+        if (len >= 2 && !s_sc_running && !s_sc_request)
+            s_adapt = p[1] ? 1 : 0;
+        break;
 #if RT_ADAPT
     case RT_ALIGN_START:
-        if (s_mode == RT_MODE_RUN && !s_sc_running && !s_sc_request) {
+        if (s_mode == RT_MODE_RUN && s_adapt && !s_sc_running && !s_sc_request) {
             ad_align_reset();
             s_mode = RT_MODE_ALIGN;
         }
@@ -272,6 +284,30 @@ void rt_idle(void)
         s_cnt.calibrate_result = r;
         s_cal_request = 0;
         status(RT_EV_CALIBRATED, r);
+    }
+    if (s_load_request) {
+        const float *feat;
+        const uint8_t *y;
+        sc_model_t m;
+        int n = os_cal_data(s_cfg.image, &feat, &y);
+        int r = n < 0 ? -1 : os_model(s_cfg.image, s_cfg.pre, &m) != 0 ? -5 : 0;
+        if (r == 0) {                           /* the same state as right after RT_CALIBRATE on day 1 */
+            const os_header_t *h = (const os_header_t *)s_cfg.image;
+            int16_t *q = (int16_t *)os_cal_rows();
+            for (int i = 0; i < n; i++)
+                os_normalize(h, feat + i * SC_DIM, q + i * SC_DIM);
+            memcpy(s_cal_y, y, (size_t)n);
+            s_cnt.cal_windows = (uint32_t)n;
+            sc_init(&m, q, s_cal_y, n, s_cfg.seed + 1u);
+            s_hdr = h;
+#if RT_ADAPT
+            ad_init(h->mu, h->inv_sd, feat, n);
+#endif
+            s_in_block = 0;
+            s_mode = RT_MODE_RUN;
+        }
+        s_load_request = 0;
+        status(RT_EV_LOADED, r == 0 ? n : r);
     }
     if (s_sc_request) {
         sc_stats_t st;

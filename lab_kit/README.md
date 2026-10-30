@@ -70,9 +70,20 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
 其他指令：`decision 600 3`（τ = 0.6、k = 3）、`report 0`（關掉每個視窗的回報）、`reset`（新的一段錄音）、
 `calend`（提早結束這個手勢的收集）、`status`。
 
+### 第 2 天（或板子斷過電）：先 `load`
+
+第 1 天的模型存在板子的 Flash 裡，斷電也不會消失。`run.bat` 開起來以後先輸入 `report 1`、`load`，**應該看到**
+`MCU: status,...,day-1 model loaded (calibration rows; < 0 = none, calibrate),60`。看到負數代表板子裡沒有有效的模型，要重新校正。
+`load` 也會把自我校正學到的東西清掉、回到第 1 天的狀態（正式實驗每個條件開始前都要做，`PROTOCOL.md`）。
+
+### 實驗條件
+
+- 固定模型（F）：`load`、`adapt 0`（不做開機對齊）
+- 完整系統（A）：`load`、`adapt 1`、`align`
+
 ### 重新戴上感測器以後（例如第 2 天）：開機對齊
 
-板子不斷電、校正過的模型還在時，重新戴上束帶後先做開機對齊（估計束帶整圈轉了幾格）：
+完整系統（`adapt 1`）時，重新戴上束帶後先做開機對齊（估計束帶整圈轉了幾格）：
 
 1. 輸入 `align`，**接下來 8 秒依序做 6 個手勢，每個約 1 秒**：Power、Lateral、Tripod、Pointer、Open、Rest。
 2. 8 秒後程式自動結束，**應該看到** `MCU: status,...,rotation,<數字>`（−3～4，束帶轉了幾格）。

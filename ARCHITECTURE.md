@@ -34,7 +34,7 @@
 | 階段 | 使用者做什麼 | MCU 做什麼 | 控制指令 |
 |---|---|---|---|
 | 第 1 天：one-shot 校正 | 6 個手勢各做 1 次（約 60 個視窗）；接著每個手勢再做 1 次驗證（TrignoBridge `verify`），認對 < 70% 就重做校正 | 算 z-score 統計值、用校正資料剪枝 50 棵預訓練樹、訓練 50 棵新樹，寫進 Flash 一次（`oneshot.c`）；記下校正資料的通道輪廓（`ad_init`） | `RT_CAL_START`／`RT_CAL_END`／`RT_CALIBRATE` |
-| 之後每次戴上：開機對齊 | 8 秒內依序做 6 個手勢（TrignoBridge 的 `align`）；**不能只做一種動作**（只做 Power 5／20 人估錯、只休息 13／20，report 20） | 比對 8 個通道的訊號大小輪廓和第 1 天，估計束帶整圈轉了幾格（−3～4），之後每個視窗都先重排通道；少於 60 個視窗不轉、回 `RT_EV_ALIGN_SHORT` | `RT_ALIGN_START`／`RT_ALIGN_END` |
+| 之後每次戴上：`load`（從 Flash 還原第 1 天模型，斷電也在）＋開機對齊 | 8 秒內依序做 6 個手勢（TrignoBridge 的 `align`）；**不能只做一種動作**（只做 Power 5／20 人估錯、只休息 13／20，report 20） | 比對 8 個通道的訊號大小輪廓和第 1 天，估計束帶整圈轉了幾格（−3～4），之後每個視窗都先重排通道；少於 60 個視窗不轉、回 `RT_EV_ALIGN_SHORT` | `RT_ALIGN_START`／`RT_ALIGN_END` |
 | 使用中 | 用手勢控制 | 即時分類與決策；每 300 個視窗自我校正一次並更新 z-score | — |
 
 配戴要求：束帶上做對齊記號，偏移壓在 ¼ 格（約 0.7 cm）以內；整格的轉動由開機對齊處理（8.1）。
@@ -120,4 +120,4 @@ RAM 的變化（`results/ram_history.csv`）：253.2 KB（加上硬體層）→ 
 | C 對照 Python | `src/check_adapt_c.py`（v2）、`check_selfcal_c.py`、`check_oneshot_c.py`、`check_rt.py`、`check_features_c.py`（舊版） |
 | 實驗 | `src/shift_sweep.py`（電極轉動、開機對齊）、`zscore_sweep.py`（z-score 更新）、`embed_sweep.py`（t-SNE／LDA／不嵌入、buffer 大小）、`aug_sweep.py`（校正資料轉動增強，不採用，第 13 節）、`pool_sweep.py`（從 100／200 棵挑 50 棵，不採用，第 14 節）、`decision_v2.py`（決策 τ × 平滑規則，第 15 節）、`filt_sweep.py`（偽標籤篩選，不採用，第 16 節）、`pca_baseline.py`（比較組 [8] PCA 對齊，第 17 節）、`channel_sweep.py`、`channel_order.py` |
 | 實驗（評估有效性） | `causal_check.py`（因果開機對齊、buffer 座標，第 20 節）、`check_align_rt.py`（開機對齊走即時迴圈，20.1） |
-| 紀錄 | `report.md`；`VALIDATION_PLAN.md`（凍結版本 `pilot-freeze-1`、驗收實驗、失敗條件與停止規則）；Notion「碩論實驗紀錄」（韌體修改紀錄、設計決定、文獻追蹤） |
+| 紀錄 | `report.md`；`VALIDATION_PLAN.md`（凍結版本 `pilot-freeze-3`、驗收實驗、失敗條件與停止規則）；`PROTOCOL.md`（正式實驗計畫與預先分析計畫）；Notion「碩論實驗紀錄」（韌體修改紀錄、設計決定、文獻追蹤） |

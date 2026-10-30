@@ -9,8 +9,10 @@
  *      OS_MAX_LEAVES >= the number of rows)
  *   4. stream everything into a one-shot image written once to Flash through os_writer_t (append-only,
  *      each byte written once; the hardware writer is in the board layer, the PC check uses a RAM array)
- * Image layout: [header (padded to 32 B)] [prune list] [app tree nodes (sc_node_t)] [prune bitmap];
- * the header is written last. os_model() turns an image (+ the pre-trained table) into an sc_model_t.
+ * Image layout: [header (padded to 32 B)] [prune list] [app tree nodes (sc_node_t)] [prune bitmap]
+ * [raw calibration features, n_cal x SC_DIM float] [labels, n_cal bytes]; the header is written last, so an image
+ * cut off by a power loss has no valid header and is ignored. os_model() turns an image (+ the pre-trained table)
+ * into an sc_model_t; os_cal_data() gives the stored calibration (to restore day 1 after a reboot, rt.c RT_LOAD).
  * Working memory: with SC_EMBED = 1 it is borrowed from the t-SNE workspace (tsne_scratch; one-shot calibration
  * runs before self-calibration starts, so the two never run at the same time); without t-SNE (SC_EMBED = 0, the
  * default) it is a static block of OS_WORK_BYTES (39,915 B were needed for the 50 pre-trained trees, report 7.6).
@@ -21,7 +23,7 @@
 #include "selfcal.h"
 
 #define OS_MAGIC 0x4F53484Fu         /* "OSHO" */
-#define OS_VERSION 1u
+#define OS_VERSION 2u                 /* 2: + raw calibration features and labels (rt.c RT_LOAD after a reboot) */
 #define OS_CAL_MAX SC_CAL_MAX         /* calibration rows */
 #define OS_MAX_DEPTH SC_MAX_DEPTH
 #define OS_MAX_LEAVES 64              /* one-shot trees: <= number of distinct rows (60) */
@@ -48,6 +50,7 @@ typedef struct {
     uint32_t off_prune, off_nodes, off_bits, bits_bytes;
     uint32_t app_roots[SC_N_APP];
     float mu[SC_DIM], inv_sd[SC_DIM]; /* z-score: q = round((x - mu) * inv_sd * 1024) */
+    uint32_t off_feat, off_y;         /* version 2: stored calibration features / labels */
 } os_header_t;
 
 /* append-only writer (Flash): write n bytes at byte offset off of the image; returns 0 on success */
@@ -78,6 +81,8 @@ const int16_t *os_cal_rows(void);
 void os_normalize(const os_header_t *h, const float *feat, int16_t *out);
 /* sc_model_t of an image; returns 0, or -1 if the image is not valid */
 int os_model(const void *image, const os_table_t *pre, sc_model_t *m);
+/* the calibration stored in a valid image: raw features (n x SC_DIM) and labels; returns n, or -1 */
+int os_cal_data(const void *image, const float **feat, const uint8_t **y);
 /* pruning only (PC check): prune the pre-trained trees with Q5.10 rows; out receives the sorted prune list
  * (at most max_out entries). Returns the number of entries, or a negative error. */
 int os_prune(const os_table_t *pre, const int16_t *rows_q, const uint8_t *y, int n, sc_prune_t *out, int max_out);

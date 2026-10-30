@@ -15,11 +15,12 @@ LSB_VOLT = 2.5e-7
 FRAMES_PER_PACKET = 20
 SAMPLES, CONTROL, COMMAND, STATUS, PRED = 0x01, 0x02, 0x81, 0x82, 0x83
 # control sub-commands (rt.h)
-STREAM_RESET, CAL_START, CAL_END, CALIBRATE, SET_DECISION, SET_REPORT, ALIGN_START, ALIGN_END = 1, 2, 3, 4, 5, 6, 7, 8
+STREAM_RESET, CAL_START, CAL_END, CALIBRATE, SET_DECISION, SET_REPORT = 1, 2, 3, 4, 5, 6
+ALIGN_START, ALIGN_END, LOAD, SET_ADAPT = 7, 8, 9, 10
 # status events
 EV_CALIBRATED, EV_SELFCAL, EV_LOST, EV_CAL_FULL, EV_ALIGNED, EV_ALIGN_SHORT, EV_SC_BEGIN, EV_SC_END = 1, 2, 3, 4, 5, 6, 7, 8
 EV_DIAG_RX_HW, EV_DIAG_STACK, EV_DIAG_RX_OVF, EV_DIAG_RX_ERR = 9, 10, 11, 12   # board main loop (app_rt.c)
-EV_SC_SKIP = 13                                      # update skipped: too few predicted classes (RT_MIN_CLASSES)
+EV_SC_SKIP, EV_LOADED = 13, 14                          # update skipped (RT_MIN_CLASSES); day-1 model restored (RT_LOAD)
 COMMANDS = {0: 'none', 1: 'pose_A', 2: 'grip', 3: 'pose_B', 4: 'release'}
 GESTURES = ['Power', 'Lateral', 'Tripod', 'Pointer', 'Open', 'Rest']
 
@@ -59,7 +60,7 @@ def control_payload(sub, *args):
         return struct.pack('<BB', sub, args[0])
     if sub == SET_DECISION:
         return struct.pack('<BHB', sub, args[0], args[1])
-    if sub == SET_REPORT:
+    if sub in (SET_REPORT, SET_ADAPT):
         return struct.pack('<BB', sub, args[0])
     return struct.pack('<B', sub)
 
