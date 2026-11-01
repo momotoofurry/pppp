@@ -230,7 +230,7 @@ def summarise(df, vf):
         krow.append(dict(span=span, comp=comp, runs=len(g), k_nonzero_pct=(g.k_est != 0).mean() * 100,
                          k_counts=' '.join(f'{k}:{c}' for k, c in g.k_est.value_counts().sort_index().items())))
     sk = df[df['var'] == 'A'].groupby(['span', 'comp']).skipped.sum().rename('skipped_updates').reset_index()
-    return sm.merge(pd.DataFrame(krow), on=['span', 'comp']).merge(sk, on=['span', 'comp'], how='left'), bad
+    return sm.merge(pd.DataFrame(krow), on=['span', 'comp'], how='left').merge(sk, on=['span', 'comp'], how='left'), bad
 
 
 def main():

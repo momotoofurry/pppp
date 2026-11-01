@@ -749,11 +749,40 @@ _, k = table_slide(
     '只有一個主終點，第二天閉迴路任務成功率，加上一個安全終點。右邊一欄是要請老師確認的數值。')
 n_rs += k
 
+# 2026-11-02: external validation on Kyranou 2025 (report 24), main deck after the stress tests
+EX = pd.read_csv(os.path.join(R, 'external_check_summary.csv')).set_index(['span', 'comp'])
+EP = pd.read_csv(os.path.join(R, 'external_posthoc.csv')).set_index(['span', 'comp', 'rotation'])
+
+
+def ex_row(comp, span='0-2s'):
+    e = EX.loc[(span, comp)]
+    return (f"{e.F:.1f} → {e.A:.1f}%", f"{e['diff']:+.2f}（{e.ci_lo:+.1f}, {e.ci_hi:+.1f}），{e.better:.0f}／{e.worse:.0f}")
+
+
+e1, ok0, bad0 = EX.loc[('0-2s', 'A1')], EP.loc[('0-2s', 'A1', '0')], EP.loc[('0-2s', 'A1', 'false (!= 0)')]
+_, k = table_slide(
+    '外部資料驗證：', '外部資料驗證：獨立 8 人跨日沒有確認增益，主要損失來自開機對齊誤轉',
+    ('比較（Kyranou 2025，預先登錄、只跑一次）', '固定 F → 完整 A', 'A − F（95% CI），變好／變差'),
+    [('A1 跨日 P5 → P5（主）',) + ex_row('A1'),
+     ('A1 敏感度（每段取 2–4 秒）',) + ex_row('A1', '2-4s'),
+     ('A2 同日、同一圈（對照）',) + ex_row('A2_row1'),
+     ('A2 同日、錯開半格的另一圈',) + ex_row('A2_row2'),
+     ('A3 手臂位置 P2／P4／P6／P8',) + ex_row('A3_all'),
+     ('A4 開機對齊誤轉（束帶沒轉卻估 ≠ 0）', f"A1 {e1.k_nonzero_pct:.0f}% 的 run（2／8 人）",
+      f"事後：估對 {ok0.diff_mean:+.2f}（{ok0.better:.0f}／{ok0.worse:.0f}）、估錯 {bad0.diff_mean:+.2f}")],
+    '判讀照計畫：A1 的 CI 含 0 →「沒有確認」，不是「無效」（8 人可偵測 dz ≥ 1.16）。開發資料同一比較 79.68 → 84.63%。'
+    '真實錯開半格讓固定模型掉 31 點，對齊救不回。事後診斷不是預先登錄的分析（report 24）',
+    '這是第一次在不是用來開發的資料上驗證。照事先登錄的計畫只跑一次，主分析跨日的差是負一點三，信賴區間含零，所以結論是沒有確認增益。'
+    '拆開來看，八個人裡兩個人的開機對齊在束帶沒轉的情況下估成轉了一格，其中一人掉了二十一點；開機對齊估對的時候，完整系統平均好一點五點。'
+    '所以下一步是讓開機對齊在沒把握時不要轉，但修改後的版本要用新的先導受試者驗證，不能再用這份資料。')
+n_rs += k
+
 # order: main deck, then the appendix
 ORDER = [lambda t: t == '研究方向', lambda t: t == '我想做的事', lambda t: t.startswith('研究問題：'),
          lambda t: t.startswith('和最接近的研究'), lambda t: t.startswith('STM32 做'), lambda t: t.startswith('韌體架構：'),
          lambda t: t == '主要結果', lambda t: t.startswith('束帶情境'), lambda t: t.startswith('韌體 v2：'),
-         lambda t: t.startswith('板子上 33 分鐘'), lambda t: t.startswith('壓力測試：'), lambda t: t.startswith('目前完成的目標'),
+         lambda t: t.startswith('板子上 33 分鐘'), lambda t: t.startswith('壓力測試：'), lambda t: t.startswith('外部資料驗證：'),
+         lambda t: t.startswith('目前完成的目標'),
          lambda t: t.startswith('還沒完成：'), lambda t: t.startswith('回答審查（1/2）'), lambda t: t.startswith('回答審查（2/2）'),
          lambda t: t.startswith('失敗條件'), lambda t: t.startswith('正式實驗：'), lambda t: t.startswith('參考文獻（1/2）'),
          lambda t: t.startswith('參考文獻（2/2）'),

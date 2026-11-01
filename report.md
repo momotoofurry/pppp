@@ -1268,11 +1268,48 @@ buffer 座標（括號是和同一種對齊的 `base` 比：差、變好／變�
 - Cortex-M7 RAM 176.5 KB（`board2`：.data 120＋.bss 178,108＋stack 2,504 B），Flash 112.1 KB。
 - 凍結成 `pilot-freeze-3`。實驗流程（每個條件先 `load`，再 `adapt 0` 或 `adapt 1`）寫在 `PROTOCOL.md`。
 
+## 24. 外部資料驗證：Kyranou 2025 的 8 人兩天資料（預先登錄，Docker，2026-11-02；`src/external_check.py` → `results/external_check*.csv`）
+
+- 計畫 `EXTERNAL_PLAN.md` 在看資料前 commit（8d16592）；通道對應與分析程式在跑任何分類前 commit（82653be）；照計畫**只跑一次**。
+  韌體 `pilot-freeze-3` 的同一份 C 碼（PC 版），參數全部沒改。這份資料從此不再是獨立資料。
+- 資料：Kyranou, Szymaniak, Nazarpour, *Sci Data* 2025（Dryad doi:10.5061/dryad.8sf7m0czv，CC0）。8 位健常受試者、Delsys Trigno 16 通道 2 kHz、
+  兩天、每天 2 個 session（同一天兩個 session 之間沒拿下感測器；論文說感測器最多錄 3 小時就要拿下充電 → 兩天之間是重新配戴）。
+  README 與 metadata 的 SHA-256 和 Dryad 公布的相同；`data.zip` 由使用者用瀏覽器下載解壓（Dryad API 要 token、網頁下載有機器人檢查），zip 本身沒有比對 hash。
+- 分類前定下的事（`src/external_check.py` 開頭）：
+  - 手勢編號照錄製程式 `graspsDict`：1 Power、2 Lateral、3 Tripod、4 Pointer、5 Open、6 Rest → 標籤＝編號 − 1（和 arm_position 同順序）。
+  - 通道排列文件沒寫。不看標籤的包絡相關（`src/external_channels.py`）呈鋸齒狀 9–1–10–2–…–16–8：通道 1–8 和 9–16 各是一圈、照檔案順序、
+    互相錯開半格＝計畫的預設。哪一圈從尺側伸腕肌開始看不出來（不影響分析）。
+  - 單位、取樣率、長度和開發資料相同（V、2 kHz；每段取 4000 個樣本當一段錄音），每通道 RMS 10–45 µV（開發資料 17–54 µV）。
+- 校正檢查：48 次（8 人 × 3 seed × 2 個時間段）中 46 次第一次就過、2 次第二次過；第一次的平均 93.0%；沒有人被排除。
+- 結果（每人 3 seed 平均；F＝固定模型、不對齊；A＝完整系統；兩者都不計前 60 個視窗）：
+
+| 比較（0–2 秒，主分析） | F | A | A − F（95% CI） | 變好／變差 | 最差的人 | 開機對齊估 ≠ 0 |
+|---|---|---|---|---|---|---|
+| **A1 跨日 P5 → P5（主）** | 73.07% | 71.75% | **−1.32（−8.27, +5.63）**，Wilcoxon p = 0.38 | 6／2 | −21.54（受試者 8） | 6／24 次（25%） |
+| A2 同日 session 2，同一圈（對照） | 84.70% | 81.75% | −2.95（−9.93, +4.03） | 0／1 | −23.61 | 3／24 |
+| A2 同日 session 2，錯開半格的另一圈 | 53.58% | 52.76% | −0.82（−12.11, +10.47） | 2／3 | −21.67 | −1：12、0：9、−4：3 |
+| A3 手臂位置 P2／P4／P6／P8（合併） | 80.32% | 77.73% | −2.58（−7.56, +2.39） | 4／4 | −15.62 | 6／96 |
+
+  - 敏感度（每段改取 2–4 秒）：A1 68.77 → 69.77%，+1.00（−5.24, +7.23），5／2；A3 合併 −1.91（−5.77, +1.95）。
+  - A2 只有 1 個 block，自我校正的更新碰不到計分的視窗，所以 A2 只比較「開機對齊」。
+- **判讀（照計畫）：A1 的 95% CI 含 0 → 在這份獨立的 8 人跨日資料上「沒有確認」增益**（不是「無效」；8 人可偵測 dz ≥ 1.16）。
+  開發資料上同樣的比較是 79.68 → 84.63%（第 20 節）。
+- 真實的錯開半格（另一圈電極）讓固定模型從 84.70% 掉到 53.58%（−31 點），開機對齊沒有救回來（估到 −1 的 12 次、0 的 9 次、−4 的 3 次）。
+  開發資料上用內插模擬的偏半格是 67.70 → 75.29%：內插的模擬比真實的另一圈樂觀很多（另一圈還差了前後位置）。
+- **事後診斷（不是預先登錄的分析，`src/external_posthoc.py` → `results/external_posthoc.csv`）**：A1、A3 裡束帶沒有被轉動，開機對齊卻估出轉了
+  （A1：受試者 1、8 三個 seed 都估 +1；A3：P2 一人估 −1、P8 一人估 −3）。估對（k = 0）的 18 次 A1：A − F 平均 +1.51（13／4）；
+  估錯的 6 次：−9.81。A3 估錯的 6 次平均 −49.1。也就是說主要的損失來自**開機對齊的誤轉**，不是自我校正本身；
+  估對時的增益也比開發資料小（+1.5 vs 約 +5）。
+- 限制：8 人；A1 只有 2 個 block（自我校正只更新 1 次就結束，開發資料有 11 個 block）；這 8 人是否在預訓練模型的 66 人裡不知道
+  （同一個實驗室；上游只說 66 人是 Jiang 2024 [JNE] 用過的全部資料，沒有名單，要問作者）；資料在錄製時已經濾波（20–450 Hz）。
+- 之後的處理（照 `EXTERNAL_PLAN.md` 第 6 節）：若因此修改開機對齊（例如對齊信心不足就不轉、或只接受 ±1），修改後的版本要用新的資料
+  （先導受試者）驗證，不能再用這份資料宣稱改善。
+
 ---
 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`causal_check.py`、`check_align_rt.py`、`stress_check.py`、`verify_check.py`、`check_load_rt.py`、`power_calc.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`board_replay.py`、`app_rt.c`、`src/pc/*`（含 `serial_replay.ps1`）、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`causal_check.py`、`check_align_rt.py`、`stress_check.py`、`verify_check.py`、`check_load_rt.py`、`power_calc.py`、`external_check.py`、`external_channels.py`、`external_posthoc.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`board_replay.py`、`app_rt.c`、`src/pc/*`（含 `serial_replay.ps1`）、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
-| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`causal_check*.csv`、`align_rt_check.csv`、`stress_check*.csv`、`verify_check*.csv`、`load_rt_check.csv`、`power_calc.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
+| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`causal_check*.csv`、`align_rt_check.csv`、`stress_check*.csv`、`verify_check*.csv`、`load_rt_check.csv`、`power_calc.csv`、`external_check*.csv`、`external_verify.csv`、`external_posthoc.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
