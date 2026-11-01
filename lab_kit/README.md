@@ -86,9 +86,10 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
 完整系統（`adapt 1`）時，重新戴上束帶後先做開機對齊（估計束帶整圈轉了幾格）：
 
 1. 輸入 `align`，**接下來 8 秒依序做 6 個手勢，每個約 1 秒**：Power、Lateral、Tripod、Pointer、Open、Rest。
-2. 8 秒後程式自動結束，**應該看到** `MCU: status,...,rotation,<數字>`（−3～4，束帶轉了幾格）。
+2. 8 秒後程式自動結束，**應該看到** `MCU: status,...,rotation,<數字>`（−1、0、1，束帶轉了幾格）。
+   - 如果先看到 `alignment unsure, rotation kept 0`：板子沒把握，維持不轉（2026-11-02 起，report 25）。束帶有動過就調回記號位置、重新 `align`；記下這件事。只會修正 ±1 格，戴的時候對準記號。
    - 如果看到 `alignment too short, rotation unchanged`：收到的視窗不到 60 個（例如中途 `reset`），重新輸入 `align`。
-3. **不要只做一種手勢或一直休息**：只做 Power 時 20 人裡有 5 人估錯、只休息時 13 人估錯（report 第 20 節）。
+3. **不要只做一種手勢或一直休息**：束帶真的轉了一格時，只休息的話 20 人裡 16 人修正不回來（report 第 25 節）。
 4. 之後照常使用（不用重新 `cal`／`calibrate`）。
 
 ## 收尾

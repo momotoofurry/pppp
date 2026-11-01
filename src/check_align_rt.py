@@ -9,6 +9,8 @@ recording rotated by r channels (np.roll of the 8 raw channels: sensor c now rec
 Cases: n = 1 (10 windows: must give ALIGN_SHORT and keep the rotation), n = 8 (71 windows) for r = 0, 1, 2, -1;
 r = 1 without alignment; r = 0 with RT_RESCALE = 0 (firmware v2 block end); blocks 1-4 with only Rest, Tripod and Open (the update must be
 skipped: RT_MIN_CLASSES, report 22). Accuracy from the PRED packets.
+2026-11-02 (report 25): with the alignment confidence rule r = 2 must give ALIGN_UNSURE 2 and rotation 0 (only
++-1 is corrected); column 'unsure' = the rejected estimate (0 = none).
 Writes results/align_rt_check.csv. Usage (in the container): python src/check_align_rt.py
 """
 import os
@@ -72,7 +74,8 @@ def main():
                          skipped=sum(e == PR.EV_SC_SKIP for e, _ in ev),
                          align_event={PR.EV_ALIGNED: 'aligned', PR.EV_ALIGN_SHORT: 'short'}.get(
                              next((e for e, _ in ev if e in (PR.EV_ALIGNED, PR.EV_ALIGN_SHORT)), None), 'none'),
-                         align_value=al[0] if al else None, calibrated=dict(ev).get(PR.EV_CALIBRATED),
+                         align_value=al[0] if al else None, unsure=dict(ev).get(PR.EV_ALIGN_UNSURE, 0),
+                         calibrated=dict(ev).get(PR.EV_CALIBRATED),
                          selfcal_blocks=max([v for e, v in ev if e == PR.EV_SELFCAL], default=0),
                          acc_block1=acc[0], acc_block2=acc[1]))
         print(rows[-1])

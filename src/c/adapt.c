@@ -13,6 +13,7 @@ static float s_cal_prof[AMP_N][AD_CH];
 static double s_al_sum[AMP_N][AD_CH];
 static int s_al_n;
 static int s_k;
+static int s_unsure;                            /* estimate rejected by the confidence rule */
 /* ---- per-block class accumulators (Welford) ---- */
 static float s_cm[SC_CLASSES][SC_DIM], s_cm2[SC_CLASSES][SC_DIM];
 static int s_cn[SC_CLASSES];
@@ -93,6 +94,7 @@ int ad_align_count(void)
 
 int ad_align_finish(void)
 {
+    s_unsure = 0;
     if (s_al_n == 0)
         return s_k = 0;
     double p[AMP_N][AD_CH];
@@ -102,18 +104,31 @@ int ad_align_finish(void)
             p[a][c] = s_al_sum[a][c] / s_al_n;
     standardise_channels(p, q);
     int best = 0;
-    double best_s = -1e300;
+    double best_s = -1e300, s0 = 0.0;
     for (int k = 0; k < AD_CH; k++) {           /* np.roll(p, k)[c] = p[c - k] */
         double s = 0.0;
         for (int a = 0; a < AMP_N; a++)
             for (int c = 0; c < AD_CH; c++)
                 s += (double)s_cal_prof[a][c] * q[a][(c - k + AD_CH) % AD_CH];
+        if (k == 0)
+            s0 = s;
         if (s > best_s) {                       /* first maximum, as np.argmax */
             best_s = s;
             best = k;
         }
     }
-    return s_k = best < 4 ? best : best - AD_CH;
+    int k = best < 4 ? best : best - AD_CH;
+    if (k != 0 && (k > AD_ALIGN_KMAX || -k > AD_ALIGN_KMAX ||
+                   best_s - s0 < AD_ALIGN_MARGIN * AMP_N * AD_CH)) {
+        s_unsure = k;                           /* not sure enough: keep the electrodes as they are */
+        k = 0;
+    }
+    return s_k = k;
+}
+
+int ad_align_unsure(void)
+{
+    return s_unsure;
 }
 
 int ad_rotation(void)

@@ -16,7 +16,8 @@
 Per subject x seed x offset: the one-shot model is built once (as check_adapt_c.run_c), every variant restarts
 from sc_init / ad_init. Accuracy: blocks 1-10 (same windows for every variant) and all scored windows.
 Writes results/causal_check.csv and causal_check_summary.csv.
-Usage (in the container): python src/causal_check.py [--jobs 19]
+--tag X writes causal_checkX*.csv (2026-11-02: _freeze4 = alignment confidence rule, report 25).
+Usage (in the container): python src/causal_check.py [--jobs 19] [--tag _freeze4]
 """
 import argparse
 import copy
@@ -164,6 +165,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--jobs', type=int, default=19)
     ap.add_argument('--subjects', type=int, default=20)
+    ap.add_argument('--tag', default='')
     args = ap.parse_args()
     build()
     for s in range(args.subjects):                                   # feature cache, sequential
@@ -172,9 +174,9 @@ def main():
     jobs = [(s, seed, sh) for s in range(args.subjects) for seed in range(3) for sh in SHIFTS]
     res = Parallel(n_jobs=args.jobs, verbose=5)(delayed(run)(*j) for j in jobs)
     df = pd.DataFrame([r for rs in res for r in rs])
-    df.to_csv(os.path.join(OUT, 'causal_check.csv'), index=False)
+    df.to_csv(os.path.join(OUT, f'causal_check{args.tag}.csv'), index=False)
     sm = summarise(df)
-    sm.to_csv(os.path.join(OUT, 'causal_check_summary.csv'), index=False, float_format='%.4g')
+    sm.to_csv(os.path.join(OUT, f'causal_check{args.tag}_summary.csv'), index=False, float_format='%.4g')
     pd.set_option('display.width', 250)
     print(sm.round(3).to_string(index=False))
     y0 = np.load(SH.prepare(0, 0))['y0']

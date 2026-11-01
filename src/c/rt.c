@@ -238,8 +238,12 @@ static void on_control(const uint8_t *p, uint16_t len)
             s_mode = RT_MODE_RUN;
             if (n < RT_ALIGN_MIN)
                 status(RT_EV_ALIGN_SHORT, n);   /* rotation unchanged */
-            else
-                status(RT_EV_ALIGNED, ad_align_finish());
+            else {
+                int k = ad_align_finish();
+                if (ad_align_unsure())
+                    status(RT_EV_ALIGN_UNSURE, ad_align_unsure());
+                status(RT_EV_ALIGNED, k);
+            }
         }
         break;
 #endif

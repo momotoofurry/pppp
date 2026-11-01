@@ -455,7 +455,8 @@ static class Program
                                "self-calibration start (windows so far)", "self-calibration took (us)", "receive ring high-water (bytes)",
                                "stack peak (bytes)", "UART bytes dropped", "UART errors",
                                "self-calibration skipped: too few gestures (classes)",
-                               "day-1 model loaded (calibration rows; < 0 = none, calibrate)" };
+                               "day-1 model loaded (calibration rows; < 0 = none, calibrate)",
+                               "alignment unsure, rotation kept 0 (rejected estimate); redo align if the strap moved" };
             return string.Format(IC, "status,,,,,,,,{0},{1}", ev < names.Length ? names[ev] : ev.ToString(), v);
         }
         return "unknown,type " + type + ",len " + p.Length + ",,,,,,,";

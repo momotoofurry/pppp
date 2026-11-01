@@ -44,7 +44,8 @@
  *                              never buffered, so there is no z-score update, no self-calibration and no alignment
  * Status events (PK_STATUS): RT_EV_CALIBRATED value = os_calibrate() result, RT_EV_SELFCAL value = blocks done,
  *   RT_EV_LOST value = packets lost in the last gap, RT_EV_CAL_FULL value = calibration windows kept,
- *   RT_EV_ALIGNED value = estimated rotation (-3..4), RT_EV_ALIGN_SHORT value = alignment windows received,
+ *   RT_EV_ALIGNED value = rotation used (-1..1 after the confidence rule), RT_EV_ALIGN_SHORT value = alignment
+ *   windows received, RT_EV_ALIGN_UNSURE value = the rejected estimate (sent before RT_EV_ALIGNED 0),
  *   RT_EV_SC_BEGIN value = windows so far when a self-calibration starts, RT_EV_SC_END value = its duration (us);
  *   the PRED packets between the two are the windows classified while it ran (test A, VALIDATION_PLAN.md);
  *   RT_EV_SC_SKIP value = predicted classes in the block, when the update was skipped (RT_MIN_CLASSES),
@@ -79,7 +80,7 @@ enum { RT_EV_CALIBRATED = 1, RT_EV_SELFCAL = 2, RT_EV_LOST = 3, RT_EV_CAL_FULL =
        RT_EV_ALIGN_SHORT = 6, RT_EV_SC_BEGIN = 7, RT_EV_SC_END = 8,
        /* diagnostics sent by the board main loop (app_rt.c), not by rt.c */
        RT_EV_DIAG_RX_HW = 9, RT_EV_DIAG_STACK = 10, RT_EV_DIAG_RX_OVF = 11, RT_EV_DIAG_RX_ERR = 12,
-       RT_EV_SC_SKIP = 13, RT_EV_LOADED = 14 };
+       RT_EV_SC_SKIP = 13, RT_EV_LOADED = 14, RT_EV_ALIGN_UNSURE = 15 };
 enum { RT_MODE_IDLE = 0, RT_MODE_CAL = 1, RT_MODE_RUN = 2, RT_MODE_ALIGN = 3 };
 
 typedef struct {

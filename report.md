@@ -1305,11 +1305,41 @@ buffer 座標（括號是和同一種對齊的 `base` 比：差、變好／變�
 - 之後的處理（照 `EXTERNAL_PLAN.md` 第 6 節）：若因此修改開機對齊（例如對齊信心不足就不轉、或只接受 ±1），修改後的版本要用新的資料
   （先導受試者）驗證，不能再用這份資料宣稱改善。
 
+## 25. 開機對齊的信心規則：沒把握就不轉（2026-11-02；`src/align_margin.py` → `results/align_margin.csv`、`causal_check_freeze4*.csv`、`external_check*_freeze4.csv`）
+
+- 起因：第 24 節的外部資料上，主要損失來自開機對齊在束帶沒轉時估成轉了（A1 受試者 8 −21.5 點；A3 P2、P8 各一人）。
+  **這個修改是看過第 24 節之後才做的，所以 Kyranou 從此只能當開發資料，不能證明修改有效**；有效與否要靠先導受試者。
+- 規則（`adapt.h`）：估到的轉法 k 只在 |k| ≤ 1（`AD_ALIGN_KMAX`），而且分數比 k = 0 高至少 0.20（每個輪廓項；`AD_ALIGN_MARGIN`）時採用，
+  否則維持 k = 0，並回新的狀態 `RT_EV_ALIGN_UNSURE`（值＝被拒絕的 k，TrignoBridge 顯示「alignment unsure … redo align if the strap moved」）。
+  - 0.20 只用開發資料決定：在開發資料上，真的轉一格時最佳轉法比 k = 0 高 0.222–1.39（40／40）；取「讓 40 個都照樣被認出的最大 0.05 倍數」。
+  - 代價：束帶轉兩格以上不再修正（開發資料 ±2 格 40／40 都改成不轉）。實驗時靠束帶上的記號，戴的時候偏差不能到兩格。
+  - C 版和 Python 版的規則在開發資料 140 次與 Kyranou 48 次逐次相同。RAM 多 4 B；板子的韌體可以編譯（RAM 174.7 KB、Flash 122.6 KB），**還沒燒進板子**。
+- 開發資料（arm_position 20 人 × 3 seed，`causal_check.py --tag _freeze4`，全部計分視窗）：
+
+| 開機時做的動作／電極偏移 | pilot-freeze-3 | 加信心規則 | 估法和整個 block 一致的人數（舊 → 新） |
+|---|---|---|---|
+| 規定的 6 種手勢，沒偏移 | 84.63% | 84.63% | 20 → 20 |
+| 規定的 6 種手勢，轉一格 | 84.63% | 84.63% | 20 → 20 |
+| 規定的 6 種手勢，偏半格（內插） | 75.29% | **76.74%** | 14 → 19 |
+| 只做 Power，沒偏移 | 71.28% | **83.94%** | 15 → 20 |
+| 只休息，沒偏移 | 57.35% | **80.39%** | 7 → 17 |
+| 只做 Power，轉一格 | 71.28% | 75.96% | 15 → 15 |
+| 只休息，轉一格 | 57.35% | 59.92% | 7 → 4 |
+
+  照規定做時完全沒有變差；做錯開機流程時，誤轉造成的大損失大部分消失了（真的轉了卻只休息時仍然救不回，所以開機時仍要做 6 種手勢）。
+- 即時迴圈（`check_align_rt.py`，PC 版 `rt.c` 走序列協定）：轉 0／1／−1 格、對齊太短、不對齊、RT_RESCALE 0、少於 5 類的情況和之前逐項相同；
+  轉 2 格現在回 `ALIGN_UNSURE −2`、不轉（準確率 33.3%／36.7%，之前 79.3%／85.3%）。
+- Kyranou（**不獨立**，`external_check.py --tag _freeze4`，同一個預先登錄的分析）：A1 跨日 73.07 → 74.44%，+1.37（95% CI +0.01, +2.74），6／1，
+  最差 −0.56（之前 −1.32，最差 −21.54）；敏感度 2–4 秒 +1.24（−0.19, +2.68）。A2 錯開半格 +4.37（−2.40, +11.15）。
+  A3 的 P2 那一人（同一天、沒動束帶、分數領先 0.43）規則擋不住，仍然 −64 點：門檻再高就會漏掉開發資料上真的轉一格的情況。
+  這些數字只說明「規則照設計擋下了大部分誤轉」，不能寫成外部驗證的增益。
+- 凍結成 `pilot-freeze-4`（演算法只改開機對齊；其他參數和 `pilot-freeze-3` 相同）。
+
 ---
 
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
-| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`causal_check.py`、`check_align_rt.py`、`stress_check.py`、`verify_check.py`、`check_load_rt.py`、`power_calc.py`、`external_check.py`、`external_channels.py`、`external_posthoc.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`board_replay.py`、`app_rt.c`、`src/pc/*`（含 `serial_replay.ps1`）、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
+| 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`causal_check.py`、`check_align_rt.py`、`stress_check.py`、`verify_check.py`、`check_load_rt.py`、`power_calc.py`、`external_check.py`、`external_channels.py`、`external_posthoc.py`、`align_margin.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`board_replay.py`、`app_rt.c`、`src/pc/*`（含 `serial_replay.ps1`）、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
-| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`causal_check*.csv`、`align_rt_check.csv`、`stress_check*.csv`、`verify_check*.csv`、`load_rt_check.csv`、`power_calc.csv`、`external_check*.csv`、`external_verify.csv`、`external_posthoc.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
+| 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`causal_check*.csv`、`align_rt_check.csv`、`stress_check*.csv`、`verify_check*.csv`、`load_rt_check.csv`、`power_calc.csv`、`external_check*.csv`、`external_verify*.csv`、`external_posthoc.csv`、`align_margin.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |

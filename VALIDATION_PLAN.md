@@ -5,7 +5,7 @@
 
 ## 1. 凍結的版本
 
-git tag `pilot-freeze-3`（2026-10-30：再加上重開機後從 Flash 還原第 1 天模型的 `load`、切換實驗條件的 `adapt 0/1`，report 23；演算法和 `pilot-freeze-2` 相同）。實驗流程與預先分析計畫在 `PROTOCOL.md`。從第一位先導受試者開始，下表都不改；要改就是新版本（新 tag），
+git tag `pilot-freeze-4`（2026-11-02：開機對齊加信心規則，只接受 ±1 格、分數比不轉高 ≥ 0.20，否則不轉，report 25；起因是外部資料 Kyranou 2025 的誤轉，report 24。之前 `pilot-freeze-3`：重開機後 `load`、`adapt 0/1`，report 23）。實驗流程與預先分析計畫在 `PROTOCOL.md`。從第一位先導受試者開始，下表都不改；要改就是新版本（新 tag），
 已收的先導資料從此變成開發資料，要再收一批新的受試者才算下一輪驗證。
 
 | 部分 | 設定 | 來源 |
@@ -18,7 +18,7 @@ git tag `pilot-freeze-3`（2026-10-30：再加上重開機後從 Flash 還原第
 | 自我校正 | 每 300 個視窗；buffer 375 筆 int16；換 20 棵（每棵 ≤ 32 葉）；最少的類 < 10 筆時不分群；預測裡 ≥ 5 個視窗的類別少於 5 類就整次不更新 | `RT_BLOCK`、`SC_BUF`、`SC_N_UPD`、`SC_MAX_LEAVES`、`SC_MIN_CLASS`、`RT_MIN_CLASSES` |
 | 偽標籤 | 第 1 天模型重新標記 → 類別平衡 → K-Means（80 維，類別中心初始化），6 群都非空才用 | `selfcal.c` |
 | z-score 更新 | 類別平衡（每類 ≥ 5 個視窗、≥ 2 類），a = 0.3；R3 順序（先更新 → buffer＋校正資料轉座標 → 訓練） | `AD_RATE`、`AD_MIN_CLASS`、`RT_RESCALE` 1 |
-| 開機對齊 | 8 秒依序做 6 個手勢（TrignoBridge `align`）；< 60 個視窗不轉、回 ALIGN_SHORT | `RT_ALIGN_MIN` 60 |
+| 開機對齊 | 8 秒依序做 6 個手勢（TrignoBridge `align`）；< 60 個視窗不轉、回 ALIGN_SHORT；只接受 ±1 格且分數比不轉高 ≥ 0.20，否則不轉、回 ALIGN_UNSURE | `RT_ALIGN_MIN` 60、`AD_ALIGN_KMAX` 1、`AD_ALIGN_MARGIN` 0.20 |
 | 決策 | τ = 0.6、連續 k = 3 個視窗 | `app_rt.c` |
 | 隨機種子 | 0x2545F491 | `app_rt.c` |
 | 重開機／條件 | 第 1 天模型、z-score、校正資料存在 Flash；`load` 還原（適應過的樹不存）；`adapt 0` 固定模型、`adapt 1` 完整系統 | `RT_LOAD`、`RT_SET_ADAPT`（report 23） |
@@ -29,7 +29,8 @@ git tag `pilot-freeze-3`（2026-10-30：再加上重開機後從 Flash 還原第
 - **系統邊界**：核心 EMG 運算（特徵、推論、校正、自我校正、決策）在 STM32H7 上執行；實驗階段 PC 只當感測器橋接（Trigno TCP → UART）
   和 Kinova 通訊介面（Kortex API）。不寫成「整個控制系統都在 MCU 上」。
 - **免標籤的範圍**：一次初始有標籤校正（第 1 天每類 2 秒）後，後續跨日使用採免標籤適應。每次戴上要做 8 秒、6 種指定手勢的開機對齊。
-- **開機對齊**：不是「任意動作即可」。只做 Power 時 5／20 人估錯，只休息時 13／20（report 20）。
+- **開機對齊**：不是「任意動作即可」。pilot-freeze-3 只做 Power 時 5／20 人估錯、只休息時 13／20（report 20）；加信心規則後沒偏移時 0／20、3／20，但真的轉了一格而只休息時 16／20 沒修正（report 25）。只修正 ±1 格。
+- **外部資料**：Kyranou 2025（8 人、跨日）上預先登錄的分析沒有確認增益（report 24）；之後的修改用到了它，所以它不是獨立證據。
 - **新穎性**：不用「沒有人做過」。差異是：單核 Cortex-M7（不是並行 GAP9）、明確的 256 KB RAM 預算、分群偽標籤＋隨機森林換樹、
   不靠已知任務目標產生偽標籤（Orlandi [12] 靠任務目標；Zanghieri [8] 只做特徵層對齊）。真人跨日與 Kinova 閉迴路是預計的驗證，不是已完成的貢獻。
 - **移植正確**：主要證據是逐位比對（特徵、one-shot、預測和 Python 逐位相同；板子關 FMA 後和 PC 逐位相同）。

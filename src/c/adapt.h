@@ -7,6 +7,11 @@
  * standardised over the 8 channels (population std). k = argmax_k sum q[f][c] * p[f][(c - k) mod 8] over the
  * 8 candidates (first maximum; returned in -3..4), q = calibration profile, p = profile of the alignment windows.
  * ad_map() then reads model channel c from recorded channel (c + k) mod 8. With k = 0 ad_map() is a copy.
+ * Confidence rule (report 25, 2026-11-02): the estimate is kept only when |k| <= AD_ALIGN_KMAX and its score beats
+ * k = 0 by >= AD_ALIGN_MARGIN per profile entry (score / 24); otherwise k = 0 (ad_align_unsure() returns the
+ * rejected estimate). AD_ALIGN_MARGIN 0.20: the largest multiple of 0.05 that keeps every one-position rotation
+ * of the development data detected (results/align_margin.csv, smallest margin 0.222). AD_ALIGN_KMAX 4 and
+ * AD_ALIGN_MARGIN 0 give the old rule (pilot-freeze-3).
  *
  * z-score update (python: zscore_sweep.py, zs = bal0.3): during a block every pushed window is added to the
  * running mean / M2 of its predicted class (Welford, float32). At the end of the block, the classes with
@@ -25,6 +30,12 @@
 #define AD_RATE 0.3f
 #endif
 #define AD_MIN_CLASS 5
+#ifndef AD_ALIGN_KMAX
+#define AD_ALIGN_KMAX 1
+#endif
+#ifndef AD_ALIGN_MARGIN
+#define AD_ALIGN_MARGIN 0.20
+#endif
 #define AD_CH 8
 
 typedef struct {
@@ -38,7 +49,8 @@ void ad_init(const float *mu, const float *inv_sd, const float *cal, int n_cal);
 void ad_align_reset(void);
 void ad_align_push(const float *raw);
 int ad_align_count(void);       /* alignment windows pushed since ad_align_reset() */
-int ad_align_finish(void);      /* sets and returns k (-3..4); 0 if no window was pushed */
+int ad_align_finish(void);      /* sets and returns k (-3..4 before the confidence rule); 0 if no window was pushed */
+int ad_align_unsure(void);      /* estimate rejected by the last ad_align_finish() (0: none rejected) */
 int ad_rotation(void);
 void ad_set_rotation(int k);
 /* raw -> aligned raw (out may not alias raw) */

@@ -34,7 +34,9 @@ rotation of A in A1 / A3 (strap not rotated: k != 0 counts as a false rotation) 
 With 1 block (A2) the update after the block reaches no scored window: A2 measures F vs start-up alignment only.
 
 Writes results/external_check.csv (per block), external_verify.csv, external_check_summary.csv.
-Usage (in the container, data mounted read-only): python src/external_check.py --data /data [--jobs 16]
+--tag X writes external_checkX*.csv: 2026-11-02 _freeze4 = the alignment confidence rule (report 25), run on this
+data AFTER it was used (not independent; the rule was made after seeing report 24).
+Usage (in the container, data mounted read-only): python src/external_check.py --data /data [--jobs 16] [--tag X]
 """
 import argparse
 import ctypes
@@ -237,6 +239,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default='/data')
     ap.add_argument('--jobs', type=int, default=16)
+    ap.add_argument('--tag', default='')
     args = ap.parse_args()
     ST.build()
     FC.lib()
@@ -244,10 +247,10 @@ def main():
                                                 for p in SUBJECTS for s in SEEDS for sp in SPANS)
     df = pd.DataFrame([r for rs, _ in res for r in rs])
     vf = pd.DataFrame([v for _, vs in res for v in vs])
-    df.to_csv(os.path.join(OUT, 'external_check.csv'), index=False)
-    vf.to_csv(os.path.join(OUT, 'external_verify.csv'), index=False, float_format='%.2f')
+    df.to_csv(os.path.join(OUT, f'external_check{args.tag}.csv'), index=False)
+    vf.to_csv(os.path.join(OUT, f'external_verify{args.tag}.csv'), index=False, float_format='%.2f')
     sm, bad = summarise(df, vf)
-    sm.to_csv(os.path.join(OUT, 'external_check_summary.csv'), index=False, float_format='%.4g')
+    sm.to_csv(os.path.join(OUT, f'external_check_summary{args.tag}.csv'), index=False, float_format='%.4g')
     pd.set_option('display.width', 260)
     pd.set_option('display.max_columns', 30)
     print('verification:', vf.groupby(['span', 'subject', 'seed']).attempt.max().add(1).value_counts().to_dict(),
