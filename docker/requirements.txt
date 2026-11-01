@@ -10,3 +10,4 @@ matplotlib==3.11.2
 emlearn==0.23.2
 setuptools==84.0.0
 python-pptx==1.0.2      # slides/*.py
+h5py==3.12.1            # src/external_check.py (Kyranou 2025 HDF5 files)
