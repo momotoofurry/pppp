@@ -1,0 +1,4 @@
+phase,windows,scored,acc,agree,not_buffered,latency_p50,latency_p95,latency_p99,latency_max,selfcal_n,selfcal_ms_mean,selfcal_ms_max,rx_ring_highwater_B,stack_peak_B,uart_overflow,uart_errors,diag_reports,crc_errors,lost_packets
+all,600,600,86.500,100.000,0,6.761,7.297,7.498,18.317,2,156.387,165.671,249,2100,0,1,14,0,0
+after,10,10,100.000,100.000,0,6.714,7.234,7.268,7.276,2,156.387,165.671,249,2100,0,1,14,0,0
+normal,590,590,86.271,100.000,0,6.763,7.303,7.498,18.317,2,156.387,165.671,249,2100,0,1,14,0,0

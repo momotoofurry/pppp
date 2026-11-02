@@ -1,0 +1,98 @@
+unix_ms,segment,event,step,trial,target,command,command_gesture,window,phase,result,latency_ms,text
+1793641734537.3,,session,,,,,,,,,,subject T00 day 0 segments practice commands grip release pose_A pose_B n 40 timeout_s 5 fake 0 udp 50555
+1793641734665.2,practice,seg_start,,,,,,,,,,0
+1793641734667.2,practice,practice_on,0,,,,,,,,,
+1793641738155.1,practice,status,0,,,,,,,,,receive ring high-water (bytes) 92
+1793641738156.9,practice,status,0,,,,,,,,,stack peak (bytes) 808
+1793641738156.9,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641738156.9,practice,status,0,,,,,,,,,UART errors 0
+1793641748293.7,practice,status,0,,,,,,,,,receive ring high-water (bytes) 92
+1793641748293.9,practice,status,0,,,,,,,,,stack peak (bytes) 916
+1793641748294.1,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641748294.2,practice,status,0,,,,,,,,,UART errors 0
+1793641749849.8,practice,status,0,,,,,,,,,calibration windows 60
+1793641750913.3,practice,status,0,,,,,,,,,calibrated (0 = ok) 0
+1793641754149.9,practice,command,0,,,pose_A,Power,126,practice,,,
+1793641756150.4,practice,command,0,,,pose_A,Power,145,practice,,,
+1793641758382.7,practice,status,0,,,,,,,,,receive ring high-water (bytes) 92
+1793641758383.6,practice,status,0,,,,,,,,,stack peak (bytes) 1144
+1793641758383.7,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641758383.8,practice,status,0,,,,,,,,,UART errors 0
+1793641760150.5,practice,command,0,,,grip,Tripod,183,practice,,,
+1793641762150.0,practice,command,0,,,pose_A,Power,202,practice,,,
+1793641764150.6,practice,command,0,,,grip,Tripod,221,practice,,,
+1793641768526.9,practice,status,0,,,,,,,,,receive ring high-water (bytes) 92
+1793641768527.0,practice,status,0,,,,,,,,,stack peak (bytes) 1144
+1793641768527.2,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641768527.4,practice,status,0,,,,,,,,,UART errors 0
+1793641776150.8,practice,command,0,,,release,Open,335,practice,,,
+1793641778673.9,practice,status,0,,,,,,,,,receive ring high-water (bytes) 92
+1793641778674.2,practice,status,0,,,,,,,,,stack peak (bytes) 1144
+1793641778674.4,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641778674.5,practice,status,0,,,,,,,,,UART errors 0
+1793641784650.4,practice,command,0,,,grip,Tripod,416,practice,,,
+1793641786150.0,practice,command,0,,,release,Open,430,practice,,,
+1793641788150.4,practice,command,0,,,release,Open,449,practice,,,
+1793641788817.0,practice,status,0,,,,,,,,,receive ring high-water (bytes) 98
+1793641788817.2,practice,status,0,,,,,,,,,stack peak (bytes) 1144
+1793641788817.3,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641788817.5,practice,status,0,,,,,,,,,UART errors 0
+1793641792150.1,practice,command,0,,,pose_B,Pointer,487,practice,,,
+1793641796149.9,practice,command,0,,,release,Open,525,practice,,,
+1793641798150.7,practice,command,0,,,release,Open,544,practice,,,
+1793641798960.3,practice,status,0,,,,,,,,,receive ring high-water (bytes) 98
+1793641798960.5,practice,status,0,,,,,,,,,stack peak (bytes) 1144
+1793641798960.7,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641798960.8,practice,status,0,,,,,,,,,UART errors 0
+1793641800150.1,practice,command,0,,,pose_A,Power,563,practice,,,
+1793641806850.7,practice,command,0,,,grip,Tripod,627,practice,,,
+1793641809103.4,practice,status,0,,,,,,,,,receive ring high-water (bytes) 98
+1793641809103.7,practice,status,0,,,,,,,,,stack peak (bytes) 1144
+1793641809103.8,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641809104.1,practice,status,0,,,,,,,,,UART errors 0
+1793641812850.9,practice,status,0,,,,,,,,,self-calibration start (windows so far) 684
+1793641812997.2,practice,status,0,,,,,,,,,self-calibration took (us) 147115
+1793641812997.4,practice,status,0,,,,,,,,,self-calibration blocks 1
+1793641814150.3,practice,command,0,,,release,Open,696,practice,,,
+1793641818150.6,practice,command,0,,,pose_A,Power,734,practice,,,
+1793641819247.1,practice,status,0,,,,,,,,,receive ring high-water (bytes) 98
+1793641819247.4,practice,status,0,,,,,,,,,stack peak (bytes) 2100
+1793641819247.5,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641819247.8,practice,status,0,,,,,,,,,UART errors 0
+1793641824150.3,practice,command,0,,,release,Open,791,practice,,,
+1793641829393.1,practice,status,0,,,,,,,,,receive ring high-water (bytes) 98
+1793641829393.3,practice,status,0,,,,,,,,,stack peak (bytes) 2100
+1793641829393.6,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641829393.7,practice,status,0,,,,,,,,,UART errors 0
+1793641834150.2,practice,command,0,,,release,Open,886,practice,,,
+1793641838850.4,practice,command,0,,,grip,Tripod,931,practice,,,
+1793641839537.9,practice,status,0,,,,,,,,,receive ring high-water (bytes) 98
+1793641839538.1,practice,status,0,,,,,,,,,stack peak (bytes) 2100
+1793641839538.4,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641839538.4,practice,status,0,,,,,,,,,UART errors 0
+1793641842149.8,practice,command,0,,,pose_A,Power,962,practice,,,
+1793641846850.4,practice,command,0,,,grip,Tripod,1007,practice,,,
+1793641849684.1,practice,status,0,,,,,,,,,receive ring high-water (bytes) 98
+1793641849684.3,practice,status,0,,,,,,,,,stack peak (bytes) 2100
+1793641849684.5,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641849684.7,practice,status,0,,,,,,,,,UART errors 0
+1793641850150.4,practice,command,0,,,release,Open,1038,practice,,,
+1793641854250.7,practice,command,0,,,grip,Tripod,1077,practice,,,
+1793641859829.0,practice,status,0,,,,,,,,,receive ring high-water (bytes) 98
+1793641859829.4,practice,status,0,,,,,,,,,stack peak (bytes) 2100
+1793641859829.5,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641859829.6,practice,status,0,,,,,,,,,UART errors 0
+1793641860150.0,practice,command,0,,,grip,Tripod,1133,practice,,,
+1793641862850.3,practice,command,0,,,pose_A,Power,1159,practice,,,
+1793641866150.0,practice,command,0,,,pose_B,Pointer,1190,practice,,,
+1793641869976.2,practice,status,0,,,,,,,,,receive ring high-water (bytes) 98
+1793641869976.4,practice,status,0,,,,,,,,,stack peak (bytes) 2100
+1793641869976.5,practice,status,0,,,,,,,,,UART bytes dropped 0
+1793641869976.7,practice,status,0,,,,,,,,,UART errors 0
+1793641872150.4,practice,command,0,,,release,Open,1247,practice,,,
+1793641872850.0,practice,status,0,,,,,,,,,self-calibration start (windows so far) 1254
+1793641873015.2,practice,status,0,,,,,,,,,self-calibration took (us) 165665
+1793641873015.3,practice,status,0,,,,,,,,,self-calibration blocks 2
+1793641884675.4,practice,practice_off,0,,,,,,,,,
+1793641884676.3,practice,seg_end,,,,,,,,,,0
+1793641884687.8,,session_end,,,,,,,,,,

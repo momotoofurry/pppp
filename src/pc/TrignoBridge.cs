@@ -622,10 +622,13 @@ static class Program
             ends.Add(int.Parse(f[0], IC)); times.Add(double.Parse(f[1], IC));
         }
         var labels = new List<int>(); var blocks = new List<int>();
-        foreach (var l in File.ReadAllLines(Path.Combine(dir, "windows.csv"))) {
-            if (l.StartsWith("block")) continue;
-            var f = l.Split(',');
-            blocks.Add(int.Parse(f[0], IC)); labels.Add(int.Parse(f[3], IC));
+        var wl = File.ReadAllLines(Path.Combine(dir, "windows.csv"));
+        var head = new List<string>(wl[0].Split(','));                // columns by name: newer files add test_block
+        int iBlock = head.IndexOf("block"), iLabel = head.IndexOf("label");
+        for (int k = 1; k < wl.Length; k++) {
+            if (wl[k].Length == 0) continue;
+            var f = wl[k].Split(',');
+            blocks.Add(int.Parse(f[iBlock], IC)); labels.Add(int.Parse(f[iLabel], IC));
         }
         udpPort = int.Parse(Get(a, "udp", "50555"));                 // board commands -> TaskScreen.exe (end-to-end test)
         if (udpPort > 0) udp = new UdpClient();

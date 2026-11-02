@@ -1335,6 +1335,18 @@ buffer 座標（括號是和同一種對齊的 `base` 比：差、變好／變�
   這些數字只說明「規則照設計擋下了大部分誤轉」，不能寫成外部驗證的增益。
 - 凍結成 `pilot-freeze-4`（演算法只改開機對齊；其他參數和 `pilot-freeze-3` 相同）。
 
+## 26. `pilot-freeze-4` 上板與任務畫面端到端（板子實測，2026-11-03；`board_replay.py --tag _freeze4` → `results/board_replay_freeze4_*.csv`、`results/taskscreen_e2e_freeze4.csv`）
+
+- 燒錄：`export_stm32.py` → `D:\stm32\blink`、`cmake --build build/rt`（text 125,436、data 108、bss 176,084 B，和 report 25 相同），
+  STM32_Programmer_CLI 2.23.0 SWD 寫入並驗證成功。
+- 板子回放（受試者 0，校正＋2 個 test block，135 秒，`serial_replay.ps1`，COM6）：block 0／1 準確率 88.00%／85.00%，和 PC 版 `rt.c`
+  **逐視窗 100% 相同**（600 個視窗）；CRC 錯誤 0、遺失封包 0、one-shot 成功、自我校正 2 次（156–166 ms）、27 個指令；
+  延遲 p50 6.76 ms、p95 7.30 ms、最大 18.3 ms；receive ring 最高 249 B、stack 峰值 2,100 B、UART 錯誤 1（和之前的韌體一樣）。
+- 端到端（板子 → `TrignoBridge replay` → UDP → `TaskScreen`）：同一個串流再跑一次，任務畫面收到 27 個指令和 64 個狀態，
+  指令的視窗編號和板子回傳的 27 個逐一相同。`TrignoBridge replay` 本身也報 88.00%／85.00%（修正：新版 `windows.csv` 多一欄
+  `test_block`，原本照固定欄位讀標籤會顯示 0%，改成照欄名讀；實驗室包裡舊格式的檔案也重跑一次，88.00%／85.00%）。
+- 沒測到的：真的 Trigno → 板子 → 任務畫面（要實驗室的 TCU）、Kinova。
+
 ---
 
 ## 附錄：檔案
