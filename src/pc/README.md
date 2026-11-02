@@ -9,6 +9,8 @@
 | `trigno_bridge.py` | 連 TCU（50040 指令、50041 EMG）→ 存 `emg.csv` → 轉成 int16（0.25 µV/LSB）送到序列埠；同時記錄 MCU 傳回的封包到 `mcu.csv` |
 | `mcu_logger.py` | 解 MCU 傳回的封包（指令、每個視窗的預測、狀態）存 CSV；bridge 內部會用到，也可以單獨解錄下來的位元組檔 |
 | `test_pc_tools.py` | 沒有硬體時的整合測試：假的 TCU → bridge → C 的 `rt.c`（假的 MCU）→ 回傳 → CSV |
+| `TrignoBridge.cs` | 實驗室用的 C# 版 bridge（不用安裝任何東西，`lab_kit/README.md`）；`run` 的 CSV 用 Unix 時間 ms，另存 `ops.csv`，指令與狀態用 UDP 轉給 TaskScreen |
+| `TaskScreen.cs` | 正式實驗的提示畫面（`PROTOCOL.md` 第 4.1、5、6 節）→ `task.csv`；終點用 `src/task_summary.py` 算 |
 
 ## 用法
 

@@ -1,0 +1,3 @@
+file,subject,day,trials,success,success_rate,wrong,timeout,aborted,median_latency_ms,rest_commands,recomputed_differ,target_counts,repeats,nc_minutes,nc_commands,nc_per_min,nc_per_item,labelled_blocks,labelled_cues,aborted_runs
+T01_d2_A_task.csv,T01,2,8,0,0.0,8,0,0,,10,0,grip:2 pose_A:2 pose_B:2 release:2,0,0.033,6,179.686,1:3 2:3,2,Lateral:1 Open:1 Pointer:1 Power:1 Rest:1 Tripod:1 | Lateral:1 Open:1 Pointer:1 Power:1 Rest:1 Tripod:1,0
+T02_d1_F_task.csv,T02,1,4,1,25.0,3,0,0,666.4,0,0,grip:1 pose_A:1 pose_B:1 release:1,0,0.025,1,39.976,1:1,0,,1

@@ -6,9 +6,12 @@
 //       TCU only (no STM32): START, record, then the measured sample rate (frames / time) and per channel the
 //       largest |value| and the RMS; warns when a channel comes near the +-8.19 mV the MCU encoding can carry.
 //   TrignoBridge run    --port COM5 [--tcu 127.0.0.1] [--rate 2000] [--emg-csv emg.csv] [--mcu-csv mcu.csv]
-//                       [--script commands.txt]          (--port file:<path>: write the serial bytes to a file)
+//                       [--ops-csv ops.csv] [--udp 50555] [--script commands.txt]
+//                       (--port file:<path>: write the serial bytes to a file; --udp 0: no forwarding)
 //       TCU -> (resampled to 2000 Hz when --rate is not 2000) -> int16 0.25 uV -> packets -> COM port at 921600;
-//       MCU packets -> mcu.csv and the console. Commands typed while running:
+//       MCU packets -> mcu.csv and the console; COMMAND / STATUS packets also -> UDP 127.0.0.1:<udp> for
+//       TaskScreen.exe; every typed command -> ops.csv. All three CSVs carry Unix time in ms (unix_ms).
+//       Commands typed while running:
 //         reset | cal <0-5> | calend | calibrate | align | decision <tau_permille> <k> | report <0|1> | status | quit
 //       cal <g> = reset + CAL_START; CAL_END follows by itself after 2 s of samples (10 windows per gesture).
 //       adapt 0|1 = study condition: 0 fixed day-1 model (no adaptation, no alignment), 1 full system (default);
@@ -321,8 +324,23 @@ static class Program
     static object txLock = new object();
     static SerialPort port;
     static volatile bool stop;
-    static StreamWriter mcuCsv;
+    static StreamWriter mcuCsv, opsCsv;
     static Stopwatch clock = Stopwatch.StartNew();
+    // one clock for every file of a session (PROTOCOL.md section 8): Unix time in ms, read once and then advanced
+    // by the Stopwatch so it never jumps (TaskScreen.exe uses the same rule)
+    static readonly double epochMs = (DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds
+                                     - clock.Elapsed.TotalMilliseconds;
+    static double UnixMs() { return epochMs + clock.Elapsed.TotalMilliseconds; }
+    // COMMAND and STATUS packets also go to TaskScreen.exe as UDP datagrams "<unix_ms>,<mcu.csv line>" (localhost)
+    static UdpClient udp;
+    static int udpPort;
+
+    static void Forward(double ms, string line)
+    {
+        if (udp == null) return;
+        var b = Encoding.ASCII.GetBytes(ms.ToString("F1", IC) + "," + line);
+        try { udp.Send(b, b.Length, "127.0.0.1", udpPort); } catch (SocketException) { }   // nobody listening: fine
+    }
     static int mcuPackets, preds;
     // day-1 calibration check (report 22): 10 predictions per gesture, pass at >= 70 % of the 60
     const int VERIFY_WINDOWS = 10, VERIFY_PASS_PCT = 70;
@@ -377,6 +395,15 @@ static class Program
 
     static bool DoCommand(string line)
     {
+        double ms = UnixMs();
+        bool ok = DoCommand1(line);
+        if (opsCsv != null && line.Trim().Length > 0)
+            lock (opsCsv) { opsCsv.WriteLine(ms.ToString("F1", IC) + "," + line.Trim().Replace(',', ' ') + "," + (ok ? 1 : 0)); opsCsv.Flush(); }
+        return ok;
+    }
+
+    static bool DoCommand1(string line)
+    {
         var p = line.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
         if (p.Length == 0) return true;
         string c = p[0].ToLowerInvariant();
@@ -427,9 +454,13 @@ static class Program
             foreach (var pk in dec.Feed(b, n)) {
                 mcuPackets++;
                 string line = Describe(pk.Key, pk.Value);
-                lock (mcuCsv) mcuCsv.WriteLine(clock.Elapsed.TotalMilliseconds.ToString("F1", IC) + "," + line);
+                double ms = UnixMs();
+                lock (mcuCsv) mcuCsv.WriteLine(ms.ToString("F1", IC) + "," + line);
                 if (pk.Key == Proto.PRED) { preds++; if (pk.Value.Length >= 13) VerifyPred(pk.Value[8]); }
-                else Console.WriteLine(string.Format(IC, "[{0:F1} s] MCU: {1}", clock.Elapsed.TotalSeconds, line));
+                else {
+                    Forward(ms, line);
+                    Console.WriteLine(string.Format(IC, "[{0:F1} s] MCU: {1}", clock.Elapsed.TotalSeconds, line));
+                }
             }
         }
     }
@@ -470,7 +501,11 @@ static class Program
         var tcu = new Tcu(Get(a, "tcu", "127.0.0.1"));
         Console.WriteLine("TCU banner: " + tcu.Banner);
         mcuCsv = new StreamWriter(Get(a, "mcu-csv", "mcu.csv"));
-        mcuCsv.WriteLine("pc_ms,kind,window,t_us,gesture,command,accepted,ratio,pushed,event,value");
+        mcuCsv.WriteLine("unix_ms,kind,window,t_us,gesture,command,accepted,ratio,pushed,event,value");
+        opsCsv = new StreamWriter(Get(a, "ops-csv", "ops.csv"));
+        opsCsv.WriteLine("unix_ms,command,accepted");
+        udpPort = int.Parse(Get(a, "udp", "50555"));
+        if (udpPort > 0) udp = new UdpClient();
         if (portName.StartsWith("file:")) {
             fileOut = new FileStream(portName.Substring(5), FileMode.Create);
             Console.WriteLine("no MCU: the serial bytes go to " + portName.Substring(5));
@@ -506,14 +541,14 @@ static class Program
         var pending = new List<short[]>();
         double lastReport = 0;
         using (var emg = new StreamWriter(Get(a, "emg-csv", "emg.csv"))) {
-            emg.WriteLine("pc_ms,frame," + string.Join(",", Enumerable(Proto.CH, "ch{0}_V")));
+            emg.WriteLine("unix_ms,frame," + string.Join(",", Enumerable(Proto.CH, "ch{0}_V")));
             while (!stop) {
                 double now = clock.Elapsed.TotalSeconds - t0;
                 while (si < script.Count && script[si].Key <= now) DoCommand(script[si++].Value);
                 if (script.Count > 0 && si == script.Count) stop = true;
                 var fr = tcu.Read();
                 if (fr.Count == 0) break;
-                double ms = clock.Elapsed.TotalMilliseconds;
+                double ms = UnixMs();
                 foreach (var f in fr) {
                     var sb = new StringBuilder();
                     sb.Append(ms.ToString("F1", IC)).Append(',').Append(framesIn);
@@ -566,6 +601,8 @@ static class Program
         if (port != null) port.Close();
         if (fileOut != null) fileOut.Close();
         lock (mcuCsv) mcuCsv.Close();
+        lock (opsCsv) opsCsv.Close();
+        if (udp != null) udp.Close();
         Console.WriteLine(string.Format(IC, "done: {0} frames in, {1} out, {2} samples clipped, {3} MCU packets ({4} PRED)",
                                         framesIn, framesOut, clipped, mcuPackets, preds));
         return 0;
@@ -590,6 +627,8 @@ static class Program
             var f = l.Split(',');
             blocks.Add(int.Parse(f[0], IC)); labels.Add(int.Parse(f[3], IC));
         }
+        udpPort = int.Parse(Get(a, "udp", "50555"));                 // board commands -> TaskScreen.exe (end-to-end test)
+        if (udpPort > 0) udp = new UdpClient();
         var dec = new Decoder();
         var predCls = new List<int>(); var events = new List<string>();
         var buf = new byte[65536];
@@ -608,7 +647,9 @@ static class Program
                     int got = sp.Read(buf, 0, Math.Min(n, buf.Length));
                     foreach (var pk in dec.Feed(buf, got)) {
                         if (pk.Key == Proto.PRED) predCls.Add(pk.Value[8]);
+                        else if (pk.Key == Proto.COMMAND) Forward(UnixMs(), Describe(pk.Key, pk.Value));
                         else if (pk.Key == Proto.STATUS) {
+                            Forward(UnixMs(), Describe(pk.Key, pk.Value));
                             string d = Describe(pk.Key, pk.Value);
                             events.Add(d);
                             Console.WriteLine(string.Format(IC, "[{0:F1} s] MCU: {1}", now, d));

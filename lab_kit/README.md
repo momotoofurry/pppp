@@ -13,7 +13,8 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
 | `TrignoBridge.exe` | check／run／replay 三種模式 |
 | `check.bat` | 第 2 步：只測 Trigno（不用 STM32） |
 | `replay.bat` | 第 1 步：只測 STM32（不用 Trigno），用錄好的資料 |
-| `run.bat` | 第 3 步：Trigno → STM32 整條路 |
+| `run.bat` | 第 3 步：Trigno → STM32 整條路（`run.bat COM5 S01_d2_A` → `S01_d2_A_emg.csv`、`_mcu.csv`、`_ops.csv`） |
+| `TaskScreen.exe`、`task.bat` | 第 4 步：正式實驗的提示畫面（有標籤段、練習、提示指令任務、非控制動作段）→ `S01_d2_A_task.csv` |
 | `board_replay\` | 第 1 步用的錄好的串流（受試者 0，校正＋2 個 block，135 秒） |
 
 ## 第 1 步：只測 STM32 和 COM port（約 3 分鐘，不用 Trigno）
@@ -92,10 +93,29 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
 3. **不要只做一種手勢或一直休息**：束帶真的轉了一格時，只休息的話 20 人裡 16 人修正不回來（report 第 25 節）。
 4. 之後照常使用（不用重新 `cal`／`calibrate`）。
 
+## 第 4 步：提示畫面（正式實驗，`PROTOCOL.md` 第 4.1、5、6 節）
+
+1. 先開 `run.bat COM5 S01_d2_A`（檔名只用代號＿天＿條件；檔案已存在會拒絕，換名字）。照第 3 步做 `report 1`、`load`、
+   `adapt`、`align`。`run.bat` 會把板子的指令和狀態用 UDP（本機 50555）轉給提示畫面，也把你打的每個指令記到 `_ops.csv`。
+2. 另開一個命令提示字元：`task.bat S01 2 A`（代號、天、條件）。畫面全螢幕，**不顯示條件**（單盲）。
+3. 每一段由實驗者按**空白鍵**開始，順序：有標籤段 → 練習 → 提示指令任務 → 有標籤段 → 非控制動作段（每一項也按空白鍵開始）。
+   - 有標籤段：6 個手勢 × 5 次，提示 2 秒、休息 3 秒，隨機順序。
+   - 提示指令任務：40 個試次，畫面顯示目標指令（夾／放／位置 A／位置 B），5 秒內板子送出的**第一個**指令是目標＝成功，
+     試次之間休息 2.5 秒（畫面顯示對錯）。**每次做完要放鬆**：同一個指令要隔一個別的手勢（含 Rest）才會再送。
+   - **Esc**：中止目前這一段（會記錄，可以按空白鍵重做；分析只用最後一次完整的）。等待時按 **Q** 離開。
+4. 改設定（老師決定後）：`task.bat S01 2 A --n 40 --timeout 5 --commands grip,release,pose_A,pose_B,home`
+   （`home`＝Lateral，要韌體也加了才有）、`--items 1,2,3,5`（非控制動作項目；預設第 1 天 1,2,3,5、第 2 天 1–8）。
+   全部選項在 `src/pc/TaskScreen.cs` 開頭。
+5. 沒有板子時演練：`task.bat S01 1 A --fake`，鍵盤 1–5 當作板子送出 位置 A／夾／位置 B／放／回原位。
+6. 結果：結束畫面和 `_task.csv` 的最後一行有任務成功數與休息中誤觸發；帶回來用 `src/task_summary.py` 算主終點。
+7. 板子接上但沒有 Trigno 時，可以先開 `task.bat T00 0 X`，再跑 `replay.bat COM5`：replay 也會把板子的指令轉給提示畫面
+   （端到端測試；`T00_d0_X_task.csv` 不是實驗資料）。
+
 ## 收尾
 
-- 把 `emg.csv`（原始 EMG）、`mcu.csv`（板子的預測、指令、狀態）、`emg_check.csv` 複製回來。
-- **檔名改成受試者代號（例如 S01_day1_emg.csv），不要用姓名。**
+- 把 `S01_d2_A_emg.csv`（原始 EMG）、`_mcu.csv`（板子的預測、指令、狀態）、`_ops.csv`（實驗者指令）、`_task.csv`（提示與結果）、
+  `emg_check.csv` 複製回來。所有檔案的時間都是 Unix 時間（ms，同一個時鐘），可以直接對齊。
+- **檔名只用受試者代號（例如 S01_d2_A），不要用姓名。**
 - 收你自己以外的受試者之前，IRB 要先通過。
 
 ## 已在我的電腦上測過的
@@ -111,6 +131,12 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
   位元組餵給 PC 版 `rt.c`：回 `rotation 0`（資料沒轉）、之後正常分類。`src/check_align_rt.py`：PC 版 `rt.c` 的開機對齊
   在通道轉 0／1／2／−1 格時都估對，之後的預測和沒轉時逐視窗相同；只給 10 個視窗時回 `alignment too short`。
 
+- 提示畫面（2026-11-02）：TaskScreen.exe 接假的板子（Python 送 UDP 指令，隨機時間、2 成的時間戳早 100 ms 模擬傳輸延遲）
+  跑完五段：8 個試次目標平衡（各 2）、沒有連續相同目標；`src/task_summary.py` 用記錄的指令重算每個試次的結果，和畫面判定
+  0 個不同。鍵盤（空白鍵、`--fake` 的 1–4、Esc 中止後重做）也測過：中止的那次分析時排除。
+  改過的 TrignoBridge.exe 接模擬的 TCU：位元組不變（`check_bridge.py`：CRC 錯誤 0、88.00%），三個 CSV 都是 Unix 時間 ms，
+  `_ops.csv` 記下每個指令。**板子 → UDP → 提示畫面這段還沒接真的板子測過**（板子接上後用第 4 步第 7 點測）。
+
 ## 還沒在真機上確認的
 
 - 真的 TCU 的協定（版本字串、START／STOP 的回應、16 通道 float32 的格式）是照 pytrigno 寫的。第 2 步就是在確認這件事：
@@ -121,9 +147,11 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
 ## 重建這個資料夾（在開發電腦上）
 
 ```
-C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /optimize+ /target:exe /out:build\pc\TrignoBridge.exe src\pc\TrignoBridge.cs
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /optimize+ /codepage:65001 /target:exe /out:build\pc\TrignoBridge.exe src\pc\TrignoBridge.cs
+C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /optimize+ /codepage:65001 /target:winexe /out:build\pc\TaskScreen.exe src\pc\TaskScreen.cs
 python src/board_replay.py make --blocks 2        (在 Docker 裡；產生 build/board_replay/)
 ```
-再把 `build/pc/TrignoBridge.exe`、`lab_kit/*.bat`、`lab_kit/README.md`、`build/board_replay/{stream.bin,schedule.csv,windows.csv}`
+（`/codepage:65001`：原始碼是沒有 BOM 的 UTF-8，不加的話中文字串會被當成 Big5 編譯成亂碼。）
+再把 `build/pc/TrignoBridge.exe`、`build/pc/TaskScreen.exe`、`lab_kit/*.bat`、`lab_kit/README.md`、`build/board_replay/{stream.bin,schedule.csv,windows.csv}`
 複製到隨身碟的 `lab_kit/`（`board_replay/` 子資料夾）。測試：`src/pc/fake_tcu.py`（Windows 的 Python＋numpy）當 TCU，
 `TrignoBridge.exe run --port file:bridge_out.bin --script script.txt`，再用 `src/pc/check_bridge.py` 檢查。
