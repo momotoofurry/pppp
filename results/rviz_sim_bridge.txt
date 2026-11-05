@@ -1,0 +1,76 @@
+﻿TCU banner: Delsys Trigno System Digital Protocol Version (fake_tcu.py)
+alignment gate on: board commands are forwarded only after a good 'align' (--gate 0: off)
+input 2000 Hz: no resampling
+START -> OK
+[0.0 s] sent: report 1
+[0.1 s] cal 0 (Power): do the gesture now and hold it; calend comes by itself after 2 s
+[2.0 s] calend (auto, 2 s): you can relax
+[2.0 s] cal 1 (Lateral): do the gesture now and hold it; calend comes by itself after 2 s
+[4.0 s] calend (auto, 2 s): you can relax
+[4.0 s] cal 2 (Tripod): do the gesture now and hold it; calend comes by itself after 2 s
+[6.0 s] calend (auto, 2 s): you can relax
+[6.0 s] cal 3 (Pointer): do the gesture now and hold it; calend comes by itself after 2 s
+[8.0 s] calend (auto, 2 s): you can relax
+[8.0 s] cal 4 (Open): do the gesture now and hold it; calend comes by itself after 2 s
+[9.1 s] MCU: status,,,,,,,,receive ring high-water (bytes),92
+[9.1 s] MCU: status,,,,,,,,stack peak (bytes),916
+[9.1 s] MCU: status,,,,,,,,UART bytes dropped,0
+[9.1 s] MCU: status,,,,,,,,UART errors,1
+[10.0 s] calend (auto, 2 s): you can relax
+[10.0 s] cal 5 (Rest): do the gesture now and hold it; calend comes by itself after 2 s
+[10 s] in 20009 frames (1999.6 Hz measured), out 20009, clipped 0, MCU packets 4 (PRED 0)
+[12.0 s] calend (auto, 2 s): you can relax
+[12.0 s] sent: calibrate
+[12.1 s] MCU: status,,,,,,,,calibration windows,60
+[13.1 s] MCU: status,,,,,,,,calibrated (0 = ok),0
+[13.1 s] commands held until a good 'align' (calibrated)
+[13.4 s] MCU: command,127,274156113,Power,pose_A,,0.860,,,  (HELD: no good alignment yet)
+[14.0 s] align: for 8 s do each gesture about 1 s: Power, Lateral, Tripod, Pointer, Open, Rest
+[19.3 s] MCU: status,,,,,,,,receive ring high-water (bytes),92
+[19.3 s] MCU: status,,,,,,,,stack peak (bytes),1244
+[19.3 s] MCU: status,,,,,,,,UART bytes dropped,0
+[19.3 s] MCU: status,,,,,,,,UART errors,1
+[20 s] in 40022 frames (2000.3 Hz measured), out 40022, clipped 0, MCU packets 21 (PRED 10)
+[22.0 s] alignend (auto, 8 s): the MCU answers with 'rotation'
+[22.1 s] MCU: status,,,,,,,,rotation,0
+[22.1 s] commands forwarded again (aligned, rotation 0)
+[23.0 s] MCU: command,222,283614108,Tripod,grip,,0.760,,,
+[29.4 s] MCU: status,,,,,,,,receive ring high-water (bytes),92
+[29.4 s] MCU: status,,,,,,,,stack peak (bytes),1244
+[29.4 s] MCU: status,,,,,,,,UART bytes dropped,0
+[29.4 s] MCU: status,,,,,,,,UART errors,1
+[30 s] in 60018 frames (2000.0 Hz measured), out 60018, clipped 0, MCU packets 107 (PRED 90)
+[34.8 s] MCU: command,340,295235117,Open,release,,0.710,,,
+[39.6 s] MCU: status,,,,,,,,receive ring high-water (bytes),92
+[39.6 s] MCU: status,,,,,,,,stack peak (bytes),1244
+[39.6 s] MCU: status,,,,,,,,UART bytes dropped,0
+[39.6 s] MCU: status,,,,,,,,UART errors,1
+[40 s] in 80023 frames (2000.1 Hz measured), out 80023, clipped 0, MCU packets 212 (PRED 190)
+[41.1 s] MCU: command,403,301440108,Pointer,pose_B,,0.740,,,
+[43.9 s] MCU: command,431,304197109,Tripod,grip,,0.790,,,
+[44.6 s] MCU: command,438,304887116,Open,release,,0.780,,,
+[47.0 s] MCU: command,462,307252116,Open,release,,0.740,,,
+[49.7 s] MCU: status,,,,,,,,receive ring high-water (bytes),92
+[49.7 s] MCU: status,,,,,,,,stack peak (bytes),1244
+[49.7 s] MCU: status,,,,,,,,UART bytes dropped,0
+[49.7 s] MCU: status,,,,,,,,UART errors,1
+[50 s] in 100025 frames (2000.1 Hz measured), out 100025, clipped 0, MCU packets 320 (PRED 290)
+[51.1 s] MCU: status,,,,,,,,self-calibration start (windows so far),503
+[51.1 s] MCU: status,,,,,,,,self-calibration took (us),67819
+[51.1 s] MCU: status,,,,,,,,self-calibration blocks,1
+[51.2 s] MCU: command,504,311387116,Pointer,pose_B,,0.840,,,
+[54.7 s] MCU: command,539,314836115,Open,release,,0.940,,,
+[59.1 s] MCU: command,583,319168125,Power,pose_A,,0.810,,,
+[59.9 s] MCU: status,,,,,,,,receive ring high-water (bytes),92
+[59.9 s] MCU: status,,,,,,,,stack peak (bytes),2100
+[59.9 s] MCU: status,,,,,,,,UART bytes dropped,0
+[59.9 s] MCU: status,,,,,,,,UART errors,1
+[60 s] in 120026 frames (2000.1 Hz measured), out 120026, clipped 0, MCU packets 430 (PRED 390)
+[65.4 s] MCU: command,646,325372117,Tripod,grip,,0.620,,,
+[69.2 s] MCU: command,684,329114126,Pointer,pose_B,,0.640,,,
+[70.1 s] MCU: status,,,,,,,,receive ring high-water (bytes),92
+[70.1 s] MCU: status,,,,,,,,stack peak (bytes),2100
+[70.1 s] MCU: status,,,,,,,,UART bytes dropped,0
+[70.1 s] MCU: status,,,,,,,,UART errors,1
+[70 s] in 140027 frames (2000.1 Hz measured), out 140027, clipped 0, MCU packets 536 (PRED 490)
+done: 144000 frames in, 144000 out, 0 samples clipped, 556 MCU packets (510 PRED), 1 commands held before alignment

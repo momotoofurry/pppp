@@ -1,0 +1,6 @@
+{
+ "_note": "EXAMPLE poses for the RViz simulation only (degrees, joint_1..joint_7). Not checked on the lab robot or its table; teach the real ones with kinova_bridge.py teach.",
+ "home": [0, 15, 180, -130, 0, 55, 90],
+ "pose_A": [35, 30, 180, -100, 0, 70, 90],
+ "pose_B": [-35, 30, 180, -100, 0, 70, 90]
+}

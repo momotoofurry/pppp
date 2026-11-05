@@ -1449,6 +1449,28 @@ buffer 座標（括號是和同一種對齊的 `base` 比：差、變好／變�
 - 用途是說明為什麼選 100 棵、深度 10、int16，以及 buffer 375 筆、新樹 ≤ 32 葉：這是 256 KB 內準確率最高、而且還在曲線平緩段的點。
 - 設定是在同一批 20 人上挑的，所以這張圖只能說明「為什麼這樣選」，不能當泛化效能。
 
+### 27.5 板子指令驅動 RViz 裡的模擬 Gen3（板子實測，2026-11-06；`results/rviz_sim_*`）
+
+- 路線：假 TCU → TrignoBridge（對齊閘門）→ 真板子（`pilot-freeze-4`，COM6）→ UDP 50556 → `kinova_bridge.py run --ros`
+  → TCP → `src/pc/sim/ros_relay.py`（WSL，ROS 2 Humble）→ ros2_control 模擬硬體上的 Gen3 7 軸＋Robotiq 2F-85，RViz 顯示。
+  - 模擬手臂用 Kinova 的 `ros2_kortex` 0.2.3（apt）啟動：`src/pc/sim/gen3_sim.sh`。
+  - apt 版本不相容：kortex 會把 `isaac_joint_commands`／`isaac_joint_states` 傳給 Robotiq 0.0.1 的巨集，但巨集沒有這兩個參數，xacro 會失敗。
+    處理方式：在 `~/.cache` 放一份 Robotiq 描述檔的 overlay，只補宣告這兩個參數（用不到，只有預設值），`/opt/ros` 下的檔案不動。
+  - WSL 不轉送 Windows 本機的 UDP，只轉送 TCP，所以橋接程式留在 Windows（收 UDP、按鍵、`robot.csv`、一次一個動作），透過 TCP 交給 WSL 裡的 relay。
+  - 關節動作的時間 = 最大關節變化 ÷ 速度上限（這次 20°/s），和真手臂的 `JOINT_CONSTRAINT_SPEED` 同一個規則。
+  - 預設姿勢用 `src/pc/sim/poses_sim.json`，是示範值，**沒有在實驗室的手臂和桌面上確認過**。
+- 先用 Python 直接送 6 個 UDP 指令測試（`rviz_sim_robot.csv` 的前 18 行）：4 個執行完成，2 個在手臂動作中收到，記成 busy、沒有執行。
+  時間符合速度限制，例如 `pose_A` → `pose_B` 第 1 軸轉 70°，花 3.5 s。
+- 板子測試（72 秒腳本：校正 → `calibrate` → `align`）：
+  - 板子送出 12 個指令。對齊前的 1 個被閘門擋下（`pose_A`，HELD），對齊結果 rotation 0。
+  - 之後的 11 個指令 relay 全部收到並執行完成，0 個 busy。紀錄在 `rviz_sim_robot.csv`、`rviz_sim_mcu.csv`、`rviz_sim_bridge.txt`。
+  - 截圖：`results/rviz_sim_gen3.png`。
+- 限制：
+  - 模擬硬體會完美照做指令，沒有動力學、負載和真實延遲。夾爪在模擬中約 0.05 s 就到位，真實夾爪要更久。
+  - 這只是流程驗證，不能取代真手臂測試，論文只能寫成「模擬環境中的端到端流程驗證」。
+  - 這次的指令來自錄好的 EMG（受試者 0），不是即時肌電控制。
+- 另外看到：板子每 10 秒回報的 `UART errors` 一直是 1，沒有增加。之前的板子測試也是這樣，CRC 錯誤是 0。
+
 
 ---
 

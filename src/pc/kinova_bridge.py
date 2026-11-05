@@ -13,6 +13,9 @@ estop, clear. End-to-end latency = robot start - the EMG window time (from mcu.c
 
 Modes:
   --sim                    no robot, actions take --sim-s seconds (tests on any PC; this is what was tested)
+  --ros [127.0.0.1:50557]  simulated Gen3 + Robotiq 2F-85 in RViz (ROS 2 mock hardware in WSL): first
+                           bash src/pc/sim/gen3_sim.sh and python3 src/pc/sim/ros_relay.py in WSL; poses in degrees
+                           (Kortex convention), e.g. src/pc/sim/poses_sim.json. Same busy / e-stop / robot.csv logic.
   --ip 192.168.1.10        real robot through the Kortex API (pip package kortex_api, from Kinova); user name and
                            password from --user / the environment variable KINOVA_PASSWORD (never in a file).
                            NOT tested yet: no robot here. Check on the lab robot with the arm in a free space first.
@@ -72,6 +75,49 @@ class SimRobot:
 
     def close(self):
         pass
+
+
+class RosRobot:
+    """the simulated Gen3 in RViz: actions go over TCP to src/pc/sim/ros_relay.py (WSL, ROS 2) - see gen3_sim.sh"""
+
+    def __init__(self, addr, speed):
+        host, port = addr.rsplit(':', 1)
+        self.sock = socket.create_connection((host, int(port)), timeout=5)
+        self.sock.settimeout(None)
+        self.speed = speed
+        self.n, self.pending, self.lock = 0, {}, threading.Lock()
+        threading.Thread(target=self._read, daemon=True).start()
+
+    def _read(self):
+        for line in self.sock.makefile('r', encoding='utf-8'):
+            m = json.loads(line)
+            with self.lock:
+                done = self.pending.pop(m.get('id'), None)
+            if done:
+                done(m['event'], m.get('note', ''))
+
+    def _send(self, msg, done=None):
+        with self.lock:
+            self.n += 1
+            msg['id'] = self.n
+            if done:
+                self.pending[self.n] = done
+        self.sock.sendall((json.dumps(msg) + '\n').encode())
+
+    def run(self, kind, target, done):
+        if kind == 'gripper':
+            self._send({'kind': 'gripper', 'target': float(target)}, done)
+        else:
+            self._send({'kind': 'joints', 'target': [float(v) for v in target], 'speed': self.speed}, done)
+
+    def estop(self):
+        self._send({'kind': 'estop'})
+
+    def clear(self):
+        pass
+
+    def close(self):
+        self.sock.close()
 
 
 class KortexRobot:                              # untested without the robot
@@ -145,6 +191,8 @@ class KortexRobot:                              # untested without the robot
 def robot_from(args):
     if args.sim:
         return SimRobot(args.sim_s)
+    if args.ros:
+        return RosRobot(args.ros, args.speed)
     pw = os.environ.get('KINOVA_PASSWORD')
     if pw is None:
         sys.exit('set KINOVA_PASSWORD in this console first (the password is not taken from a file)')
@@ -157,7 +205,7 @@ def run(args):
     robot = robot_from(args)
     state = dict(busy=False, stopped=False, cur='')
     lock = threading.Lock()
-    log('session', note=f"mode {'sim' if args.sim else args.ip} poses {sorted(poses)} speed {args.speed}")
+    log('session', note=f"mode {'sim' if args.sim else ('ros ' + args.ros) if args.ros else args.ip} poses {sorted(poses)} speed {args.speed}")
 
     def finished(kind, note):
         with lock:
@@ -242,6 +290,7 @@ def main():
     ap.add_argument('--sim', action='store_true')
     ap.add_argument('--sim-s', type=float, default=1.5)
     ap.add_argument('--ip')
+    ap.add_argument('--ros', nargs='?', const='127.0.0.1:50557', help='simulated Gen3 in RViz via ros_relay.py')
     ap.add_argument('--user', default='admin')
     ap.add_argument('--udp', type=int, default=50556)
     ap.add_argument('--out', default='robot.csv')
@@ -252,8 +301,8 @@ def main():
     ap.add_argument('--seconds', type=float, default=0, help='stop after this many seconds (tests)')
     ap.add_argument('--name')
     args = ap.parse_args()
-    if not args.sim and not args.ip:
-        sys.exit('--sim or --ip')
+    if not args.sim and not args.ip and not args.ros:
+        sys.exit('--sim, --ros or --ip')
     teach(args) if args.mode == 'teach' else run(args)
 
 

@@ -124,6 +124,10 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
   `python kinova_bridge.py run --ip 192.168.1.10 --out S01_d2_A_robot.csv --poses poses.json`
   （要先 `pip install` Kinova 的 kortex_api、在那個視窗設好環境變數 `KINOVA_PASSWORD`；預設位置用 `kinova_bridge.py teach --ip ... --name pose_A` 存）。
   **按 e 急停**；c 解除；q 離開。真的手臂還沒測過，第一次要低速、手臂周圍淨空、旁邊有人拿急停。沒有手臂時可以加 `--sim` 演練。
+- 在自己的電腦用 RViz 看模擬手臂（需要 WSL＋ROS 2 Humble＋`ros2_kortex`，安裝指令在 `src/pc/sim/gen3_sim.sh` 開頭）：
+  WSL 裡依序跑 `bash src/pc/sim/gen3_sim.sh` 和 `python3 src/pc/sim/ros_relay.py`，
+  Windows 這邊跑 `python kinova_bridge.py run --ros --poses poses_sim.json`，再加上 `TrignoBridge run --udp 50555,50556`。
+  2026-11-06 用真板子測過（report 27.5）。只是流程演練，不能代替真手臂。
 
 ## 收尾
 
