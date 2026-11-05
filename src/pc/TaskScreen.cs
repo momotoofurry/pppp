@@ -5,7 +5,7 @@
 //   TaskScreen --subject S01 --day 2 --cond A [--out .] [--segments labelled,practice,task,labelled,noncontrol]
 //              [--commands grip,release,pose_A,pose_B] [--n 40] [--timeout 5] [--rest 2.5]
 //              [--reps 5] [--cue 2] [--gap 3] [--practice 120] [--items 1,2,3,5] [--item 60]
-//              [--udp 50555] [--fake] [--auto] [--windowed]
+//              [--retry 0|1] [--udp 50555] [--fake] [--auto] [--windowed]
 //
 // The board's commands come from TrignoBridge.exe (run, same PC) as UDP datagrams "<unix_ms>,<mcu.csv line>" on
 // 127.0.0.1:<udp>. Segments, in the order of --segments; the experimenter starts each one with the space bar:
@@ -18,6 +18,11 @@
 //              = failure. <rest> s rest between trials (feedback shown); commands there are 'rest' false commands.
 //   noncontrol the items of section 6 (default day 1: 1,2,3,5; day 2: 1-8), <item> s each; every command counts
 //   (safety endpoint). The experimenter starts each item with the space bar.
+//   tlx        raw NASA-TLX (6 scales, 0-100 in steps of 5, no weighting) for this condition: Left / Right move the
+//              mark, Enter keeps it and goes to the next scale (the subject or the experimenter presses the keys).
+// --retry 1 (secondary endpoint, PROTOCOL.md 5): after a wrong FIRST command the trial stays open until <timeout>
+// and logs whether the target came later ('retry_end': success2 / fail2). The primary result is still the first
+// command; with --retry 0 (default, as before) a wrong command ends the trial at once.
 // Random orders come from a seed made from subject|day|cond|segment|index, so they are fixed in advance.
 // The condition (A / F) is only in the file name, never on the screen (single blind).
 // Keys: space = start the next segment / item; Esc = abort the running segment (logged; it can be run again);
@@ -59,12 +64,13 @@ class TaskForm : Form
     static readonly string[] ITEMS = { "", "放鬆，手自然放在桌上", "拿杯子喝水、放回", "打鍵盤", "摸臉、扶眼鏡", "前臂旋前、旋後",
                                        "轉頭、交談", "站起來走幾步再坐下", "在機器人旁邊，但不打算控制" };
     static readonly Dictionary<string, string> SEG_ZH = new Dictionary<string, string> {
-        { "labelled", "有標籤段" }, { "practice", "練習" }, { "task", "提示指令任務" }, { "noncontrol", "非控制動作段" } };
+        { "labelled", "有標籤段" }, { "practice", "練習" }, { "task", "提示指令任務" }, { "noncontrol", "非控制動作段" },
+        { "tlx", "問卷（NASA-TLX）" } };
 
     readonly Dictionary<string, string> a;
     readonly string subject, day, cond;
     readonly string[] segs, commands;
-    readonly bool fake, auto;
+    readonly bool fake, auto, retry;
     readonly double timeoutMs, restMs, cueMs, gapMs, practiceMs, itemMs;
     readonly int nTrials, reps;
     readonly int[] items;
@@ -82,6 +88,19 @@ class TaskForm : Form
     int stepIdx;
     double stepStart;
     bool answered;                   // trial: first command seen
+    bool retrying;                   // --retry 1: first command was wrong, trial still open for a second try
+    int nRetry, nRetryOk;
+    // raw NASA-TLX (Hart & Staveland 1988): mental, physical, temporal demand, performance, effort, frustration
+    static readonly string[] TLX = {
+        "心智需求：這段任務需要多少思考、決定、記憶？\n很低 ←→ 很高",
+        "身體需求：這段任務需要多少體力（出力、維持手勢）？\n很低 ←→ 很高",
+        "時間壓力：你覺得節奏有多趕？\n很低 ←→ 很高",
+        "表現：你覺得自己做得多成功？\n完美 ←→ 失敗",
+        "努力：為了達到這個表現，你多努力？\n很低 ←→ 很高",
+        "挫折：你覺得多煩躁、有壓力、不耐煩？\n很低 ←→ 很高" };
+    static readonly string[] TLX_KEY = { "mental", "physical", "temporal", "performance", "effort", "frustration" };
+    int tlxValue = 50;
+    readonly List<int> tlxScores = new List<int>();
     int nSuccess, nTrialsDone, nRestCmds, nItemCmds;
     double itemMinutes;
     string lastCommand = "";
@@ -103,7 +122,7 @@ class TaskForm : Form
         var it = Get("items", day == "1" ? "1,2,3,5" : "1,2,3,4,5,6,7,8").Split(',');
         items = new int[it.Length];
         for (int i = 0; i < it.Length; i++) items[i] = int.Parse(it[i]);
-        fake = a.ContainsKey("fake"); auto = a.ContainsKey("auto");
+        fake = a.ContainsKey("fake"); auto = a.ContainsKey("auto"); retry = Get("retry", "0") == "1";
         epochMs = (DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds - clock.Elapsed.TotalMilliseconds;
 
         string dir = Get("out", ".");
@@ -113,8 +132,9 @@ class TaskForm : Form
         log = new StreamWriter(path, false, new UTF8Encoding(false));
         log.WriteLine("unix_ms,segment,event,step,trial,target,command,command_gesture,window,phase,result,latency_ms,text");
         Log(Now(), "", "session", -1, -1, "", "", "", "", "", "", "",
-            string.Format("subject {0} day {1} segments {2} commands {3} n {4} timeout_s {5} fake {6}",
-                          subject, day, string.Join(" ", segs), string.Join(" ", commands), nTrials, timeoutMs / 1000, fake ? 1 : 0)
+            string.Format("subject {0} day {1} segments {2} commands {3} n {4} timeout_s {5} fake {6} retry {7}",
+                          subject, day, string.Join(" ", segs), string.Join(" ", commands), nTrials, timeoutMs / 1000, fake ? 1 : 0,
+                          retry ? 1 : 0)
             + (udp != null ? " udp " + port : " udp off"));
 
         Text = "TaskScreen";
@@ -221,6 +241,9 @@ class TaskForm : Form
                 s.Add(new Step { Kind = "wait", Ms = 0, Target = i.ToString(IC), Text = "下一項：" + ITEMS[i] + "\n（實驗者按空白鍵開始）" });
                 s.Add(new Step { Kind = "item", Ms = itemMs, Target = i.ToString(IC), Text = ITEMS[i] });
             }
+        } else if (seg == "tlx") {
+            for (int i = 0; i < TLX.Length; i++)
+                s.Add(new Step { Kind = "tlx", Ms = 0, Target = TLX_KEY[i], Text = TLX[i] });
         } else throw new ArgumentException("unknown segment " + seg);
         return s;
     }
@@ -243,6 +266,11 @@ class TaskForm : Form
     {
         var p = new List<string>();
         if (nTrialsDone > 0) p.Add(string.Format(IC, "任務成功 {0}/{1}，休息中誤觸發 {2}", nSuccess, nTrialsDone, nRestCmds));
+        if (nRetry > 0) p.Add(string.Format(IC, "第二次對 {0}/{1}", nRetryOk, nRetry));
+        if (tlxScores.Count == TLX.Length) {
+            double m = 0; foreach (int v in tlxScores) m += v;
+            p.Add(string.Format(IC, "TLX {0:F1}", m / TLX.Length));
+        }
         if (itemMinutes > 0) p.Add(string.Format(IC, "非控制段指令 {0:F2}/分", nItemCmds / itemMinutes));
         return string.Join("   ", p);
     }
@@ -275,6 +303,7 @@ class TaskForm : Form
         var s = steps[stepIdx];
         stepStart = now;
         answered = false;
+        retrying = false;
         if (s.Kind != "rest" || stepIdx == 0 || steps[stepIdx - 1].Kind != "trial") {   // keep the trial feedback during its rest
             big.ForeColor = s.Kind == "rest" || s.Kind == "wait" ? Color.Gray : Color.White;
             big.Text = s.Kind == "practice" ? s.Text + "\n" + lastCommand : s.Text;
@@ -282,11 +311,16 @@ class TaskForm : Form
         small.Text = string.Format(IC, "{0}   {1} {2}/{3}", subject, SEG_ZH[segName], stepIdx + 1, steps.Count);
         Log(now, segName, s.Kind + "_on", stepIdx, s.Trial, s.Target ?? "", "", "", "", "", "", "", s.Kind == "item" ? s.Text : "");
         if (s.Kind == "wait" && auto) NextStep();
+        if (s.Kind == "tlx") { tlxValue = 50; ShowTlx(); if (auto) TlxKeep(now); }
     }
 
     void StepOff(double now, string note)
     {
         var s = steps[stepIdx];
+        if (s.Kind == "trial" && retrying) {                         // second try ran out
+            Log(now, segName, "retry_end", stepIdx, s.Trial, s.Target, "", "", "", "", note == "" ? "fail2" : "aborted", "", "");
+            retrying = false;
+        }
         if (s.Kind == "trial" && !answered) {                        // aborted mid-trial: not a trial result
             if (note == "") Result(now, s, "timeout", "", "", "", 0);
             else Log(now, segName, "trial_end", stepIdx, s.Trial, s.Target, "", "", "", "", "aborted", "", "");
@@ -320,8 +354,18 @@ class TaskForm : Form
             phase, "", "", text);
         if (s == null) return;
         if (phase == "trial" && s.Kind == "trial" && !answered && ms <= stepStart + s.Ms) {
-            Result(ms, s, cmd == s.Target ? "success" : "wrong", cmd, cg, window, ms - stepStart);
-            NextStep();
+            bool ok = cmd == s.Target;
+            Result(ms, s, ok ? "success" : "wrong", cmd, cg, window, ms - stepStart);
+            if (ok || !retry) NextStep();
+            else { retrying = true; nRetry++; big.Text += "\n再試一次"; }
+        } else if (phase == "trial" && s.Kind == "trial" && retrying && ms <= stepStart + s.Ms) {
+            if (cmd == s.Target) {
+                retrying = false; nRetryOk++;
+                Log(ms, segName, "retry_end", stepIdx, s.Trial, s.Target, cmd, cg, window, "", "success2",
+                    (ms - stepStart).ToString("F1", IC), "");
+                big.ForeColor = Color.Gold; big.Text = "✓ 第二次正確";
+                NextStep();
+            }
         } else if (phase == "rest" && segName == "task") nRestCmds++;
         else if (phase == "item") nItemCmds++;
         if (s.Kind == "practice") big.Text = s.Text + "\n" + lastCommand;
@@ -360,6 +404,14 @@ class TaskForm : Form
             OnCommand(now, c, COMMAND[c][1], "", "fake");
             return;
         }
+        if (segName != "" && stepIdx >= 0 && stepIdx < steps.Count && steps[stepIdx].Kind == "tlx") {
+            if (e.KeyCode == Keys.Left || e.KeyCode == Keys.Right) {
+                tlxValue = Math.Max(0, Math.Min(100, tlxValue + (e.KeyCode == Keys.Right ? 5 : -5)));
+                ShowTlx();
+                return;
+            }
+            if (e.KeyCode == Keys.Enter) { TlxKeep(now); return; }
+        }
         if (e.KeyCode == Keys.Space) {
             if (segName == "") { if (segIdx < segs.Length) StartSegment(); }
             else if (steps[stepIdx].Kind == "wait") NextStep();
@@ -367,6 +419,25 @@ class TaskForm : Form
             Log(now, segName, "key", stepIdx, -1, "", "", "", "", "", "", "", "Esc");
             EndSegment(true);
         } else if (e.KeyCode == Keys.Q && segName == "") Close();
+    }
+
+    void ShowTlx()
+    {
+        var s = steps[stepIdx];
+        int k = tlxValue / 5;
+        big.ForeColor = Color.White;
+        big.Font = new Font("Microsoft JhengHei UI", 30, FontStyle.Bold);
+        big.Text = s.Text + "\n\n" + new string('─', k) + "●" + new string('─', 20 - k) + "\n" + tlxValue.ToString(IC)
+                   + "\n（← → 移動，Enter 確定）";
+    }
+
+    void TlxKeep(double now)
+    {
+        var s = steps[stepIdx];
+        tlxScores.Add(tlxValue);
+        Log(now, segName, "tlx", stepIdx, -1, s.Target, "", "", "", "", tlxValue.ToString(IC), "", "");
+        if (stepIdx == steps.Count - 1) big.Font = new Font("Microsoft JhengHei UI", 56, FontStyle.Bold);
+        NextStep();
     }
 
     void Shutdown()

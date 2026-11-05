@@ -1,0 +1,5 @@
+data,group,updates,skipped,clustered_pct,n_sel,pseudo_acc,pseudo_acc_p10,model_acc,km_fixed,km_broken,cur_frac,gain_next,d_gain,pa_vs_gain_next_n,pa_vs_gain_next_spearman_r,pa_vs_gain_next_spearman_p,pa_vs_d_gain_n,pa_vs_d_gain_spearman_r,pa_vs_d_gain_spearman_p
+dev,base,657,3,98.78,281.4,86.46,69.69,84.58,6.678,4.794,87.2,5.531,0.8811,597,0.02473,0.5464,597,0.08829,0.031
+dev,rest2,195,465,95.9,195.7,71.29,53.4,70.83,7.356,6.892,71.52,-3.058,-0.7283,184,0.3832,7.949e-08,184,0.1631,0.02693
+ext,A1,42,6,45.24,113.5,71.85,50.13,69.96,3.492,1.607,96.7,1.413,-0.3532,21,0.2508,0.2727,21,0.2636,0.2483
+ext,A3,190,2,63.16,162,76.65,47.64,74.31,4.196,1.849,94.42,-0.773,1.426,94,0.2514,0.0145,94,0.1408,0.1759

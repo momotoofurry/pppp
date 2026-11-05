@@ -5,6 +5,9 @@ Per file (subject x day x condition), from the last completed run of each segmen
               timeouts, commands during the rests between trials ('rest' false commands)
   noncontrol: commands per minute over the items (safety endpoint), per item
   labelled:   cues per gesture (the labels for offline accuracy)
+  retry:      with TaskScreen --retry 1: trials whose first command was wrong, and how many of them got the target
+              later within the time limit (second-attempt success, secondary)
+  tlx:        raw NASA-TLX: the 6 scales (0-100) and their mean (performance: 0 = perfect, 100 = failure)
 The trial results are also recomputed from the logged commands (first command time-stamped within the time limit
 of the cue) and compared with TaskScreen's own trial_end rows; any difference is printed (e.g. a command that
 reached the PC after the 150 ms grace) and counted in 'recomputed_differ'.
@@ -44,6 +47,7 @@ def task_stats(rr, timeout_ms):
             cmds.append((float(r['unix_ms']), r['command'], r['phase']))
     cmds.sort()
     res, lat, differ = Counter(), [], 0
+    retry = Counter(r['result'] for r in rr if r['event'] == 'retry_end')
     for t, (t0, target) in sorted(trials.items()):
         first = next((c for c in cmds if t0 <= c[0] <= t0 + timeout_ms), None)
         mine = 'timeout' if first is None else 'success' if first[1] == target else 'wrong'
@@ -60,6 +64,7 @@ def task_stats(rr, timeout_ms):
                 wrong=res['wrong'], timeout=res['timeout'], aborted=res['aborted'],
                 median_latency_ms=round(statistics.median(lat), 1) if lat else None,
                 rest_commands=sum(1 for c in cmds if c[2] == 'rest'),
+                retry_trials=sum(retry.values()), retry_success2=retry['success2'],
                 recomputed_differ=differ, target_counts=' '.join(f'{k}:{v}' for k, v in sorted(Counter(targets).items())),
                 repeats=sum(1 for a, b in zip(targets, targets[1:]) if a == b))
 
@@ -101,6 +106,11 @@ def summarise(path):
         out.update(task_stats(done['task'], timeout_ms))
     if 'noncontrol' in done:
         out.update(noncontrol_stats(done['noncontrol']))
+    if 'tlx' in done:
+        tlx = {r['target']: int(r['result']) for r in done['tlx'] if r['event'] == 'tlx'}
+        out.update({f'tlx_{k}': v for k, v in tlx.items()})
+        if len(tlx) == 6:
+            out['tlx_raw'] = round(sum(tlx.values()) / 6, 2)
     out['labelled_blocks'] = len(lab)
     out['labelled_cues'] = ' | '.join(' '.join(f'{k}:{v}' for k, v in sorted(c.items())) for c in lab)
     out['aborted_runs'] = sum(1 for _s, _r, ok in runs(rows) if not ok)

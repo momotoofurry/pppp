@@ -6,8 +6,9 @@
 //       TCU only (no STM32): START, record, then the measured sample rate (frames / time) and per channel the
 //       largest |value| and the RMS; warns when a channel comes near the +-8.19 mV the MCU encoding can carry.
 //   TrignoBridge run    --port COM5 [--tcu 127.0.0.1] [--rate 2000] [--emg-csv emg.csv] [--mcu-csv mcu.csv]
-//                       [--ops-csv ops.csv] [--udp 50555] [--script commands.txt]
-//                       (--port file:<path>: write the serial bytes to a file; --udp 0: no forwarding)
+//                       [--ops-csv ops.csv] [--udp 50555] [--gate 1] [--script commands.txt]
+//                       (--port file:<path>: write the serial bytes to a file; --udp 0: no forwarding;
+//                        --udp 50555,50556: forward to TaskScreen and to src/pc/kinova_bridge.py)
 //       TCU -> (resampled to 2000 Hz when --rate is not 2000) -> int16 0.25 uV -> packets -> COM port at 921600;
 //       MCU packets -> mcu.csv and the console; COMMAND / STATUS packets also -> UDP 127.0.0.1:<udp> for
 //       TaskScreen.exe; every typed command -> ops.csv. All three CSVs carry Unix time in ms (unix_ms).
@@ -23,6 +24,12 @@
 //       align = reset + ALIGN_START; ALIGN_END follows by itself after 8 s (70 windows; the MCU needs >= 60 and
 //       several gestures, report 20): start-up alignment after the sensors were put on again.
 //       --script: lines "<seconds> <command>" run at those times after START (for tests).
+//       Alignment gate (--gate 1, default; PROTOCOL.md 3.1): after 'load' / 'calibrate' / 'adapt 1' the board's
+//       commands are written to mcu.csv but NOT forwarded to TaskScreen / the robot until an 'align' ends with a
+//       usable rotation. 'alignment too short' always asks for a new 'align'; 'alignment unsure' asks once to check
+//       the strap mark and redo 'align'; on the second unsure in a row the gate opens with rotation 0 (the
+//       firmware's choice). 'adapt 0' (fixed model) opens the gate. Held commands reach TaskScreen as a status line.
+//       note <text> = free-text note in ops.csv (room / skin temperature, strap offset, ...).
 //   TrignoBridge replay --port COM5 --dir <board_replay folder>
 //       board test without the Trigno: the recorded stream of src/board_replay.py (stream.bin, schedule.csv,
 //       windows.csv) sent in real time; prints the board's status events and its accuracy per block.
@@ -333,15 +340,66 @@ static class Program
     static double UnixMs() { return epochMs + clock.Elapsed.TotalMilliseconds; }
     // COMMAND and STATUS packets also go to TaskScreen.exe as UDP datagrams "<unix_ms>,<mcu.csv line>" (localhost)
     static UdpClient udp;
-    static int udpPort;
+    static int[] udpPorts = new int[0];                           // --udp 50555,50556: TaskScreen and kinova_bridge.py
+
+    static void OpenUdp(string arg)
+    {
+        var l = new List<int>();
+        foreach (var x in arg.Split(',')) { int v = int.Parse(x.Trim()); if (v > 0) l.Add(v); }
+        udpPorts = l.ToArray();
+        if (udpPorts.Length > 0) udp = new UdpClient();
+    }
 
     static void Forward(double ms, string line)
     {
         if (udp == null) return;
         var b = Encoding.ASCII.GetBytes(ms.ToString("F1", IC) + "," + line);
-        try { udp.Send(b, b.Length, "127.0.0.1", udpPort); } catch (SocketException) { }   // nobody listening: fine
+        foreach (int up in udpPorts)
+            try { udp.Send(b, b.Length, "127.0.0.1", up); } catch (SocketException) { }   // nobody listening: fine
     }
     static int mcuPackets, preds;
+    // alignment gate: commands reach TaskScreen / the robot only after a usable start-up alignment
+    static bool gateOn = true;
+    static volatile bool gateOpen = true, adaptOn = true;
+    static int unsureInRow, heldCommands;
+    // the board ignores ALIGN_START while it is busy (e.g. still building the model after 'calibrate'): when an
+    // 'align' gets no answer within ANSWER_FRAMES after its ALIGN_END, say so
+    const long ANSWER_FRAMES = 2000;
+    static long alignAnswerDue = -1;
+
+    static void Gate(bool open, string why)
+    {
+        bool was = gateOpen;
+        gateOpen = open || !gateOn;
+        if (gateOn && was != gateOpen)
+            Console.WriteLine(string.Format(IC, "[{0:F1} s] {1}", clock.Elapsed.TotalSeconds,
+                                            gateOpen ? "commands forwarded again (" + why + ")"
+                                                     : "commands held until a good 'align' (" + why + ")"));
+    }
+
+    static void NeedAlign(string why) { unsureInRow = 0; if (adaptOn) Gate(false, why); }
+
+    // board status -> gate (event numbers of rt.h)
+    static void GateStatus(int ev, int v)
+    {
+        if (ev == 5 || ev == 6 || ev == 15) alignAnswerDue = -1;
+        if (ev == 6) {                                            // RT_EV_ALIGN_SHORT
+            Gate(false, "alignment too short");
+            Console.WriteLine("  >>> 對齊太短（" + v + " 個視窗）：請再打 align，8 秒內依序做 6 個手勢 <<<");
+        } else if (ev == 15) {                                    // RT_EV_ALIGN_UNSURE, sent before RT_EV_ALIGNED 0
+            unsureInRow++;
+            if (unsureInRow == 1) {
+                Gate(false, "alignment unsure");
+                Console.WriteLine("  >>> 對齊沒把握（估到 " + v + "）：檢查束帶記號（偏差 > 15 mm 就重戴），再打一次 align <<<");
+            } else
+                Console.WriteLine("  >>> 連續第 " + unsureInRow + " 次沒把握：照韌體規則用 rotation 0 繼續，記在配戴紀錄 <<<");
+        } else if (ev == 5) {                                     // RT_EV_ALIGNED
+            if (unsureInRow != 1) { Gate(true, "aligned, rotation " + v); unsureInRow = 0; }
+        } else if (ev == 14 && v > 0)                             // RT_EV_LOADED: a condition starts from the day-1 model
+            NeedAlign("day-1 model loaded");
+        else if (ev == 1 && v == 0)                               // RT_EV_CALIBRATED, ok
+            NeedAlign("calibrated");
+    }
     // day-1 calibration check (report 22): 10 predictions per gesture, pass at >= 70 % of the 60
     const int VERIFY_WINDOWS = 10, VERIFY_PASS_PCT = 70;
     static int verifyG = -1, verifyLeft;
@@ -377,6 +435,7 @@ static class Program
     {
         lock (txLock) {
             if (autoStart >= 0) Send(Proto.Control(autoEnd));      // the previous gesture / alignment was not finished
+            alignAnswerDue = -1;
             Send(Proto.Control(Proto.STREAM_RESET));
             Send(arg >= 0 ? Proto.Control(start, arg) : Proto.Control(start));
             autoStart = framesSent; autoFrames = frames; autoEnd = end; autoMsg = msg;
@@ -435,11 +494,16 @@ static class Program
         }
         else if (c == "calibrate") Send(Proto.Control(Proto.CALIBRATE));
         else if (c == "load") Send(Proto.Control(Proto.LOAD));
-        else if (c == "adapt" && p.Length == 2 && (p[1] == "0" || p[1] == "1")) Send(Proto.Control(Proto.SET_ADAPT, int.Parse(p[1])));
+        else if (c == "adapt" && p.Length == 2 && (p[1] == "0" || p[1] == "1")) {
+            Send(Proto.Control(Proto.SET_ADAPT, int.Parse(p[1])));
+            adaptOn = p[1] == "1";
+            if (adaptOn) NeedAlign("adapt 1"); else Gate(true, "adapt 0: fixed model, no alignment");
+        }
+        else if (c == "note" && p.Length >= 2) { Console.WriteLine("  note saved in ops.csv"); return true; }
         else if (c == "decision" && p.Length == 3) Send(Proto.Control(Proto.SET_DECISION, int.Parse(p[1]), int.Parse(p[2])));
         else if (c == "report" && p.Length == 2) Send(Proto.Control(Proto.SET_REPORT, int.Parse(p[1])));
         else if (c == "status") return true;
-        else { Console.WriteLine("? reset | cal <0-5> | calend | calibrate | load | adapt <0|1> | verify <0-5> | align | decision <tau_permille> <k> | report <0|1> | status | quit"); return false; }
+        else { Console.WriteLine("? reset | cal <0-5> | calend | calibrate | load | adapt <0|1> | verify <0-5> | align | decision <tau_permille> <k> | report <0|1> | note <text> | status | quit"); return false; }
         Console.WriteLine(string.Format(IC, "[{0:F1} s] sent: {1}", clock.Elapsed.TotalSeconds, line.Trim()));
         return true;
     }
@@ -458,8 +522,20 @@ static class Program
                 lock (mcuCsv) mcuCsv.WriteLine(ms.ToString("F1", IC) + "," + line);
                 if (pk.Key == Proto.PRED) { preds++; if (pk.Value.Length >= 13) VerifyPred(pk.Value[8]); }
                 else {
+                    if (pk.Key == Proto.COMMAND && !gateOpen) {
+                        heldCommands++;
+                        Forward(ms, string.Format(IC, "status,,,,,,,,command held before alignment ({0}),{1}",
+                                                  line.Split(',')[4], BitConverter.ToUInt32(pk.Value, 0)));
+                        Console.WriteLine(string.Format(IC, "[{0:F1} s] MCU: {1}  (HELD: no good alignment yet)",
+                                                        clock.Elapsed.TotalSeconds, line));
+                        continue;
+                    }
                     Forward(ms, line);
                     Console.WriteLine(string.Format(IC, "[{0:F1} s] MCU: {1}", clock.Elapsed.TotalSeconds, line));
+                    if (pk.Key == Proto.STATUS && pk.Value.Length >= 8) GateStatus(pk.Value[0], BitConverter.ToInt32(pk.Value, 4));
+                    if (pk.Key == Proto.STATUS && pk.Value.Length >= 8 && pk.Value[0] == 3 && preds == 0)
+                        Console.WriteLine("  (packets lost before the first PRED of this run: the board was not reset since the last run and"
+                                          + " counts the restart of the packet numbers; not data loss. PROTOCOL 10)");
                 }
             }
         }
@@ -504,8 +580,10 @@ static class Program
         mcuCsv.WriteLine("unix_ms,kind,window,t_us,gesture,command,accepted,ratio,pushed,event,value");
         opsCsv = new StreamWriter(Get(a, "ops-csv", "ops.csv"));
         opsCsv.WriteLine("unix_ms,command,accepted");
-        udpPort = int.Parse(Get(a, "udp", "50555"));
-        if (udpPort > 0) udp = new UdpClient();
+        OpenUdp(Get(a, "udp", "50555"));
+        gateOn = Get(a, "gate", "1") != "0";
+        Console.WriteLine(gateOn ? "alignment gate on: board commands are forwarded only after a good 'align' (--gate 0: off)"
+                                 : "alignment gate off");
         if (portName.StartsWith("file:")) {
             fileOut = new FileStream(portName.Substring(5), FileMode.Create);
             Console.WriteLine("no MCU: the serial bytes go to " + portName.Substring(5));
@@ -531,7 +609,7 @@ static class Program
             var input = new Thread(() => { string l; while (!stop && (l = Console.ReadLine()) != null) DoCommand(l); });
             input.IsBackground = true;
             input.Start();
-            Console.WriteLine("commands: reset | cal <0-5> | calend | calibrate | load | adapt <0|1> | verify <0-5> | align | decision <tau> <k> | report <0|1> | status | quit");
+            Console.WriteLine("commands: reset | cal <0-5> | calend | calibrate | load | adapt <0|1> | verify <0-5> | align | decision <tau> <k> | report <0|1> | note <text> | status | quit");
         }
 
         Console.WriteLine("START -> " + tcu.Command("START"));
@@ -582,7 +660,12 @@ static class Program
                         if (autoStart >= 0 && framesSent - autoStart >= autoFrames) {
                             Send(Proto.Control(autoEnd));
                             autoStart = -1;
+                            if (autoEnd == Proto.ALIGN_END) alignAnswerDue = framesSent + ANSWER_FRAMES;
                             Console.WriteLine(string.Format(IC, "[{0:F1} s] {1}", clock.Elapsed.TotalSeconds, autoMsg));
+                        }
+                        if (alignAnswerDue >= 0 && framesSent >= alignAnswerDue && port != null) {
+                            alignAnswerDue = -1;
+                            Console.WriteLine("  >>> 板子沒有回應這次 align（可能還在忙，例如 calibrate 後約 1 秒內）：請再打一次 align <<<");
                         }
                     }
                 }
@@ -603,8 +686,8 @@ static class Program
         lock (mcuCsv) mcuCsv.Close();
         lock (opsCsv) opsCsv.Close();
         if (udp != null) udp.Close();
-        Console.WriteLine(string.Format(IC, "done: {0} frames in, {1} out, {2} samples clipped, {3} MCU packets ({4} PRED)",
-                                        framesIn, framesOut, clipped, mcuPackets, preds));
+        Console.WriteLine(string.Format(IC, "done: {0} frames in, {1} out, {2} samples clipped, {3} MCU packets ({4} PRED), {5} commands held before alignment",
+                                        framesIn, framesOut, clipped, mcuPackets, preds, heldCommands));
         return 0;
     }
 
@@ -630,8 +713,7 @@ static class Program
             var f = wl[k].Split(',');
             blocks.Add(int.Parse(f[iBlock], IC)); labels.Add(int.Parse(f[iLabel], IC));
         }
-        udpPort = int.Parse(Get(a, "udp", "50555"));                 // board commands -> TaskScreen.exe (end-to-end test)
-        if (udpPort > 0) udp = new UdpClient();
+        OpenUdp(Get(a, "udp", "50555"));                              // board commands -> TaskScreen.exe (end-to-end test)
         var dec = new Decoder();
         var predCls = new List<int>(); var events = new List<string>();
         var buf = new byte[65536];

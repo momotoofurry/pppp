@@ -44,6 +44,9 @@
 #ifndef SC_ROLLBACK
 #define SC_ROLLBACK 0           /* 1: sc_save / sc_restore / sc_cal_correct (stress tests, report 22; not in the firmware) */
 #endif
+#ifndef SC_DIAG
+#define SC_DIAG 0               /* 1: PC diagnostics of the pseudo-labels (src/pseudo_quality.py; not in the firmware) */
+#endif
 #ifndef SC_TSNE_ITER
 #define SC_TSNE_ITER 500
 #endif
@@ -117,3 +120,8 @@ void sc_restore(void);              /* back to the last sc_save() */
 int sc_cal_correct(void);           /* calibration rows the current model classifies correctly */
 #endif
 unsigned sc_static_bytes(void);
+#if SC_DIAG
+void sc_diag_tag(int32_t tag);          /* id of the next row given to sc_push */
+int sc_diag_get(int32_t *id, uint8_t *pseudo, uint8_t *model);  /* rows used by the last sc_end_block: id,
+                                         pseudo-label used for training, one-shot model label; returns count */
+#endif

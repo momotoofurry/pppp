@@ -1,0 +1,2 @@
+chosen_A,chosen_B,acc_all8,acc_6ch_nested,diff,t_ci_lo,t_ci_hi,boot_ci_lo,boot_ci_hi,wilcoxon_p,better,worse,worst,insample_ch123567_diff,seconds
+ch123567,ch123568,81.85,80.48,-1.37,-3.452,0.7113,-3.477,0.2571,0.498,10,10,-16.59,-0.3212,2632

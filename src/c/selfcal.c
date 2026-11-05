@@ -55,6 +55,12 @@ static uint8_t s_km[SC_BUF];
 static rft_tree_t s_new;
 static int32_t s_block_base;                    /* keys reserved for the rows concatenated in this block */
 static int s_block_rows, s_in_block;
+#if SC_DIAG
+static int32_t s_tag[SC_BUF], s_next_tag;       /* PC diagnostics only: caller-given id of each buffer row */
+static int32_t s_d_id[SC_BUF];
+static uint8_t s_d_pseudo[SC_BUF], s_d_model[SC_BUF];
+static int s_d_n;
+#endif
 
 unsigned sc_static_bytes(void)
 {
@@ -279,6 +285,9 @@ static void buffer_push(const int16_t *x, uint8_t lab)
     memcpy(s_buf[slot], x, sizeof s_buf[slot]);
     s_lab[slot] = lab;
     s_key[slot] = key;
+#if SC_DIAG
+    s_tag[slot] = s_next_tag;
+#endif
     s_block_rows++;
 }
 
@@ -426,6 +435,14 @@ void sc_end_block(sc_stats_t *st)
         }
     }
 #endif
+#if SC_DIAG
+    s_d_n = ns;
+    for (int i = 0; i < ns; i++) {
+        s_d_id[i] = s_tag[s_sel[i]];
+        s_d_pseudo[i] = s_y[i];
+        s_d_model[i] = s_lab[s_sel[i]];
+    }
+#endif
     /* 4. train SC_N_UPD trees on pseudo-labelled rows + calibration set, replace random slots */
     int nt = ns;
     for (int i = 0; i < s_ncal; i++) {
@@ -459,3 +476,16 @@ void sc_end_block(sc_stats_t *st)
     for (int s = 0; s < SC_N_APP; s++)
         st->ram_trees += s_ram[s];
 }
+
+#if SC_DIAG
+void sc_diag_tag(int32_t tag) { s_next_tag = tag; }
+int sc_diag_get(int32_t *id, uint8_t *pseudo, uint8_t *model)
+{
+    for (int i = 0; i < s_d_n; i++) {
+        id[i] = s_d_id[i];
+        pseudo[i] = s_d_pseudo[i];
+        model[i] = s_d_model[i];
+    }
+    return s_d_n;
+}
+#endif

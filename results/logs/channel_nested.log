@@ -1,0 +1,57 @@
+[Parallel(n_jobs=20)]: Using backend LokyBackend with 20 concurrent workers.
+[Parallel(n_jobs=20)]: Done   3 out of   6 | elapsed:  3.6min remaining:  3.6min
+[Parallel(n_jobs=20)]: Done   6 out of   6 | elapsed:  3.7min finished
+ran 1 sets, 225 s
+[Parallel(n_jobs=20)]: Using backend LokyBackend with 20 concurrent workers.
+[Parallel(n_jobs=20)]: Done  19 out of  48 | elapsed:  6.7min remaining: 10.2min
+[Parallel(n_jobs=20)]: Done  29 out of  48 | elapsed: 11.3min remaining:  7.4min
+[Parallel(n_jobs=20)]: Done  39 out of  48 | elapsed: 12.6min remaining:  2.9min
+[Parallel(n_jobs=20)]: Done  48 out of  48 | elapsed: 14.9min finished
+ran 8 sets, 1122 s
+[Parallel(n_jobs=20)]: Using backend LokyBackend with 20 concurrent workers.
+[Parallel(n_jobs=20)]: Done  12 out of  42 | elapsed:  6.7min remaining: 16.9min
+[Parallel(n_jobs=20)]: Done  21 out of  42 | elapsed: 11.3min remaining: 11.3min
+[Parallel(n_jobs=20)]: Done  30 out of  42 | elapsed: 12.8min remaining:  5.1min
+[Parallel(n_jobs=20)]: Done  39 out of  42 | elapsed: 13.6min remaining:  1.0min
+[Parallel(n_jobs=20)]: Done  42 out of  42 | elapsed: 14.5min finished
+ran 7 sets, 1993 s
+[Parallel(n_jobs=20)]: Using backend LokyBackend with 20 concurrent workers.
+[Parallel(n_jobs=20)]: Done   5 out of  36 | elapsed:  5.2min remaining: 32.1min
+[Parallel(n_jobs=20)]: Done  13 out of  36 | elapsed:  5.8min remaining: 10.2min
+[Parallel(n_jobs=20)]: Done  21 out of  36 | elapsed:  9.6min remaining:  6.9min
+[Parallel(n_jobs=20)]: Done  29 out of  36 | elapsed: 10.2min remaining:  2.5min
+[Parallel(n_jobs=20)]: Done  36 out of  36 | elapsed: 10.6min finished
+ran 6 sets, 2632 s
+outer scored_on  n_channels  removed       set  acc_inner  chosen
+    A         B           7        1 ch2345678      78.02   False
+    A         B           7        2 ch1345678      79.06   False
+    A         B           7        3 ch1245678      78.60   False
+    A         B           7        4 ch1235678      81.36   False
+    A         B           7        5 ch1234678      79.44   False
+    A         B           7        6 ch1234578      79.89   False
+    A         B           7        7 ch1234568      80.13   False
+    A         B           7        8 ch1234567      81.87    True
+    A         B           6        1  ch234567      77.80   False
+    A         B           6        2  ch134567      79.67   False
+    A         B           6        3  ch124567      79.43   False
+    A         B           6        4  ch123567      83.28    True
+    A         B           6        5  ch123467      81.09   False
+    A         B           6        6  ch123457      81.18   False
+    A         B           6        7  ch123456      80.14   False
+    B         A           7        1 ch2345678      81.74   False
+    B         A           7        2 ch1345678      80.89   False
+    B         A           7        3 ch1245678      81.59   False
+    B         A           7        4 ch1235678      83.23    True
+    B         A           7        5 ch1234678      81.31   False
+    B         A           7        6 ch1234578      81.41   False
+    B         A           7        7 ch1234568      81.54   False
+    B         A           7        8 ch1234567      78.94   False
+    B         A           6        1  ch235678      81.71   False
+    B         A           6        2  ch135678      81.45   False
+    B         A           6        3  ch125678      81.37   False
+    B         A           6        5  ch123678      81.95   False
+    B         A           6        6  ch123578      81.85   False
+    B         A           6        7  ch123568      82.02    True
+    B         A           6        8  ch123567      79.78   False
+chosen_A chosen_B  acc_all8  acc_6ch_nested  diff  t_ci_lo  t_ci_hi  boot_ci_lo  boot_ci_hi  wilcoxon_p  better  worse   worst  insample_ch123567_diff  seconds
+ch123567 ch123568    81.851          80.481 -1.37   -3.452    0.711      -3.477       0.257       0.498      10     10 -16.586                  -0.321 2632.281

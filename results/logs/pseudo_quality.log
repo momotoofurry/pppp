@@ -1,0 +1,23 @@
+[Parallel(n_jobs=18)]: Using backend LokyBackend with 18 concurrent workers.
+[Parallel(n_jobs=18)]: Done 36 out of 84 | elapsed:   26.8s
+[Parallel(n_jobs=18)]: Done 66 out of 84 | elapsed:   47.7s remaining:   13.0s
+[Parallel(n_jobs=18)]: Done 84 out of 84 | elapsed:   55.0s finished
+repro dev base, blocks 1-10: A 84.73 F 79.22
+repro ext A1: A 74.44 F 73.07
+data group  updates  skipped  clustered_pct   n_sel  pseudo_acc  pseudo_acc_p10  model_acc  km_fixed  km_broken  cur_frac  gain_next  d_gain  pa_vs_gain_next_n  pa_vs_gain_next_spearman_r  pa_vs_gain_next_spearman_p  pa_vs_d_gain_n  pa_vs_d_gain_spearman_r  pa_vs_d_gain_spearman_p
+ dev  base      657        3         98.782 281.370      86.463          69.688     84.579     6.678      4.794    87.199      5.531   0.881                597                       0.025                       0.546             597                    0.088                    0.031
+ dev rest2      195      465         95.897 195.738      71.289          53.395     70.825     7.356      6.892    71.523     -3.058  -0.728                184                       0.383                       0.000             184                    0.163                    0.027
+ ext    A1       42        6         45.238 113.548      71.849          50.128     69.964     3.492      1.607    96.700      1.413  -0.353                 21                       0.251                       0.273              21                    0.264                    0.248
+ ext    A3      190        2         63.158 162.005      76.653          47.639     74.306     4.196      1.849    94.416     -0.773   1.426                 94                       0.251                       0.014              94                    0.141                    0.176
+            updates  pseudo_acc  gain_next  d_gain  d_gain_neg_pct
+data bin                                                          
+dev  <60         66       52.96      -5.11   -2.79           65.15
+     60-70       84       64.76       1.61   -0.51           57.14
+     70-80      141       75.86       3.61    0.47           38.30
+     80-90      171       85.36       4.22    1.07           41.52
+     >=90       319       95.63       5.37    1.16           35.11
+ext  <60         34       45.36      -5.81   -0.20           52.94
+     60-70       28       65.86       1.94    1.18           28.57
+     70-80       10       75.57       3.97    3.97           10.00
+     80-90       24       84.18       1.21    1.21           45.83
+     >=90        19       97.07       1.67    1.67           31.58

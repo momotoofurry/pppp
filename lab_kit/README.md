@@ -108,8 +108,22 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
    全部選項在 `src/pc/TaskScreen.cs` 開頭。
 5. 沒有板子時演練：`task.bat S01 1 A --fake`，鍵盤 1–5 當作板子送出 位置 A／夾／位置 B／放／回原位。
 6. 結果：結束畫面和 `_task.csv` 的最後一行有任務成功數與休息中誤觸發；帶回來用 `src/task_summary.py` 算主終點。
+   PROTOCOL v3 的完整段落：`task.bat S01 2 A --segments labelled,practice,task,labelled,noncontrol,tlx --retry 1`
+   （`--retry 1`：第一個指令錯了還可以再試一次，只記錄、主終點不變；`tlx`：NASA-TLX 6 題，← → 調整、Enter 確定）。
 7. 板子接上但沒有 Trigno 時，可以先開 `task.bat T00 0 X`，再跑 `replay.bat COM5`：replay 也會把板子的指令轉給提示畫面
    （端到端測試；`T00_d0_X_task.csv` 不是實驗資料）。
+
+## 對齊閘門、溫度、Kinova（2026-11-05）
+
+- `run.bat` 的 TrignoBridge 預設開**對齊閘門**：`calibrate`、`load`、`adapt 1` 之後，板子的指令要等 `align` 成功才會送到提示畫面和機器人。
+  畫面出現 `>>> ... <<<` 的提示就照著做（對齊太短 → 再打 `align`；沒把握 → 檢查記號再 `align`；板子沒回應 → 再打 `align`）。
+  `calibrate` 之後等畫面出現 `calibrated (0 = ok)` 再打 `align`。
+- 溫度：每個條件開始和結束時打 `note temp room 24.0 skin 31.5`（數字換成量到的），會記進 `_ops.csv`。
+- 畫面一開始出現 `packets lost`，下面又註明「board was not reset」：這是板子沒重開就重跑，**不是掉資料**。
+- 接 Kinova：`run.bat COM5 S01_d2_A --udp 50555,50556`，再開一個視窗跑
+  `python kinova_bridge.py run --ip 192.168.1.10 --out S01_d2_A_robot.csv --poses poses.json`
+  （要先 `pip install` Kinova 的 kortex_api、在那個視窗設好環境變數 `KINOVA_PASSWORD`；預設位置用 `kinova_bridge.py teach --ip ... --name pose_A` 存）。
+  **按 e 急停**；c 解除；q 離開。真的手臂還沒測過，第一次要低速、手臂周圍淨空、旁邊有人拿急停。沒有手臂時可以加 `--sim` 演練。
 
 ## 收尾
 
@@ -140,11 +154,16 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
 - 2026-11-03 `pilot-freeze-4` 燒進板子：`replay` 88.00%／85.00%，和 PC 逐視窗 100% 相同、CRC 錯誤 0；板子 → UDP → 提示畫面收到的
   27 個指令和板子送出的逐一相同（report 第 26 節）。**這個資料夾的板子已經是 pilot-freeze-4，到實驗室不用重燒。**
 
+- 2026-11-05：對齊閘門、`note`、`--udp 50555,50556` 用假 TCU 接真板子（pilot-freeze-4）測了 3 次：對齊前的指令都被擋下（2、3、3 個），
+  「對齊太短」「板子沒回應」的提示都照預期出現，放行的 7 個指令提示畫面和 `kinova_bridge.py --sim` 都收到同一批（report 27.3）。
+  TaskScreen 的 `--retry 1` 和 `tlx` 用模擬指令測過，`task_summary.py` 重算和畫面判定 0 個不同。
+
 ## 還沒在真機上確認的
 
 - 真的 TCU 的協定（版本字串、START／STOP 的回應、16 通道 float32 的格式）是照 pytrigno 寫的。第 2 步就是在確認這件事：
   如果 `check.bat` 連不上或數值不合理，把畫面拍下來帶回來。
 - `run.bat` 接真的 STM32＋真的 Trigno 的整條路（第 3 步）。
+- `kinova_bridge.py` 接真的 Kinova（Kortex API）。
 - 板子剛插上或剛重置時，ST-LINK 要幾秒才準備好；replay 一開始就出現「已中止 I/O 操作」的話，等 5 秒再跑一次。
 
 ## 重建這個資料夾（在開發電腦上）
@@ -155,6 +174,6 @@ C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe /nologo /optimize+ /code
 python src/board_replay.py make --blocks 2        (在 Docker 裡；產生 build/board_replay/)
 ```
 （`/codepage:65001`：原始碼是沒有 BOM 的 UTF-8，不加的話中文字串會被當成 Big5 編譯成亂碼。）
-再把 `build/pc/TrignoBridge.exe`、`build/pc/TaskScreen.exe`、`lab_kit/*.bat`、`lab_kit/README.md`、`build/board_replay/{stream.bin,schedule.csv,windows.csv}`
+再把 `build/pc/TrignoBridge.exe`、`build/pc/TaskScreen.exe`、`src/pc/kinova_bridge.py`、`lab_kit/*.bat`、`lab_kit/README.md`、`build/board_replay/{stream.bin,schedule.csv,windows.csv}`
 複製到隨身碟的 `lab_kit/`（`board_replay/` 子資料夾）。測試：`src/pc/fake_tcu.py`（Windows 的 Python＋numpy）當 TCU，
 `TrignoBridge.exe run --port file:bridge_out.bin --script script.txt`，再用 `src/pc/check_bridge.py` 檢查。
