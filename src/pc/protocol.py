@@ -22,7 +22,7 @@ EV_CALIBRATED, EV_SELFCAL, EV_LOST, EV_CAL_FULL, EV_ALIGNED, EV_ALIGN_SHORT, EV_
 EV_DIAG_RX_HW, EV_DIAG_STACK, EV_DIAG_RX_OVF, EV_DIAG_RX_ERR = 9, 10, 11, 12   # board main loop (app_rt.c)
 EV_SC_SKIP, EV_LOADED = 13, 14                          # update skipped (RT_MIN_CLASSES); day-1 model restored (RT_LOAD)
 EV_ALIGN_UNSURE = 15                                    # start-up rotation estimate rejected (kept 0)
-COMMANDS = {0: 'none', 1: 'pose_A', 2: 'grip', 3: 'pose_B', 4: 'release'}
+COMMANDS = {0: 'none', 1: 'pose_A', 2: 'grip', 3: 'pose_B', 4: 'release', 5: 'home'}   # 5: Lateral, pilot-freeze-5
 GESTURES = ['Power', 'Lateral', 'Tripod', 'Pointer', 'Open', 'Rest']
 
 

@@ -1470,6 +1470,46 @@ buffer 座標（括號是和同一種對齊的 `base` 比：差、變好／變�
   - 這只是流程驗證，不能取代真手臂測試，論文只能寫成「模擬環境中的端到端流程驗證」。
   - 這次的指令來自錄好的 EMG（受試者 0），不是即時肌電控制。
 - 另外看到：板子每 10 秒回報的 `UART errors` 一直是 1，沒有增加。之前的板子測試也是這樣，CRC 錯誤是 0。
+  查程式（`board_hal.c` 的 `USART3_IRQHandler`）：它累計開機以來 UART 的溢位、框架或雜訊錯誤，第一次回報（約 9 秒）就已經是 1，
+  最可能是 PC 打開 COM port 時線路抖了一下。壞掉的封包會被 CRC 擋掉、算成遺失，而遺失是 0，所以不影響資料，韌體不改。
+
+## 28. `pilot-freeze-5`：Lateral＝回原位（板子實測，2026-11-06；`results/decision_home_*.csv`、`board_*_freeze5*`、`rviz_sim_freeze5_*`）
+
+- 為什麼改（PROTOCOL 3.1、5）：預測少於 5 類時自我校正會跳過（cls5，report 22）。Lateral 沒有指令時，任務裡很少有人做它，
+  A 條件會常常不更新。改成 Lateral＝回原位（home），讓 6 種手勢都會出現在任務中。2026-11-06 由使用者決定；老師還要確認。
+- 改動：只有指令表。
+  - `decision.c` 的 `dc_class_command`：Lateral 從不送改成 `DC_HOME = 5`（`decision.h`）。演算法、門檻（τ 0.6、k 3）、其他指令都不變。
+  - PC 工具認得 5＝`home`：`TrignoBridge.cs`、`protocol.py`。`TaskScreen` 的 `--commands` 預設加上 home。
+  - `eval_decision.py` 的 Python 對照表跟著改；舊的 `results/decision_*.csv` 是 Lateral 不送時做的，沒有重跑。
+- PC 驗證（`src/check_decision_home.py`，report 7.2 錄下的票數，20 人 × 3 seed × 11 block，198,000 個視窗）：
+  C 的 `dc_replay` 和 Python 在 6 組設定（自我校正／one-shot × 3 組 τ、k）都**逐視窗相同**。
+- 離線估計 home 好不好用（`src/decision_home_rate.py`，韌體 v2 的票數，偏移 0，每個 1 秒試次的第一個指令，τ 0.6、k 3）：
+
+| 手勢 → 指令 | 自我校正後：第一個指令就對 | 錯的指令 | 沒有指令 | one-shot：就對 |
+|---|---|---|---|---|
+| Power → pose_A | 57.7% | 3.0% | 39.3% | 47.9% |
+| **Lateral → home** | **41.0%** | **4.9%** | 54.2% | 25.3% |
+| Tripod → grip | 51.1% | 4.1% | 44.8% | 42.6% |
+| Pointer → pose_B | 57.7% | 1.8% | 40.5% | 45.1% |
+| Open → release | 80.3% | 1.2% | 18.5% | 72.1% |
+| Rest → 不送 | — | 0.8% | 99.2% | — |
+
+  - Lateral 是最難的一類，「回原位」的成功率要預期比較低，主終點以外要**分指令報**。
+  - 這是 1 秒試次的離線代理指標；實驗的任務有 5 秒時限、連續串流，數字會不一樣。
+  - 現在 Lateral 被誤認時會多送一個 home。之前 Lateral 沒有指令，誤認成 Lateral 不會送出任何東西，所以其他手勢的錯誤指令可能略增。
+- 韌體：`export_stm32.py` → `D:\stm32\blink`、`cmake --build build/rt`。text 125,436、data 108、bss 176,084 B，和 freeze-4 完全相同（只改一個表的值）。
+  STM32_Programmer_CLI 2.23.0 SWD 寫入並驗證成功。freeze-4 的 ELF 另外備份。
+- 板子回放（`serial_replay.ps1`，COM6，同一個 135 秒串流）：
+  - block 0／1 準確率 88.00%／85.00%，和 PC 版 `rt.c` 逐視窗 100% 相同；CRC 錯誤 0、遺失 0；自我校正 2 次（147、166 ms）。
+  - 延遲 p50 6.76 ms、p95 7.20 ms、最大 7.74 ms。
+  - 指令 28 個（freeze-4 是 27 個，多出來的是窗 318 的 home），和 PC 版逐一相同（`src/check_commands_board.py` → `results/board_commands_freeze5.csv`）。
+- 端到端：
+  - 假 TCU → TrignoBridge（閘門）→ 板子 → RViz：對齊前 1 個指令被擋下，之後 11 個都送到手臂（8 個執行、3 個 busy）。
+    這段串流剛好沒有產生 home。
+  - `TrignoBridge replay --udp 50556` → `kinova_bridge.py --ros`：TrignoBridge 也報 88.00%／85.00%；手臂收到 28 個指令（26 個執行、2 個 busy），
+    **home 在 1.8 s 內回到 home 姿勢**（`rviz_sim_freeze5_replay_robot.csv`）。
+  - `test_pc_tools.py` 結果和之前相同。
+- 版本：git tag `pilot-freeze-5`。目前還沒有收任何先導資料，所以沒有資料要改列為開發資料。
 
 
 ---

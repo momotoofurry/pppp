@@ -7,17 +7,18 @@
  *   - a class is "established" when k consecutive accepted windows have the same top class
  *   - when a class is established and it is not the latched class, its command is sent (if it has one) and it
  *     becomes the latched class: holding a gesture sends its command once; the same command is sent again
- *     only after another class (Rest and Lateral included) has been established in between
+ *     only after another class (Rest included) has been established in between
  * Gestures (labels 0-5): Power, Lateral, Tripod, Pointer, Open, Rest. Commands (from the one-shot confusion
  * matrix, results/confusion_oneshot_N100_d10_int16.csv): Tripod = grip, Open = release, Power / Pointer =
- * preset pose A / B, Lateral and Rest = no command.
+ * preset pose A / B, Lateral = home (since pilot-freeze-5, 2026-11-06: so that all 6 gestures occur in the task
+ * and the self-calibration is not skipped for too few classes, PROTOCOL.md 3.1 / 5), Rest = no command.
  */
 #pragma once
 #include <stdint.h>
 
 #define DC_CLASSES 6
 
-enum { DC_NONE = 0, DC_POSE_A = 1, DC_GRIP = 2, DC_POSE_B = 3, DC_RELEASE = 4 };
+enum { DC_NONE = 0, DC_POSE_A = 1, DC_GRIP = 2, DC_POSE_B = 3, DC_RELEASE = 4, DC_HOME = 5 };
 
 typedef struct {
     uint16_t tau_permille;      /* rejection threshold, 0..1000 */
@@ -34,7 +35,7 @@ typedef struct {
     int8_t established;         /* class established in this window, -1 none */
 } dc_out_t;
 
-/* command of each class (DC_NONE for Lateral and Rest) */
+/* command of each class (DC_NONE for Rest) */
 extern const uint8_t dc_class_command[DC_CLASSES];
 
 void dc_init(dc_state_t *s, uint16_t tau_permille, uint8_t k);

@@ -52,7 +52,7 @@ static class Proto
     public const int CH = 8, FRAMES_PER_PACKET = 20, MAX_PAYLOAD = 512, OVERHEAD = 9;
     public const double LSB_VOLT = 2.5e-7;
     public static readonly string[] GESTURES = { "Power", "Lateral", "Tripod", "Pointer", "Open", "Rest" };
-    public static readonly string[] COMMANDS = { "none", "pose_A", "grip", "pose_B", "release" };
+    public static readonly string[] COMMANDS = { "none", "pose_A", "grip", "pose_B", "release", "home" };   // 5 = home: Lateral, pilot-freeze-5
     static ushort seqSamples, seqControl;
 
     public static ushort Crc16(byte[] b, int off, int n)          // CRC-16/CCITT-FALSE
@@ -547,7 +547,7 @@ static class Program
         if (type == Proto.COMMAND && p.Length >= 12) {
             int cmd = p[8], cls = p[9];
             return string.Format(IC, "command,{0},{1},{2},{3},,{4:F3},,,", BitConverter.ToUInt32(p, 0), BitConverter.ToUInt32(p, 4),
-                                 cls < 6 ? Proto.GESTURES[cls] : cls.ToString(), cmd < 5 ? Proto.COMMANDS[cmd] : cmd.ToString(),
+                                 cls < 6 ? Proto.GESTURES[cls] : cls.ToString(), cmd < Proto.COMMANDS.Length ? Proto.COMMANDS[cmd] : cmd.ToString(),
                                  BitConverter.ToUInt16(p, 10) / 1000.0);
         }
         if (type == Proto.PRED && p.Length >= 13) {

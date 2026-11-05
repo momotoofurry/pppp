@@ -1,0 +1,13 @@
+votes,gesture,command,trials,correct,wrong,no_command
+votes_sc,Power,pose_A,3300,57.7,3.0,39.3
+votes_sc,Lateral,home,3300,41.0,4.9,54.2
+votes_sc,Tripod,grip,3300,51.1,4.1,44.8
+votes_sc,Pointer,pose_B,3300,57.7,1.8,40.5
+votes_sc,Open,release,3300,80.3,1.2,18.5
+votes_sc,Rest,none,3300,,0.8,99.2
+votes_os,Power,pose_A,3300,47.9,2.2,49.9
+votes_os,Lateral,home,3300,25.3,4.8,69.9
+votes_os,Tripod,grip,3300,42.6,2.2,55.1
+votes_os,Pointer,pose_B,3300,45.1,1.4,53.5
+votes_os,Open,release,3300,72.1,0.6,27.3
+votes_os,Rest,none,3300,,0.4,99.6

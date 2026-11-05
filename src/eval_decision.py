@@ -36,7 +36,8 @@ import pipeline as P  # noqa: E402
 OUT = os.path.join(P.ROOT, 'results')
 VOTES = os.path.join(P.ROOT, 'build', 'decision', 'votes.npz')
 TREES = 100
-CLASS_CMD = np.array([1, 0, 2, 3, 4, 0])          # decision.c dc_class_command: Power Lateral Tripod Pointer Open Rest
+CLASS_CMD = np.array([1, 5, 2, 3, 4, 0])          # decision.c dc_class_command: Power Lateral Tripod Pointer Open Rest
+# (Lateral = 5 home since pilot-freeze-5, 2026-11-06; results/decision_*.csv were made with Lateral = 0, no command)
 TAUS = [0.0] + [round(t, 2) for t in np.arange(0.30, 0.951, 0.05)]
 KS = [1, 2, 3, 4, 5]
 

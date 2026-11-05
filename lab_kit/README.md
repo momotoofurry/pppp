@@ -104,7 +104,7 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
      試次之間休息 2.5 秒（畫面顯示對錯）。**每次做完要放鬆**：同一個指令要隔一個別的手勢（含 Rest）才會再送。
    - **Esc**：中止目前這一段（會記錄，可以按空白鍵重做；分析只用最後一次完整的）。等待時按 **Q** 離開。
 4. 改設定（老師決定後）：`task.bat S01 2 A --n 40 --timeout 5 --commands grip,release,pose_A,pose_B,home`
-   （`home`＝Lateral，要韌體也加了才有）、`--items 1,2,3,5`（非控制動作項目；預設第 1 天 1,2,3,5、第 2 天 1–8）。
+   （`home`＝Lateral，`pilot-freeze-5` 起韌體會送；`--commands` 不寫時預設就是這 5 個）、`--items 1,2,3,5`（非控制動作項目；預設第 1 天 1,2,3,5、第 2 天 1–8）。
    全部選項在 `src/pc/TaskScreen.cs` 開頭。
 5. 沒有板子時演練：`task.bat S01 1 A --fake`，鍵盤 1–5 當作板子送出 位置 A／夾／位置 B／放／回原位。
 6. 結果：結束畫面和 `_task.csv` 的最後一行有任務成功數與休息中誤觸發；帶回來用 `src/task_summary.py` 算主終點。
@@ -156,7 +156,7 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
   改過的 TrignoBridge.exe 接模擬的 TCU：位元組不變（`check_bridge.py`：CRC 錯誤 0、88.00%），三個 CSV 都是 Unix 時間 ms，
   `_ops.csv` 記下每個指令。
 - 2026-11-03 `pilot-freeze-4` 燒進板子：`replay` 88.00%／85.00%，和 PC 逐視窗 100% 相同、CRC 錯誤 0；板子 → UDP → 提示畫面收到的
-  27 個指令和板子送出的逐一相同（report 第 26 節）。**這個資料夾的板子已經是 pilot-freeze-4，到實驗室不用重燒。**
+  27 個指令和板子送出的逐一相同（report 第 26 節）。**2026-11-06 起板子是 `pilot-freeze-5`（Lateral＝回原位），到實驗室不用重燒**：`replay` 一樣是 88.00%／85.00%，指令多 1 個 home（28 個，report 28）。
 
 - 2026-11-05：對齊閘門、`note`、`--udp 50555,50556` 用假 TCU 接真板子（pilot-freeze-4）測了 3 次：對齊前的指令都被擋下（2、3、3 個），
   「對齊太短」「板子沒回應」的提示都照預期出現，放行的 7 個指令提示畫面和 `kinova_bridge.py --sim` 都收到同一批（report 27.3）。

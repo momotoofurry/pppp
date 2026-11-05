@@ -143,7 +143,8 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
-        rclpy.shutdown()
+        if rclpy.ok():                      # Ctrl-C already shuts the context down (rclpy's signal handler)
+            rclpy.shutdown()
 
 
 if __name__ == '__main__':

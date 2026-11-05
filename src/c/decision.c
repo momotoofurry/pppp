@@ -1,8 +1,8 @@
 /* Low-confidence rejection + k-window agreement. See decision.h. */
 #include "decision.h"
 
-/* Power, Lateral, Tripod, Pointer, Open, Rest */
-const uint8_t dc_class_command[DC_CLASSES] = {DC_POSE_A, DC_NONE, DC_GRIP, DC_POSE_B, DC_RELEASE, DC_NONE};
+/* Power, Lateral, Tripod, Pointer, Open, Rest (pilot-freeze-5: Lateral = home, PROTOCOL.md 5) */
+const uint8_t dc_class_command[DC_CLASSES] = {DC_POSE_A, DC_HOME, DC_GRIP, DC_POSE_B, DC_RELEASE, DC_NONE};
 
 void dc_init(dc_state_t *s, uint16_t tau_permille, uint8_t k)
 {

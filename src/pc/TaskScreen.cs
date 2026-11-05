@@ -3,7 +3,7 @@
 //   csc /nologo /optimize+ /target:winexe /out:build\pc\TaskScreen.exe src\pc\TaskScreen.cs
 //
 //   TaskScreen --subject S01 --day 2 --cond A [--out .] [--segments labelled,practice,task,labelled,noncontrol]
-//              [--commands grip,release,pose_A,pose_B] [--n 40] [--timeout 5] [--rest 2.5]
+//              [--commands grip,release,pose_A,pose_B,home] [--n 40] [--timeout 5] [--rest 2.5]
 //              [--reps 5] [--cue 2] [--gap 3] [--practice 120] [--items 1,2,3,5] [--item 60]
 //              [--retry 0|1] [--udp 50555] [--fake] [--auto] [--windowed]
 //
@@ -56,7 +56,7 @@ class TaskForm : Form
     static readonly string[] GESTURES = { "Power", "Lateral", "Tripod", "Pointer", "Open", "Rest" };
     static readonly Dictionary<string, string> GESTURE_ZH = new Dictionary<string, string> {
         { "Power", "握拳" }, { "Lateral", "側捏" }, { "Tripod", "三指捏" }, { "Pointer", "食指指出" }, { "Open", "張開" }, { "Rest", "放鬆" } };
-    // command -> (screen name, gesture) of decision.c; 'home' (Lateral) only exists if the firmware adds it (PROTOCOL.md 5)
+    // command -> (screen name, gesture) of decision.c; 'home' (Lateral) is sent by the firmware since pilot-freeze-5 (PROTOCOL.md 5)
     static readonly Dictionary<string, string[]> COMMAND = new Dictionary<string, string[]> {
         { "grip", new[] { "夾", "Tripod" } }, { "release", new[] { "放", "Open" } }, { "pose_A", new[] { "位置 A", "Power" } },
         { "pose_B", new[] { "位置 B", "Pointer" } }, { "home", new[] { "回原位", "Lateral" } } };
@@ -113,7 +113,7 @@ class TaskForm : Form
         subject = Get("subject", null); day = Get("day", null); cond = Get("cond", null);
         if (subject == null || day == null || cond == null) throw new ArgumentException("--subject, --day and --cond are required");
         segs = Get("segments", "labelled,practice,task,labelled,noncontrol").Split(',');
-        commands = Get("commands", "grip,release,pose_A,pose_B").Split(',');
+        commands = Get("commands", "grip,release,pose_A,pose_B,home").Split(',');
         foreach (var c in commands) if (!COMMAND.ContainsKey(c)) throw new ArgumentException("unknown command " + c);
         nTrials = int.Parse(Get("n", "40")); reps = int.Parse(Get("reps", "5"));
         if (nTrials % commands.Length != 0) throw new ArgumentException("--n must be a multiple of the number of commands (balanced targets)");
