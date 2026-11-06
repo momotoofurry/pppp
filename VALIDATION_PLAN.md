@@ -5,7 +5,8 @@
 
 ## 1. 凍結的版本
 
-git tag `pilot-freeze-4`（2026-11-02：開機對齊加信心規則，只接受 ±1 格、分數比不轉高 ≥ 0.20，否則不轉，report 25；起因是外部資料 Kyranou 2025 的誤轉，report 24。之前 `pilot-freeze-3`：重開機後 `load`、`adapt 0/1`，report 23）。2026-11-03 已燒進板子，板子回放和 PC 逐視窗 100% 相同（report 26）。實驗流程與預先分析計畫在 `PROTOCOL.md`。從第一位先導受試者開始，下表都不改；要改就是新版本（新 tag），
+git tag `pilot-freeze-5`（2026-11-06：和 freeze-4 只差指令表，Lateral＝回原位，讓任務中 6 種手勢都會出現、自我校正不因類別太少而跳過，report 28；
+板子回放和 PC 逐視窗 100% 相同、28 個指令逐一相同）。之前 `pilot-freeze-4`（2026-11-02：開機對齊加信心規則，只接受 ±1 格、分數比不轉高 ≥ 0.20，否則不轉，report 25；起因是外部資料 Kyranou 2025 的誤轉，report 24。之前 `pilot-freeze-3`：重開機後 `load`、`adapt 0/1`，report 23）。2026-11-03 已燒進板子，板子回放和 PC 逐視窗 100% 相同（report 26）。實驗流程與預先分析計畫在 `PROTOCOL.md`。從第一位先導受試者開始，下表都不改；要改就是新版本（新 tag），
 已收的先導資料從此變成開發資料，要再收一批新的受試者才算下一輪驗證。
 
 | 部分 | 設定 | 來源 |
@@ -22,7 +23,7 @@ git tag `pilot-freeze-4`（2026-11-02：開機對齊加信心規則，只接受 
 | 決策 | τ = 0.6、連續 k = 3 個視窗 | `app_rt.c` |
 | 隨機種子 | 0x2545F491 | `app_rt.c` |
 | 重開機／條件 | 第 1 天模型、z-score、校正資料存在 Flash；`load` 還原（適應過的樹不存）；`adapt 0` 固定模型、`adapt 1` 完整系統 | `RT_LOAD`、`RT_SET_ADAPT`（report 23） |
-| 指令對應 | Tripod＝夾、Open＝放、Power／Pointer＝預設位置 A／B；Lateral、Rest 不送 | `rt.c` |
+| 指令對應 | Tripod＝夾、Open＝放、Power／Pointer＝預設位置 A／B、Lateral＝回原位（home，freeze-5 起）；Rest 不送 | `decision.c` |
 
 ## 2. 論文裡要寫準的說法
 
