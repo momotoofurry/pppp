@@ -1,0 +1,19 @@
+item,value
+z-score day-1 weight after 5 blocks (0.7^5),0.1681
+z-score day-1 weight after 10 blocks,0.0282
+z-score half-life (blocks),1.94
+"z-score half-life (s, block = 300 windows = 30 s)",58.3
+z-score steady-state variance factor a/(2-a),0.1765
+z-score effective blocks (2-a)/a,5.67
+appended trees still original after 1 update (0.6),0.6
+appended trees still original after 5 updates (0.6^5),0.0778
+tree half-life (updates),1.36
+votes one update can move per class,20.0
+votes never changed by self-calibration (pretrained),50.0
+class-mean standard error at 10 rows (sigma units),0.316
+class-mean standard error at 375/6 rows,0.126
+Chebyshev bound P(|z| >= 32),0.000977
+Q5.10 resolution (sigma units),0.0009765625
+buffer bytes 375 x 80 x 2,60000.0
+nodes per new tree <= 2*32-1,63.0
+nodes per depth-10 tree <= 2^11-1,2047.0
