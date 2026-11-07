@@ -10,12 +10,28 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
 
 | 檔案 | 用途 |
 |---|---|
-| `TrignoBridge.exe` | check／run／replay 三種模式 |
+| `TrignoBridge.exe` | probe／check／run／verify／replay 五種模式 |
+| `probe.bat` | 第 0 步（只做一次，第一次實驗前）：問 TCU 的設定、量各資料埠的流量 → `tcu_probe.txt`；只問問題，不改任何設定 |
 | `check.bat` | 第 2 步：只測 Trigno（不用 STM32） |
+| `verify.bat` | 每天結束：檢查一個 session 的檔案齊不齊（`verify.bat T00_d1`）；`OK` 就馬上複製到隨身碟 |
 | `replay.bat` | 第 1 步：只測 STM32（不用 Trigno），用錄好的資料 |
 | `run.bat` | 第 3 步：Trigno → STM32 整條路（`run.bat COM5 S01_d2_A` → `S01_d2_A_emg.csv`、`_mcu.csv`、`_ops.csv`） |
 | `TaskScreen.exe`、`task.bat` | 第 4 步：正式實驗的提示畫面（有標籤段、練習、提示指令任務、非控制動作段）→ `S01_d2_A_task.csv` |
 | `board_replay\` | 第 1 步用的錄好的串流（受試者 0，校正＋2 個 block，135 秒） |
+
+## 第 0 步：TCU 探測（第一次去實驗室時做一次，約 1 分鐘）
+
+1. 基地台接 USB、打開 **Trigno Control Utility**（TCU），感測器開機配對到 1–8。不要開 EMGworks／Trigno Discover。
+2. 執行 `probe.bat`（TCU 在另一台電腦上的話：`probe.bat <那台的 IP>`）。
+3. **應該看到**：`banner:` 一行版本字串；最後一行 `-> 50041 streams about 2000 Hz`。
+   - `cannot connect to ...:50040`：TCU 沒開，或這台裝的是新版 Trigno Discover（沒有這個介面）。拍照帶回來。
+   - `nothing on 50041`：資料在別的埠（例如 50043），TrignoBridge 要改。`tcu_probe.txt` 帶回來。
+   - `not 2000 Hz`：第 2 步 `check.bat` 再確認，之後 `run.bat ... --rate <數字>`、`verify.bat ... --rate <數字>`。
+4. 不論結果，`tcu_probe.txt` 都帶回來；裡面 `BACKWARDS COMPATIBILITY?`、`UPSAMPLING?` 等的回答決定 TrignoBridge 要不要改。
+   查詢指令是照 Trigno SDK 的慣例寫的，有些 TCU 版本不認得，會回錯誤訊息，這也是有用的資訊。
+
+TCU 只能裝在實驗室電腦、程式要在自己筆電跑的話：兩台接同一個網路，`check.bat <IP>`、`run.bat COM5 T00_d1 --tcu <IP>`；
+實驗室電腦的防火牆要允許 50040–50044。
 
 ## 第 1 步：只測 STM32 和 COM port（約 3 分鐘，不用 Trigno）
 
@@ -162,10 +178,15 @@ STM32（NUCLEO-H753ZI）裡要是 2026-10-30 以後的路線 B 韌體（`app_rt.
   「對齊太短」「板子沒回應」的提示都照預期出現，放行的 7 個指令提示畫面和 `kinova_bridge.py --sim` 都收到同一批（report 27.3）。
   TaskScreen 的 `--retry 1` 和 `tlx` 用模擬指令測過，`task_summary.py` 重算和畫面判定 0 個不同。
 
+- 2026-11-08：新增 `probe`、`verify`。`probe` 接假 TCU：50041 量到 1926 frames/s，和 `check` 量到的 1929 Hz 一致
+  （假 TCU 在 WSL 裡跑不到 2000 Hz，不是工具的問題），沒開的 50042–50044 顯示無法連線。`verify` 用假 TCU 錄的 session
+  （沒有板子）抓到 4 個警告（取樣率、沒有預測、沒有 note、沒有 task 檔），手做的 `mcu.csv`（含帶逗號的狀態名稱、
+  開始前與開始後的 packets lost）解析正確。`run` 的資料路徑沒改（只有 `check` 的 EMG 埠加了 10 秒逾時）。
+
 ## 還沒在真機上確認的
 
 - 真的 TCU 的協定（版本字串、START／STOP 的回應、16 通道 float32 的格式）是照 pytrigno 寫的。第 2 步就是在確認這件事：
-  如果 `check.bat` 連不上或數值不合理，把畫面拍下來帶回來。
+  如果 `probe.bat`／`check.bat` 連不上或數值不合理，把畫面拍下來、`tcu_probe.txt` 帶回來。
 - `run.bat` 接真的 STM32＋真的 Trigno 的整條路（第 3 步）。
 - `kinova_bridge.py` 接真的 Kinova（Kortex API）。
 - 板子剛插上或剛重置時，ST-LINK 要幾秒才準備好；replay 一開始就出現「已中止 I/O 操作」的話，等 5 秒再跑一次。

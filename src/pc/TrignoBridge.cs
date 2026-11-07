@@ -2,6 +2,14 @@
 // (.NET Framework 4: C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe), C# 5. Same protocol as
 // src/pc/protocol.py and src/c/protocol.h; same TCU handling as src/pc/trigno_bridge.py (to be verified on the lab PC).
 //
+//   TrignoBridge probe  [--tcu 127.0.0.1] [--out tcu_probe.txt]
+//       TCU only, before the first session: the banner, the answers to read-only queries (BACKWARDS COMPATIBILITY?,
+//       UPSAMPLING?, SENSOR n PAIRED? / TYPE? / MODE?; an unknown query just gets the TCU's error reply) and, for 3 s of
+//       START, the bytes per second on the data ports 50041-50044. Changes no TCU setting. Everything also -> --out.
+//   TrignoBridge verify --name T00_d1 [--dir .] [--rate 2000 = the --rate run.bat had]
+//       after a session: <name>_emg.csv (frames, minutes, rate, pauses > 0.2 s, silent channels), <name>_mcu.csv
+//       (predictions, commands, calibrate / load results, packets lost after the start, UART drops), <name>_ops.csv
+//       (typed commands, notes) and <name>_*_task.csv; exit code 0 = complete, 3 = warnings.
 //   TrignoBridge check  [--tcu 127.0.0.1] [--seconds 60] [--out emg_check.csv]
 //       TCU only (no STM32): START, record, then the measured sample rate (frames / time) and per channel the
 //       largest |value| and the RMS; warns when a channel comes near the +-8.19 mV the MCU encoding can carry.
@@ -177,12 +185,17 @@ class Tcu
     NetworkStream cs, es;
     public string Banner;
 
-    public Tcu(string host)
+    public Tcu(string host) : this(host, 0) { }
+
+    // dataTimeoutMs > 0: Read() throws when the EMG port sends nothing for that long (check: no endless wait when the
+    // TCU streams elsewhere); run keeps the blocking read so that a short stall never ends a recording
+    public Tcu(string host, int dataTimeoutMs)
     {
         cmd = new TcpClient(host, 50040);
         emg = new TcpClient(host, 50041);
         cs = cmd.GetStream(); es = emg.GetStream();
         cs.ReadTimeout = 10000;
+        if (dataTimeoutMs > 0) es.ReadTimeout = dataTimeoutMs;
         Banner = Reply();
     }
 
@@ -261,9 +274,11 @@ static class Program
 
     static int Main(string[] argv)
     {
-        if (argv.Length < 1) { Console.WriteLine("usage: TrignoBridge check|run|replay [options] (see the top of TrignoBridge.cs)"); return 1; }
+        if (argv.Length < 1) { Console.WriteLine("usage: TrignoBridge probe|check|run|verify|replay [options] (see the top of TrignoBridge.cs)"); return 1; }
         var a = Args(argv, 1);
         try {
+            if (argv[0] == "probe") return Probe(a);
+            if (argv[0] == "verify") return Verify(a);
             if (argv[0] == "check") return Check(a);
             if (argv[0] == "run") return Run(a);
             if (argv[0] == "replay") return Replay(a);
@@ -275,12 +290,225 @@ static class Program
         return 1;
     }
 
+    // ------------------------------------------------------------------ probe: what the TCU answers (read-only)
+    static string ReplyOf(NetworkStream s)
+    {
+        var sb = new StringBuilder();
+        var b = new byte[1024];
+        try {
+            while (!sb.ToString().EndsWith("\r\n\r\n")) {
+                int n = s.Read(b, 0, b.Length);
+                if (n <= 0) break;
+                sb.Append(Encoding.ASCII.GetString(b, 0, n));
+            }
+        } catch (IOException) { return sb.Length > 0 ? sb.ToString().Trim() + " (incomplete)" : "(no reply in 3 s)"; }
+        return sb.ToString().Trim().Replace("\r\n", " | ");
+    }
+
+    static string Ask(NetworkStream s, string text)
+    {
+        var b = Encoding.ASCII.GetBytes(text + "\r\n\r\n");
+        s.Write(b, 0, b.Length);
+        return ReplyOf(s);
+    }
+
+    static int Probe(Dictionary<string, string> a)
+    {
+        string host = Get(a, "tcu", "127.0.0.1");
+        string outPath = Get(a, "out", "tcu_probe.txt");
+        var log = new StringBuilder();
+        Action<string> say = s => { Console.WriteLine(s); log.AppendLine(s); };
+        say("TrignoBridge probe " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", IC) + ", TCU host " + host);
+        say("(only questions ending in '?' plus START / STOP: no TCU setting is changed)");
+        TcpClient cmd;
+        try { cmd = new TcpClient(host, 50040); }
+        catch (Exception e) {
+            say("cannot connect to " + host + ":50040 (" + e.Message + ")");
+            say("-> is the Trigno Control Utility open (not only EMGworks / Trigno Discover)? on another PC: firewall for 50040-50044?");
+            File.WriteAllText(outPath, log.ToString());
+            return 2;
+        }
+        var cs = cmd.GetStream();
+        cs.ReadTimeout = 3000;
+        int[] ports = { 50041, 50042, 50043, 50044 };              // connected before the banner, as TrignoBridge does
+        var cl = new TcpClient[ports.Length];
+        for (int i = 0; i < ports.Length; i++) {
+            try { cl[i] = new TcpClient(host, ports[i]); }
+            catch (Exception e) { say(string.Format(IC, "  port {0}: no connection ({1})", ports[i], e.Message)); }
+        }
+        say("banner: " + ReplyOf(cs));
+        var q = new List<string> { "VERSION?", "BACKWARDS COMPATIBILITY?", "UPSAMPLING?", "UPSAMPLE?", "FRAME INTERVAL?",
+                                   "MAX SAMPLES EMG?", "MAX SAMPLES AUX?" };
+        for (int s = 1; s <= 8; s++) { q.Add("SENSOR " + s + " PAIRED?"); q.Add("SENSOR " + s + " TYPE?"); q.Add("SENSOR " + s + " MODE?"); }
+        foreach (var x in q) say(string.Format(IC, "  {0,-26} -> {1}", x, Ask(cs, x)));
+        say("START -> " + Ask(cs, "START"));
+        var counts = new long[ports.Length];
+        var firstT = new double[ports.Length];                    // rate from each port's first data on (as check)
+        for (int i = 0; i < ports.Length; i++) firstT[i] = -1;
+        var buf = new byte[1 << 16];
+        var sw = Stopwatch.StartNew();
+        while (sw.Elapsed.TotalSeconds < 6) {
+            for (int i = 0; i < ports.Length; i++) {
+                if (cl[i] == null) continue;
+                var st = cl[i].GetStream();
+                while (st.DataAvailable) {
+                    int n = st.Read(buf, 0, buf.Length);
+                    if (n <= 0) break;
+                    if (firstT[i] < 0) { firstT[i] = sw.Elapsed.TotalSeconds; continue; }   // first chunk starts the clock
+                    counts[i] += n;
+                }
+            }
+            Thread.Sleep(5);
+        }
+        double end = sw.Elapsed.TotalSeconds;
+        say("STOP -> " + Ask(cs, "STOP"));
+        say("data during 6 s of START (TrignoBridge reads 50041: 16 float32 channels, 2000 Hz = 128000 bytes/s):");
+        var fps = new double[ports.Length];
+        for (int i = 0; i < ports.Length; i++) {
+            if (cl[i] == null) continue;
+            double el = firstT[i] < 0 ? 0 : end - firstT[i];
+            double bps = el > 0.5 ? counts[i] / el : 0;
+            fps[i] = bps / 64;
+            say(string.Format(IC, "  port {0}: {1,9:F0} bytes/s = {2,7:F1} frames/s if 16 float channels", ports[i], bps, fps[i]));
+            cl[i].Close();
+        }
+        cmd.Close();
+        if (fps[0] == 0) say("-> nothing on 50041: TrignoBridge would get no EMG. Bring " + outPath + " back (data may be on 50043).");
+        else if (Math.Abs(fps[0] - 2000) > 40) say("-> 50041 is not 2000 Hz: confirm with check.bat (60 s), then run.bat ... --rate <its measured rate>.");
+        else say("-> 50041 streams about 2000 Hz: as TrignoBridge expects (check.bat confirms over 60 s).");
+        File.WriteAllText(outPath, log.ToString());
+        Console.WriteLine("saved " + outPath);
+        return 0;
+    }
+
+    // ------------------------------------------------------------------ verify: are one session's files complete?
+    static int Verify(Dictionary<string, string> a)
+    {
+        string name = Get(a, "name", "");
+        string dir = Get(a, "dir", ".");
+        if (name.Length == 0) { Console.WriteLine("usage: TrignoBridge verify --name T00_d1 [--dir .]"); return 1; }
+        int warn = 0;
+        Action<string> W = s => { Console.WriteLine("  WARNING: " + s); warn++; };
+        Console.WriteLine("files of " + name + " in " + Path.GetFullPath(dir));
+
+        string emgPath = Path.Combine(dir, name + "_emg.csv");
+        if (!File.Exists(emgPath)) W("missing " + emgPath);
+        else {
+            long rows = 0, bad = 0, gaps = 0;
+            double first = double.NaN, last = double.NaN, maxGap = 0;
+            var maxAbs = new double[Proto.CH];
+            using (var r = new StreamReader(emgPath)) {
+                r.ReadLine();
+                string l;
+                while ((l = r.ReadLine()) != null) {
+                    var f = l.Split(',');
+                    double ms;
+                    if (f.Length < 2 + Proto.CH || !double.TryParse(f[0], NumberStyles.Float, IC, out ms)) { bad++; continue; }
+                    if (double.IsNaN(first)) first = ms;
+                    else if (ms - last > 200) { gaps++; maxGap = Math.Max(maxGap, ms - last); }
+                    last = ms;
+                    for (int c = 0; c < Proto.CH; c++) {
+                        double v;
+                        if (double.TryParse(f[2 + c], NumberStyles.Float, IC, out v)) maxAbs[c] = Math.Max(maxAbs[c], Math.Abs(v));
+                    }
+                    rows++;
+                }
+            }
+            double dur = rows > 1 ? (last - first) / 1000 : 0;
+            Console.WriteLine(string.Format(IC, "  emg: {0} frames, {1:F1} min, {2:F1} Hz", rows, dur / 60, dur > 0 ? rows / dur : 0));
+            if (rows == 0) W("emg.csv has no data");
+            if (bad > 0) W(bad + " unreadable lines in emg.csv");
+            double expect = double.Parse(Get(a, "rate", "2000"), IC);   // emg.csv keeps the TCU's own frames
+            if (dur > 60 && Math.Abs(rows / dur - expect) > 0.02 * expect)
+                W(string.Format(IC, "EMG rate {0:F1} Hz, expected {1:F0} (if run.bat had --rate {0:F0}: verify.bat {2} --rate {0:F0})",
+                                rows / dur, expect, name));
+            if (gaps > 0) W(string.Format(IC, "{0} pauses > 0.2 s in the EMG stream (longest {1:F1} s)", gaps, maxGap / 1000));
+            for (int c = 0; c < Proto.CH; c++) {
+                if (maxAbs[c] == 0) W("channel " + (c + 1) + " has no signal");
+                else if (maxAbs[c] > 0.8 * CLIP_V) Console.WriteLine(string.Format(IC, "  note: channel {0} reached {1:F2} mV (MCU limit 8.19 mV)", c + 1, maxAbs[c] * 1e3));
+            }
+        }
+
+        string mcuPath = Path.Combine(dir, name + "_mcu.csv");
+        if (!File.Exists(mcuPath)) W("missing " + mcuPath);
+        else {
+            long preds = 0, cmds = 0, lostAfterStart = 0, dropped = 0, scBlocks = -1, scSkipped = 0, aligns = 0;
+            var calibrated = new List<string>(); var loaded = new List<string>();
+            using (var r = new StreamReader(mcuPath)) {
+                r.ReadLine();
+                string l;
+                while ((l = r.ReadLine()) != null) {
+                    var f = l.Split(',');
+                    if (f.Length < 3) continue;
+                    if (f[1] == "pred") { preds++; continue; }
+                    if (f[1] == "command") { cmds++; continue; }
+                    if (f[1] != "status" || f.Length < 11) continue;
+                    string ev = string.Join(",", f, 9, f.Length - 10);
+                    string val = f[f.Length - 1];
+                    long v; long.TryParse(val, NumberStyles.Integer, IC, out v);
+                    if (ev == "packets lost" && preds > 0) lostAfterStart += v;
+                    else if (ev == "UART bytes dropped") dropped += v;
+                    else if (ev == "self-calibration blocks") scBlocks = v;
+                    else if (ev.StartsWith("self-calibration skipped")) scSkipped++;
+                    else if (ev == "rotation" || ev.StartsWith("alignment")) aligns++;
+                    else if (ev.StartsWith("calibrated")) calibrated.Add(val);
+                    else if (ev.StartsWith("day-1 model loaded")) loaded.Add(val);
+                }
+            }
+            Console.WriteLine(string.Format(IC, "  mcu: {0} predictions, {1} commands, {2} alignment results, self-calibration blocks {3}, skipped {4}",
+                                            preds, cmds, aligns, scBlocks < 0 ? "-" : scBlocks.ToString(IC), scSkipped));
+            Console.WriteLine("  calibrate results (0 = ok): " + (calibrated.Count > 0 ? string.Join(" ", calibrated) : "-")
+                              + "   load results (rows, < 0 = none): " + (loaded.Count > 0 ? string.Join(" ", loaded) : "-"));
+            if (preds == 0) W("no predictions from the board (report 1 not sent, or the board did not run)");
+            if (lostAfterStart > 0) W(lostAfterStart + " packets lost while running (the count before the first prediction is a restart, not loss)");
+            if (dropped > 0) W(dropped + " UART bytes dropped by the board");
+            foreach (var x in loaded) if (x.StartsWith("-")) W("a 'load' found no day-1 model (" + x + ")");
+        }
+
+        string opsPath = Path.Combine(dir, name + "_ops.csv");
+        if (!File.Exists(opsPath)) W("missing " + opsPath);
+        else {
+            var n = new SortedDictionary<string, int>();
+            int notes = 0;
+            using (var r = new StreamReader(opsPath)) {
+                r.ReadLine();
+                string l;
+                while ((l = r.ReadLine()) != null) {
+                    int i = l.IndexOf(',');
+                    if (i < 0) continue;
+                    string c = l.Substring(i + 1).TrimStart('"');
+                    string w0 = c.Split(' ', ',')[0];
+                    if (w0 == "note") { notes++; continue; }
+                    n[w0] = n.ContainsKey(w0) ? n[w0] + 1 : 1;
+                }
+            }
+            var parts = new List<string>();
+            foreach (var kv in n) parts.Add(kv.Key + " " + kv.Value);
+            Console.WriteLine("  ops: " + string.Join(", ", parts) + "; notes " + notes);
+            if (notes == 0) W("no 'note' lines: were the temperatures typed in (note temp room .. skin ..)?");
+        }
+
+        var tasks = Directory.GetFiles(dir, name + "_*_task.csv");
+        if (tasks.Length == 0) W("no " + name + "_*_task.csv from TaskScreen");
+        foreach (var t in tasks) {
+            long rows = 0;
+            using (var r = new StreamReader(t)) { while (r.ReadLine() != null) rows++; }
+            Console.WriteLine(string.Format(IC, "  task: {0} ({1} lines)", Path.GetFileName(t), rows));
+            if (rows <= 1) W(Path.GetFileName(t) + " is empty");
+        }
+        if (!File.Exists(Path.Combine(dir, name + "_emg_check.csv"))) Console.WriteLine("  note: no " + name + "_emg_check.csv (rename emg_check.csv after check.bat)");
+
+        Console.WriteLine(warn == 0 ? "OK: all files are there. Copy them to the USB stick now." :
+                          warn + " warning(s): write them on the paper record (note) and bring this screen back.");
+        return warn == 0 ? 0 : 3;
+    }
+
     // ------------------------------------------------------------------ check: TCU only
     static int Check(Dictionary<string, string> a)
     {
         double seconds = double.Parse(Get(a, "seconds", "60"), IC);
         string outPath = Get(a, "out", "emg_check.csv");
-        var tcu = new Tcu(Get(a, "tcu", "127.0.0.1"));
+        var tcu = new Tcu(Get(a, "tcu", "127.0.0.1"), 10000);
         Console.WriteLine("TCU banner: " + tcu.Banner);
         Console.WriteLine("START -> " + tcu.Command("START"));
         var max = new double[Tcu.CHANNELS]; var sq = new double[Tcu.CHANNELS];
