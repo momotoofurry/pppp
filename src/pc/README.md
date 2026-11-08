@@ -26,6 +26,9 @@ MCU 每個手勢只收 warmup 之後的視窗，最多總共 60 個視窗；平�
 
 ## 待在實驗室電腦上驗證
 
+- 2026-11-08 對照 Delsys Trigno SDK 官方範例：伺服器預設 big-endian（C# 範例反轉位元組），`TrignoBridge.cs` 已改成連線後送
+  `ENDIAN LITTLE` 並依 `ENDIANNESS?` 決定要不要反轉；`trigno_bridge.py`（Python 版）還沒改，實驗用 C# 版。
+  感測器若是 IM／Avanti 類型，EMG 可能在 50043 而不是 50041（`probe` 會量各埠的流量）。
 - TCU 的協定是參照 pytrigno：連線後 50040 會送版本字串、指令以 `\r\n\r\n` 結尾、50041 是 16 通道 little-endian float32、單位伏特。
   實際的版本字串、是否需要其他指令（例如 `BACKWARDS COMPATIBILITY`、`UPSAMPLE`）、取樣率是否真的是 2000 Hz，都還沒有在真的 TCU 上確認。
 - 序列埠（pyserial、921600 baud）沒有在 Docker 裡測過；Docker 裡的測試用 TCP 取代序列埠。
