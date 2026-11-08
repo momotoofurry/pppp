@@ -1,0 +1,19 @@
+{
+  "model": "claude-opus-5-5",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/run_check.py\"",
+            "timeout": 900,
+            "asyncRewake": true,
+            "statusMessage": "Running matching check_*.py"
+          }
+        ]
+      }
+    ]
+  }
+}
