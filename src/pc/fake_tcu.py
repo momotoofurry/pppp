@@ -34,6 +34,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--out', required=True)
     ap.add_argument('--rate', type=float, default=2000.0)
+    ap.add_argument('--big', action='store_true',
+                    help='act like a server that ignores ENDIAN LITTLE: answer INVALID COMMAND to it, BIG to '
+                         'ENDIANNESS?, and stream big-endian floats (the Delsys C# sample reverses every float)')
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     segs = recordings()
@@ -81,7 +84,12 @@ def main():
             buf += d
             while b'\r\n\r\n' in buf:
                 cmd, buf = buf.split(b'\r\n\r\n', 1)
-                c.sendall(b'OK\r\n\r\n')
+                if args.big and cmd.strip() == b'ENDIAN LITTLE':
+                    c.sendall(b'INVALID COMMAND\r\n\r\n')
+                elif args.big and cmd.strip() == b'ENDIANNESS?':
+                    c.sendall(b'BIG\r\n\r\n')
+                else:
+                    c.sendall(b'OK\r\n\r\n')
                 if cmd.strip() == b'START':
                     started.set()
     threading.Thread(target=commands, daemon=True).start()
@@ -91,7 +99,7 @@ def main():
         due = int((time.perf_counter() - t0) * args.rate)
         if due > i:
             j = min(len(f16), due)
-            e.sendall(f16[i:j].tobytes())
+            e.sendall(f16[i:j].astype('>f4').tobytes() if args.big else f16[i:j].tobytes())
             i = j
         else:
             time.sleep(0.002)

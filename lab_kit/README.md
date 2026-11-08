@@ -183,6 +183,13 @@ TCU 只能裝在實驗室電腦、程式要在自己筆電跑的話：兩台接�
   （沒有板子）抓到 4 個警告（取樣率、沒有預測、沒有 note、沒有 task 檔），手做的 `mcu.csv`（含帶逗號的狀態名稱、
   開始前與開始後的 packets lost）解析正確。`run` 的資料路徑沒改（只有 `check` 的 EMG 埠加了 10 秒逾時）。
 
+- 2026-11-08：讀了 Delsys Trigno SDK（TrignoServer 3.6.0）附的官方範例。埠號和 pytrigno 一樣（50040 指令、50041 EMG、
+  50042 ACC、50043／50044 給 IM／Avanti 類感測器），但 **C# 範例在 Windows 上把每個 float 的位元組反轉**，表示伺服器預設是
+  big-endian；Linux 範例先送 `ENDIAN LITTLE`。TrignoBridge 現在連上後送 `ENDIAN LITTLE`、再問 `ENDIANNESS?`，回答含 BIG 就自己反轉，
+  並印出 `RATE?`。`check` 若讀到 NaN 或 > 100 mV 會警告「可能是位元組順序」。`fake_tcu.py --big`（不接受 ENDIAN LITTLE、
+  回 BIG、送 big-endian）用 Windows 的 Python 跑：`check_bridge.py` 300 個視窗、88.00%、每段 4000 frame、CRC 0，和之前相同。
+  （WSL 裡的假 TCU 跑不到 2000 Hz，腳本時間會錯開，那時是 52.40%，不是程式的問題。）
+
 ## 還沒在真機上確認的
 
 - 真的 TCU 的協定（版本字串、START／STOP 的回應、16 通道 float32 的格式）是照 pytrigno 寫的。第 2 步就是在確認這件事：

@@ -197,6 +197,23 @@ class Tcu
         cs.ReadTimeout = 10000;
         if (dataTimeoutMs > 0) es.ReadTimeout = dataTimeoutMs;
         Banner = Reply();
+        // Byte order (Delsys Trigno SDK samples, 2026-11-08): the C# sample reverses every float on a little-endian
+        // PC, so the server's default is big-endian; the Linux sample sends "ENDIAN LITTLE" first. Ask for little
+        // endian, then read it back; if the server still says BIG (or did not take the command and answers BIG),
+        // swap the bytes of every float.
+        EndianReply = Command("ENDIAN LITTLE");
+        Endianness = Command("ENDIANNESS?");
+        Swap = Endianness.ToUpperInvariant().Contains("BIG");
+        Rate = Command("RATE?");
+    }
+
+    public string EndianReply, Endianness, Rate;
+    public bool Swap;
+
+    public string Describe()
+    {
+        return "ENDIAN LITTLE -> " + EndianReply + "; ENDIANNESS? -> " + Endianness + (Swap ? " (swapping bytes)" : "")
+               + "; RATE? -> " + Rate;
     }
 
     string Reply()
@@ -233,7 +250,11 @@ class Tcu
         int fb = CHANNELS * 4, m = all.Length / fb;
         for (int i = 0; i < m; i++) {
             var f = new float[CHANNELS];
-            for (int c = 0; c < CHANNELS; c++) f[c] = BitConverter.ToSingle(all, i * fb + c * 4);
+            for (int c = 0; c < CHANNELS; c++) {
+                int o = i * fb + c * 4;
+                if (Swap) { byte t = all[o]; all[o] = all[o + 3]; all[o + 3] = t; t = all[o + 1]; all[o + 1] = all[o + 2]; all[o + 2] = t; }
+                f[c] = BitConverter.ToSingle(all, o);
+            }
             outp.Add(f);
         }
         carry = new byte[all.Length - m * fb];
@@ -337,8 +358,8 @@ static class Program
             catch (Exception e) { say(string.Format(IC, "  port {0}: no connection ({1})", ports[i], e.Message)); }
         }
         say("banner: " + ReplyOf(cs));
-        var q = new List<string> { "VERSION?", "BACKWARDS COMPATIBILITY?", "UPSAMPLING?", "UPSAMPLE?", "FRAME INTERVAL?",
-                                   "MAX SAMPLES EMG?", "MAX SAMPLES AUX?" };
+        var q = new List<string> { "VERSION?", "RATE?", "ENDIANNESS?", "BACKWARDS COMPATIBILITY?", "UPSAMPLING?",
+                                   "UPSAMPLE?", "FRAME INTERVAL?", "MAX SAMPLES EMG?", "MAX SAMPLES AUX?", "TRIGGER?" };
         for (int s = 1; s <= 8; s++) { q.Add("SENSOR " + s + " PAIRED?"); q.Add("SENSOR " + s + " TYPE?"); q.Add("SENSOR " + s + " MODE?"); }
         foreach (var x in q) say(string.Format(IC, "  {0,-26} -> {1}", x, Ask(cs, x)));
         say("START -> " + Ask(cs, "START"));
@@ -510,6 +531,7 @@ static class Program
         string outPath = Get(a, "out", "emg_check.csv");
         var tcu = new Tcu(Get(a, "tcu", "127.0.0.1"), 10000);
         Console.WriteLine("TCU banner: " + tcu.Banner);
+        Console.WriteLine("TCU: " + tcu.Describe());
         Console.WriteLine("START -> " + tcu.Command("START"));
         var max = new double[Tcu.CHANNELS]; var sq = new double[Tcu.CHANNELS];
         long frames = 0;
@@ -544,6 +566,12 @@ static class Program
             string note = max[c] == 0 ? "  (no signal)" : max[c] > 0.8 * CLIP_V ? "  WARNING: near the 8.19 mV limit" : "";
             Console.WriteLine(string.Format(IC, "  {0,2}      {1,8:F3}    {2,8:F1}{3}", c + 1, max[c] * 1e3, rms * 1e6, note));
         }
+        // surface EMG in volts stays far below 0.1 V; NaN or huge values mean the bytes are read in the wrong order
+        bool absurd = false;
+        for (int c = 0; c < Tcu.CHANNELS; c++) if (double.IsNaN(max[c]) || double.IsInfinity(max[c]) || max[c] > 0.1) absurd = true;
+        if (absurd)
+            Console.WriteLine("WARNING: values are not plausible EMG volts (NaN or > 100 mV): probably the byte order. "
+                              + "Bring this screen and " + outPath + " back (TCU said: " + tcu.Endianness + ").");
         Console.WriteLine("saved " + outPath);
         return 0;
     }
@@ -804,6 +832,7 @@ static class Program
         if (portName == null) return 1;
         var tcu = new Tcu(Get(a, "tcu", "127.0.0.1"));
         Console.WriteLine("TCU banner: " + tcu.Banner);
+        Console.WriteLine("TCU: " + tcu.Describe());
         mcuCsv = new StreamWriter(Get(a, "mcu-csv", "mcu.csv"));
         mcuCsv.WriteLine("unix_ms,kind,window,t_us,gesture,command,accepted,ratio,pushed,event,value");
         opsCsv = new StreamWriter(Get(a, "ops-csv", "ops.csv"));
