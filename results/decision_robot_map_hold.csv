@@ -1,0 +1,13 @@
+votes,true,windows,down_pct,up_pct,down_s_per_min,up_s_per_min
+votes_os,Power,33000,0.05,0.0,0.03,0.0
+votes_os,Lateral,33000,0.02,2.01,0.01,1.21
+votes_os,Tripod,33000,0.0,20.83,0.0,12.5
+votes_os,Pointer,33000,23.42,0.0,14.05,0.0
+votes_os,Open,33000,0.02,0.0,0.01,0.0
+votes_os,Rest,33000,0.06,0.0,0.03,0.0
+votes_sc,Power,33000,0.18,0.0,0.11,0.0
+votes_sc,Lateral,33000,0.02,2.08,0.01,1.25
+votes_sc,Tripod,33000,0.0,28.4,0.0,17.04
+votes_sc,Pointer,33000,34.84,0.0,20.9,0.0
+votes_sc,Open,33000,0.02,0.0,0.01,0.0
+votes_sc,Rest,33000,0.09,0.01,0.05,0.0

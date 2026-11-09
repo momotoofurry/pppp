@@ -1,0 +1,13 @@
+votes,true,new_meaning,trials,none,open_sent_any,first_Power,first_Lateral,first_Tripod,first_Pointer,first_Open
+votes_os,Power,grip,3300,49.9,1.7,47.9,0.0,0.0,0.5,1.7
+votes_os,Lateral,home,3300,69.9,0.1,0.0,25.3,4.6,0.2,0.1
+votes_os,Tripod,up(hold),3300,55.1,0.0,0.0,2.2,42.6,0.0,0.0
+votes_os,Pointer,down(hold),3300,53.5,0.7,0.7,0.0,0.0,45.1,0.7
+votes_os,Open,open,3300,27.3,72.1,0.6,0.0,0.0,0.1,72.1
+votes_os,Rest,none,3300,99.6,0.1,0.0,0.0,0.0,0.3,0.1
+votes_sc,Power,grip,3300,39.3,2.4,57.7,0.0,0.0,0.6,2.4
+votes_sc,Lateral,home,3300,54.2,0.0,0.1,41.0,4.5,0.2,0.0
+votes_sc,Tripod,up(hold),3300,44.8,0.0,0.0,4.1,51.1,0.0,0.0
+votes_sc,Pointer,down(hold),3300,40.5,0.8,1.0,0.0,0.0,57.7,0.8
+votes_sc,Open,open,3300,18.5,80.3,1.1,0.0,0.0,0.1,80.3
+votes_sc,Rest,none,3300,99.2,0.1,0.0,0.3,0.1,0.3,0.1
