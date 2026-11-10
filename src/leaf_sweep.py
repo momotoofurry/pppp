@@ -74,7 +74,43 @@ def lname(tr, w0, d):
     return f'L{tr}_w{w0}_d{d:g}'
 
 
-CONDS = (['F', 'Z', 'A'] + [lname(*g) for g in LEAF_GRID] + [lname(*DEFAULT) + '_noz', lname(*DEFAULT) + '_nog', 'R'])
+# second round (after the first results): the cued start-up sequence as TRAINING signal instead of as a judge, and a
+# one-byte-per-leaf version of the refresh. All on all 100 trees, with the z-score update.
+#   LA_a<a>      leaf refresh (w0 4, no decay) + every labelled anchor window adds a to its true class in its leaves,
+#                at the start of the block (before the block is classified)
+#   LAonly_a<a>  anchor counts only, no pseudo-labels (what the labels alone give without retraining)
+#   ..._za       the z-score is first moved towards the anchor's statistics (same rule, a = 0.3; the anchor is
+#                class-balanced by construction)
+#   M_w<w0>      one byte per leaf (label + confidence 0..31), streaming, no block, no guard, no class weights:
+#                pseudo-label == leaf label -> confidence + 1, else - 1; below 0 the leaf takes the pseudo-label
+#   MA_w<w0>_a<a>  M + every labelled anchor window applied a times
+#   B_w<w0>      two bytes per leaf, streaming, no block, no guard, no class weights: a challenger class and a signed
+#                margin = (windows pseudo-labelled challenger) - (windows pseudo-labelled as the one-shot label),
+#                clamped to +-127. The leaf answers the challenger while margin > w0, otherwise its one-shot label,
+#                so the one-shot label is never forgotten. A third class takes the challenger's place only while
+#                margin <= 0. (M failed in the first test: runs of 10 windows of one gesture flip leaves back and
+#                forth, since M keeps no memory of the one-shot label.)
+#   BA_w<w0>_a<a>  B + every labelled anchor window applied a times
+#   ..._k<k>     counters only on the 50 appended trees + the first k pre-trained trees (RAM knob; default all 100)
+CMAX = 31
+MMAX = 127
+NEW = {'LA_a2': dict(kind='cnt', anc=2, pseudo=True, za=False), 'LA_a8': dict(kind='cnt', anc=8, pseudo=True, za=False),
+       'LA_a8_za': dict(kind='cnt', anc=8, pseudo=True, za=True),
+       'LAonly_a8': dict(kind='cnt', anc=8, pseudo=False, za=False),
+       'LAonly_a8_za': dict(kind='cnt', anc=8, pseudo=False, za=True),
+       'M_w4': dict(kind='byte', w0=4, anc=0, za=False), 'M_w16': dict(kind='byte', w0=16, anc=0, za=False),
+       'MA_w4_a4': dict(kind='byte', w0=4, anc=4, za=False), 'MA_w16_a4': dict(kind='byte', w0=16, anc=4, za=False),
+       'MA_w16_a4_za': dict(kind='byte', w0=16, anc=4, za=True),
+       'LA_a8_za_k0': dict(kind='cnt', anc=8, pseudo=True, za=True, k=0),
+       'LA_a8_za_k10': dict(kind='cnt', anc=8, pseudo=True, za=True, k=10),
+       'LA_a8_za_k25': dict(kind='cnt', anc=8, pseudo=True, za=True, k=25),
+       'LAonly_a8_za_k0': dict(kind='cnt', anc=8, pseudo=False, za=True, k=0),
+       'LAonly_a8_za_k10': dict(kind='cnt', anc=8, pseudo=False, za=True, k=10),
+       'B_w4': dict(kind='two', w0=4, anc=0, za=False), 'B_w16': dict(kind='two', w0=16, anc=0, za=False),
+       'BA_w4_a4': dict(kind='two', w0=4, anc=4, za=False), 'BA_w16_a4': dict(kind='two', w0=16, anc=4, za=False),
+       'BA_w4_a4_za': dict(kind='two', w0=4, anc=4, za=True), 'BA_w16_a4_za': dict(kind='two', w0=16, anc=4, za=True)}
+CONDS = (['F', 'Z', 'A'] + [lname(*g) for g in LEAF_GRID] + [lname(*DEFAULT) + '_noz', lname(*DEFAULT) + '_nog', 'R']
+         + list(NEW) + ['Rcum'])
 
 
 def thr_q(mdl):
@@ -160,10 +196,13 @@ def run_static(cond, mdl, Xc_raw, blocks):
         nodes = leaves(mdl, thr, (Xu - mu) / sd)
         pred, _ = vote(nodes, lab)
         # anchor: adapted state vs day-1 state on the cued sequence, then the block with the better one
-        pa, _ = vote(leaves(mdl, thr, (Xa - mu) / sd), lab)
-        p0a, _ = vote(leaves(mdl, thr, (Xa - mu0) / np.sqrt(var0)), lab0)
-        acc_a, acc_a0 = np.mean(pa == ya), np.mean(p0a == ya)
-        if acc_a >= acc_a0:
+        if len(ya):
+            pa, _ = vote(leaves(mdl, thr, (Xa - mu) / sd), lab)
+            p0a, _ = vote(leaves(mdl, thr, (Xa - mu0) / np.sqrt(var0)), lab0)
+            acc_a, acc_a0 = np.mean(pa == ya), np.mean(p0a == ya)
+        else:                                                        # no cued sequence before this block
+            acc_a = acc_a0 = np.nan
+        if not acc_a < acc_a0:
             pred_sel = pred
         else:
             pred_sel, _ = vote(leaves(mdl, thr, (Xu - mu0) / np.sqrt(var0)), lab0)
@@ -188,6 +227,82 @@ def run_static(cond, mdl, Xc_raw, blocks):
     return rows
 
 
+def run_anchor(cond, mdl, Xc_raw, blocks):
+    """second-round conditions (NEW): anchor labels as training signal; counters (cnt) or one byte per leaf (byte)"""
+    p = NEW[cond]
+    mu, var = Xc_raw.mean(0), Xc_raw.var(0)
+    thr = thr_q(mdl)
+    lab0 = P.leaf_labels(mdl)
+    off = np.concatenate([[0], np.cumsum([len(x) for x in lab0])])[:-1]      # global leaf index = off[tree] + node
+    lab = np.concatenate(lab0).copy()
+    base = lab.copy()
+    sel = np.r_[0:p.get('k', N_PRE), N_PRE:N]                                # trees with counters
+    if p['kind'] == 'cnt':
+        cnt = np.zeros((len(lab), K))
+    elif p['kind'] == 'byte':
+        conf = np.full(len(lab), p['w0'], dtype=np.int64)
+    else:
+        ch, mar = base.copy(), np.zeros(len(lab), dtype=np.int64)
+
+    def route(X):
+        return np.stack(leaves(mdl, thr, (X - mu) / np.sqrt(var)), axis=1) + off     # n x trees
+
+    def relabel():
+        score = cnt.copy()
+        score[np.arange(len(base)), base] += 4.0                                     # w0 = 4
+        lab[:] = np.argmax(score, axis=1)
+
+    def byte_step(g, c):
+        same = lab[g] == c
+        conf[g] = np.where(same, np.minimum(conf[g] + 1, CMAX), conf[g] - 1)
+        flip = g[conf[g] < 0]
+        lab[flip], conf[flip] = c, 0
+
+    def two_step(g, c):
+        isb, isc = base[g] == c, ch[g] == c
+        take = g[~isb & ~isc & (mar[g] <= 0)]                                        # third class, challenger not ahead
+        ch[take] = c
+        mar[g] = np.clip(mar[g] + np.where(isb, -1, np.where(ch[g] == c, 1, 0)), -MMAX, MMAX)
+        lab[g] = np.where(mar[g] > p['w0'], ch[g], base[g])
+
+    step = two_step if p['kind'] == 'two' else byte_step
+    rows = []
+    for b, (Xa, ya, Xu, yu) in enumerate(blocks):
+        if p['za'] and len(ya):
+            st = ZW.balanced_stats(Xa, ya)
+            mu = (1 - A_Z) * mu + A_Z * st[0]
+            var = (1 - A_Z) * var + A_Z * st[1]
+        Ga = route(Xa) if len(ya) else np.zeros((0, N), dtype=np.int64)
+        if p['kind'] == 'cnt':
+            np.add.at(cnt, (Ga[:, sel], ya[:, None]), float(p['anc']))
+            relabel()
+        else:
+            for _ in range(p['anc']):
+                for g, c in zip(Ga, ya):
+                    step(g, c)
+        G = route(Xu)
+        if p['kind'] == 'cnt':
+            pred = np.array([np.argmax(np.bincount(lab[g], minlength=K)) for g in G])
+            if p['pseudo'] and guard_ok(pred):
+                cls = np.bincount(pred, minlength=K)
+                w = len(pred) / (np.sum(cls > 0) * cls[pred])
+                np.add.at(cnt, (G[:, sel], pred[:, None]), w[:, None] * np.ones((1, len(sel))))
+                relabel()
+        else:
+            pred = np.zeros(len(G), dtype=np.int64)
+            for i, g in enumerate(G):                                                # streaming: classify, then update
+                pred[i] = np.argmax(np.bincount(lab[g], minlength=K))
+                step(g, pred[i])
+        rows.append(dict(block=b, acc=np.mean(pred == yu), acc_sel=np.mean(pred == yu), anc=np.nan, anc0=np.nan,
+                         n=len(yu), flipped=int(np.sum(lab != base))))
+        if p['kind'] != 'cnt' or guard_ok(pred):
+            st = ZW.balanced_stats(Xu, pred)
+            if st is not None:
+                mu = (1 - A_Z) * mu + A_Z * st[0]
+                var = (1 - A_Z) * var + A_Z * st[1]
+    return rows
+
+
 def run_retrain(mdl_os, Xc_raw, yc, blocks):
     """A: zscore_sweep.run with zs = bal0.3, embed = 'none', plus the cls5 guard and the anchor selection"""
     mu0, var0 = Xc_raw.mean(0), Xc_raw.var(0)
@@ -199,10 +314,12 @@ def run_retrain(mdl_os, Xc_raw, yc, blocks):
     for b, (Xa, ya, Xu, yu) in enumerate(blocks):
         X = (Xu - mu) / np.sqrt(var)
         pred = P.predict(mdl, X, PREC)
-        pa = P.predict(mdl, (Xa - mu) / np.sqrt(var), PREC)
-        p0a = P.predict(mdl_os, (Xa - mu0) / np.sqrt(var0), PREC)
-        acc_a, acc_a0 = np.mean(pa == ya), np.mean(p0a == ya)
-        pred_sel = pred if acc_a >= acc_a0 else P.predict(mdl_os, (Xu - mu0) / np.sqrt(var0), PREC)
+        acc_a = acc_a0 = np.nan
+        if len(ya):
+            pa = P.predict(mdl, (Xa - mu) / np.sqrt(var), PREC)
+            p0a = P.predict(mdl_os, (Xa - mu0) / np.sqrt(var0), PREC)
+            acc_a, acc_a0 = np.mean(pa == ya), np.mean(p0a == ya)
+        pred_sel = pred if not acc_a < acc_a0 else P.predict(mdl_os, (Xu - mu0) / np.sqrt(var0), PREC)
         rows.append(dict(block=b, acc=np.mean(pred == yu), acc_sel=np.mean(pred_sel == yu), anc=acc_a, anc0=acc_a0,
                          n=len(yu), flipped=0))
         if not guard_ok(pred):
@@ -222,12 +339,23 @@ def run_retrain(mdl_os, Xc_raw, yc, blocks):
     return rows
 
 
-def run_recal(pre, blocks):
-    """R: a new one-shot calibration from the anchor of every block"""
+def run_recal(pre, blocks, cum=None):
+    """R: a new one-shot calibration from the anchor of every block. Rcum (cum = day-1 calibration, raw): the same,
+    trained on the day-1 calibration and ALL anchors so far, each normalised with its own statistics - the
+    retraining counterpart of the anchor counters, which also accumulate over the sessions"""
     rows = []
+    pool = [] if cum is None else [((cum[0] - cum[0].mean(0)) / cum[0].std(0), cum[1])]
     for b, (Xa, ya, Xu, yu) in enumerate(blocks):
+        if not len(ya):                                              # no new anchor: keep the last model
+            acc = np.mean(P.predict(mdl, (Xu - mu) / sd, PREC) == yu)
+            rows.append(dict(block=b, acc=acc, acc_sel=acc, anc=np.nan, anc0=np.nan, n=len(yu), flipped=0))
+            continue
         mu, sd = Xa.mean(0), Xa.std(0)
-        mdl = one_shot((Xa - mu) / sd, ya, pre)
+        if cum is None:
+            mdl = one_shot((Xa - mu) / sd, ya, pre)
+        else:
+            pool.append(((Xa - mu) / sd, ya))
+            mdl = one_shot(np.concatenate([x for x, _ in pool]), np.concatenate([y for _, y in pool]), pre)
         acc = np.mean(P.predict(mdl, (Xu - mu) / sd, PREC) == yu)
         rows.append(dict(block=b, acc=acc, acc_sel=acc, anc=np.nan, anc0=np.nan, n=len(yu), flipped=0))
     return rows
@@ -261,6 +389,10 @@ def run(subject, seed, shift, conds):
                 rows = run_retrain(mdl_os, Xc_raw, yc, blk)
             elif cond == 'R':
                 rows = run_recal(pre, blk)
+            elif cond == 'Rcum':
+                rows = run_recal(pre, blk, (Xc_raw, yc))
+            elif cond in NEW:
+                rows = run_anchor(cond, mdl_os, Xc_raw, blk)
             else:
                 rows = run_static(cond, mdl_os, Xc_raw, blk)
             out += [dict(subject=subject, seed=seed, shift=shift, stream=stream, cond=cond, k_est=k_est, **r)
@@ -301,6 +433,7 @@ def main():
     ap.add_argument('--conds', nargs='+', default=CONDS)
     ap.add_argument('--jobs', type=int, default=19)
     ap.add_argument('--suffix', default='')
+    ap.add_argument('--add', action='store_true', help='add --conds to the existing leaf_sweep.csv (runs are seeded per condition)')
     args = ap.parse_args()
     t0 = time.time()
     import check_features_c as FC
@@ -309,6 +442,10 @@ def main():
     tasks = [(s, seed, sh, args.conds) for sh in args.shifts for seed in args.seeds for s in args.subjects]
     res = Parallel(n_jobs=args.jobs, verbose=5)(delayed(run)(*t) for t in tasks)
     acc = pd.DataFrame([r for rows, _ in res for r in rows])
+    path = os.path.join(OUT, f'leaf_sweep{args.suffix}.csv')
+    if args.add and os.path.exists(path):                                # keep the conditions already there
+        old = pd.read_csv(path)
+        acc = pd.concat([old[~old.cond.isin(args.conds)], acc], ignore_index=True)
     acc.to_csv(os.path.join(OUT, f'leaf_sweep{args.suffix}.csv'), index=False, float_format='%.4f')
     pd.DataFrame([i for _, i in res]).to_csv(os.path.join(OUT, f'leaf_sweep_leaves{args.suffix}.csv'), index=False)
     s = summarize(acc)
