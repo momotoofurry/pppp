@@ -1,0 +1,26 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+static bytes (PC build, default LC_MAX_LEAVES): 79920
+PASS one-shot class before learning
+PASS one window of another class takes the leaf (2*1 > 1)
+PASS equal counts: the one-shot class wins
+PASS 1000 more windows (counter halves at 255): still the learned class
+PASS then 600 windows of the one-shot class: it wins again
+PASS lc_reset: back to the one-shot model
+PASS lc_init refuses a model that needs more counter rows than LC_MAX_LEAVES
+[Parallel(n_jobs=19)]: Done  34 tasks      | elapsed:   42.6s
+[Parallel(n_jobs=19)]: Done 108 out of 120 | elapsed:  1.5min remaining:   10.2s
+[Parallel(n_jobs=19)]: Done 120 out of 120 | elapsed:  1.6min finished
+ shift  k  runs  windows  agree  leaves_mean  leaves_max    acc_py     acc_c  agree_pct extra_checks_passed
+   0.0  0    60   158400 158400   349.933333         402 84.127083 84.127083      100.0                 7/7
+   0.0 10    60   158400 158400  2795.683333        2849 85.118056 85.118056      100.0                 7/7
+   0.0 25    60   158400 158400  6464.033333        6617 86.308333 86.308333      100.0                 7/7
+   0.0 50    60   158400 158400 12541.683333       12828 86.834028 86.834028      100.0                 7/7
+   0.5  0    60   158400 158400   349.933333         402 77.050000 77.050000      100.0                 7/7
+   0.5 10    60   158400 158400  2795.683333        2849 78.965972 78.965972      100.0                 7/7
+   0.5 25    60   158400 158400  6464.033333        6617 81.216667 81.216667      100.0                 7/7
+   0.5 50    60   158400 158400 12541.683333       12828 82.444444 82.444444      100.0                 7/7
+ k  leaves_needed_max  LC_MAX_LEAVES  text  data   bss  max_stack_frame  leaf_base_table
+ 0                402            512   420     0  3096               40              202
+10               2849           3072   420     0 18456               40              202
+25               6617           6656   420     0 39960               40              202
+50              12828          13056   422     0 78360               40              202

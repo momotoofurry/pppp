@@ -227,7 +227,7 @@ def run_static(cond, mdl, Xc_raw, blocks):
     return rows
 
 
-def run_anchor(cond, mdl, Xc_raw, blocks):
+def run_anchor(cond, mdl, Xc_raw, blocks, preds=None):
     """second-round conditions (NEW): anchor labels as training signal; counters (cnt) or one byte per leaf (byte)"""
     p = NEW[cond]
     mu, var = Xc_raw.mean(0), Xc_raw.var(0)
@@ -293,6 +293,8 @@ def run_anchor(cond, mdl, Xc_raw, blocks):
             for i, g in enumerate(G):                                                # streaming: classify, then update
                 pred[i] = np.argmax(np.bincount(lab[g], minlength=K))
                 step(g, pred[i])
+        if preds is not None:                                                        # check_leafcal_c.py
+            preds.append(np.asarray(pred).copy())
         rows.append(dict(block=b, acc=np.mean(pred == yu), acc_sel=np.mean(pred == yu), anc=np.nan, anc0=np.nan,
                          n=len(yu), flipped=int(np.sum(lab != base))))
         if p['kind'] != 'cnt' or guard_ok(pred):
