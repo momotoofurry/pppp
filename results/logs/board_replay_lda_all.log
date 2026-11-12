@@ -1,0 +1,38 @@
+scored_windows         1980
+received               1980
+same_class_as_pc       1980
+same_margin_as_pc      1741
+margin_max_diff        13
+acc_board              92.92929292929293
+acc_pc                 92.92929292929293
+commands_board         169
+commands_pc            169
+commands_equal         True
+latency_p50            6.690999999991618
+latency_p95            7.247000000035041
+latency_max            10.780999999988126
+rx_crc_errors          0
+rx_skipped             0
+fits                   12
+fits_ok                12
+fit_us_min             7835
+fit_us_max             11776
+lost_packets           0
+pc_fits_ok             12
+diag_rx_hw_max         244
+diag_stack_max         948
+diag_rx_ovf_max        0
+diag_rx_err_max        0
+           n  acc_board  acc_pc
+block                          
+0      180.0      82.78   82.78
+1      180.0      80.56   80.56
+2      180.0      86.67   86.67
+3      180.0      88.33   88.33
+4      180.0      97.78   97.78
+5      180.0      98.89   98.89
+6      180.0      97.22   97.22
+7      180.0     100.00  100.00
+8      180.0      99.44   99.44
+9      180.0      92.22   92.22
+10     180.0      98.33   98.33

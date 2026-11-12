@@ -34,6 +34,7 @@ import protocol as PR  # noqa: E402
 
 D = os.path.join(P.ROOT, 'build', 'board_replay_lda')
 OUT = os.path.join(P.ROOT, 'results')
+TAG = ''
 SUBJECT = 0
 FS = 2000.0
 WIN_PER_REC = 19
@@ -147,7 +148,7 @@ def decode():
             row['latency_ms'] = arrive - txl[w.packet]
         rows.append(row)
     df = pd.DataFrame(rows)
-    df.to_csv(os.path.join(OUT, 'board_replay_lda_windows.csv'), index=False, float_format='%.3f')
+    df.to_csv(os.path.join(OUT, f'board_replay_lda{TAG}_windows.csv'), index=False, float_format='%.3f')
     ok = df[df.board >= 0]
     sm = dict(scored_windows=len(df), received=len(ok), same_class_as_pc=int((ok.board == ok.pc).sum()),
               same_margin_as_pc=int((ok.board_margin == ok.pc_margin).sum()),
@@ -164,7 +165,7 @@ def decode():
     for e in ('diag_rx_hw', 'diag_stack', 'diag_rx_ovf', 'diag_rx_err'):
         v = [x for k, x in bs if k == e]
         sm[e + '_max'] = max(v) if v else -1
-    pd.DataFrame([sm]).T.to_csv(os.path.join(OUT, 'board_replay_lda_summary.csv'), header=['value'])
+    pd.DataFrame([sm]).T.to_csv(os.path.join(OUT, f'board_replay_lda{TAG}_summary.csv'), header=['value'])
     for k, v in sm.items():
         print(f'{k:22s} {v}')
     print(df.groupby('block').apply(lambda g: pd.Series(dict(n=len(g), acc_board=(g.board == g.label).mean() * 100,
@@ -175,7 +176,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('mode', choices=['make', 'decode'])
     ap.add_argument('--blocks', type=int, default=3)
+    ap.add_argument('--tag', default='', help='e.g. _all: build/board_replay_lda_all, results/board_replay_lda_all_*')
     args = ap.parse_args()
+    global D, TAG
+    D, TAG = D + args.tag, args.tag
     make(args.blocks) if args.mode == 'make' else decode()
 
 
