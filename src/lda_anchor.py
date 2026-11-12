@@ -18,6 +18,9 @@ development data blocks 1..10):
             means from the user's day-1 calibration + all anchors so far (as LDAcum). Leave-one-subject-out, so
             the user's data never enters the covariance. On Kyranou the covariance comes from all 20 arm_position
             subjects.
+  LDAr_oas / LDAcum_oas   the MCU form of LDAr / LDAcum (src/c/ldacal.c): Q5.10 rows, running sums only (per-class
+            sum and count, one 80 x 80 sum of outer products), pooled within-class covariance with the OAS shrinkage
+            (needs only the covariance and the sample count, so nothing but the sums is kept), equal priors.
 LDA with 60-120 windows in 80 dimensions has a singular covariance: LDAr / LDAcum use sklearn's lsqr solver with
 Ledoit-Wolf shrinkage ('auto'); LDAfix keeps the upstream default (svd) so that it reproduces the paper's baseline.
 Writes results/lda_anchor.csv, lda_anchor_summary.csv (paired with F and the leaf / RF conditions of leaf_sweep.csv)
@@ -39,7 +42,7 @@ import pipeline as P  # noqa: E402
 import zscore_sweep as ZW  # noqa: E402
 
 OUT = os.path.join(P.ROOT, 'results')
-CONDS = ['LDAfix', 'LDAfixS', 'LDAfixSz', 'LDAr', 'LDAcum', 'LDApool']
+CONDS = ['LDAfix', 'LDAfixS', 'LDAfixSz', 'LDAr', 'LDAcum', 'LDApool', 'LDAr_oas', 'LDAcum_oas']
 REF = ['F', 'A', 'LAonly_a8_za', 'R', 'Rcum']
 RIDGE = 1e-6
 
@@ -66,6 +69,44 @@ def pooled_cov(subjects, shift):
             a, b = within_cov(zs(X), np.asarray(y).astype(np.int64))
             S, n = S + a, n + b
     return S / n
+
+
+class OasLDA:
+    """ldacal.c in float64: the reference the C module is checked against (src/check_ldacal_c.py)"""
+
+    def __init__(self):
+        d = 80
+        self.G, self.s, self.n = np.zeros((d, d)), np.zeros((LS.K, d)), np.zeros(LS.K)
+
+    @staticmethod
+    def q(X):
+        return P.quantize(X).astype(np.float64) / (1 << P.Q_SHIFT)
+
+    def add(self, X, y):
+        X = self.q(X)
+        self.G += X.T @ X
+        for c in range(LS.K):
+            self.s[c] += X[y == c].sum(0)
+            self.n[c] += np.sum(y == c)
+
+    def fit(self):
+        d, N = self.G.shape[0], self.n.sum()
+        m = self.s / self.n[:, None]
+        S = (self.G - (m.T * self.n) @ m) / N
+        mu = np.trace(S) / d
+        alpha = np.mean(S ** 2)
+        num, den = alpha + mu ** 2, (N + 1.0) * (alpha - mu ** 2 / d)
+        self.rho = 1.0 if den == 0 else min(num / den, 1.0)
+        C = (1 - self.rho) * S + self.rho * mu * np.eye(d)
+        self.w = np.linalg.solve(C, m.T).T
+        self.b = -0.5 * np.sum(m * self.w, axis=1)
+        return self
+
+    def scores(self, X):
+        return self.q(X) @ self.w.T + self.b
+
+    def predict(self, X):
+        return np.argmax(self.scores(X), axis=1)
 
 
 class MeanLDA:
@@ -103,7 +144,12 @@ def run(cond, Xc_raw, yc, blocks, cov=None):
             if len(ya):
                 mu, sd = Xa.mean(0), Xa.std(0)
                 pool.append(((Xa - mu) / sd, ya))
-                if cond == 'LDAr':
+                if cond.endswith('_oas'):
+                    mdl_last = OasLDA()
+                    for x, t in (pool[-1:] if cond == 'LDAr_oas' else pool):
+                        mdl_last.add(x, t)
+                    mdl_last.fit()
+                elif cond == 'LDAr':
                     mdl_last = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto').fit(*pool[-1])
                 else:
                     X = np.concatenate([x for x, _ in pool])

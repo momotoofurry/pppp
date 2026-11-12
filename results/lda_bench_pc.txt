@@ -1,0 +1,13 @@
+
+=== LDA re-calibration bench ===
+PC
+ldacal static 30132 B, 80 features, 6 classes, 60 labelled rows, 240 test rows
+new LDA from 60 rows: fit 0, rho x 1e6 371847, correct 178 of 240, predictions 27 69 17 56 41 30, hash 9f3896cc
+  ld_add       n=  60  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
+  ld_fit       n=   1  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
+  ld_predict   n= 240  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
+60 more rows (120): fit 0, rho x 1e6 187460, correct 179 of 240, predictions 28 68 17 56 41 30, hash c86395e7
+  ld_add       n=  60  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
+  ld_fit       n=   1  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
+  ld_predict   n= 240  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
+=== done ===
