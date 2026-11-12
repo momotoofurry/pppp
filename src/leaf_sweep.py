@@ -109,6 +109,21 @@ NEW = {'LA_a2': dict(kind='cnt', anc=2, pseudo=True, za=False), 'LA_a8': dict(ki
        'B_w4': dict(kind='two', w0=4, anc=0, za=False), 'B_w16': dict(kind='two', w0=16, anc=0, za=False),
        'BA_w4_a4': dict(kind='two', w0=4, anc=4, za=False), 'BA_w16_a4': dict(kind='two', w0=16, anc=4, za=False),
        'BA_w4_a4_za': dict(kind='two', w0=4, anc=4, za=True), 'BA_w16_a4_za': dict(kind='two', w0=16, anc=4, za=True)}
+# prior sweep (2026-11-12, after the board bench of report 35.6): anchor counters only (the C module leafcal.c), the
+# one-shot class of a leaf gets a prior of r anchor windows (anc = 1, w0 = r). r = 0.5 is LAonly_a8_za (anc 8, w0 4,
+# same ratio, identical results). Half-integer r: no ties between the one-shot class and another class.
+# r = 1e6: the counters never change a leaf, i.e. only the anchor's z-score update.
+PRIORS = [0.5, 1.5, 2.5, 4.5, 9.5, 19.5, 1e6]
+
+
+def pname(r, za=True):
+    return f'LAonly_r{r:g}' + ('_za' if za else '')
+
+
+for _r in PRIORS:
+    NEW[pname(_r)] = dict(kind='cnt', anc=1, pseudo=False, za=True, w0=_r)
+for _r in (0.5, 4.5):
+    NEW[pname(_r, False)] = dict(kind='cnt', anc=1, pseudo=False, za=False, w0=_r)
 CONDS = (['F', 'Z', 'A'] + [lname(*g) for g in LEAF_GRID] + [lname(*DEFAULT) + '_noz', lname(*DEFAULT) + '_nog', 'R']
          + list(NEW) + ['Rcum'])
 
@@ -249,7 +264,7 @@ def run_anchor(cond, mdl, Xc_raw, blocks, preds=None):
 
     def relabel():
         score = cnt.copy()
-        score[np.arange(len(base)), base] += 4.0                                     # w0 = 4
+        score[np.arange(len(base)), base] += p.get('w0', 4.0)                        # prior of the one-shot class
         lab[:] = np.argmax(score, axis=1)
 
     def byte_step(g, c):

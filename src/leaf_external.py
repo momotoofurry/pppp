@@ -33,6 +33,8 @@ from pipeline import emg_functions  # noqa: E402
 
 OUT = os.path.join(P.ROOT, 'results')
 CONDS = ['F', 'Z', 'A', 'Lall_w4_d1', 'LA_a8_za', 'LAonly_a8_za', 'LAonly_a8', 'R', 'Rcum']
+# prior sweep (leaf_sweep.PRIORS); --conds selects, --add merges into the existing CSV
+PRIOR_CONDS = [LS.pname(r) for r in LS.PRIORS]
 
 
 def calibrate(s, p, seed, pre):
@@ -60,6 +62,12 @@ def with_anchor(blocks):
             a, u = np.zeros(0, dtype=np.int64), np.arange(len(y))
         out.append((X[a], y[a], X[u], y[u]))
     return out
+
+
+def job_conds(data, p, seed, conds):
+    global CONDS
+    CONDS = conds
+    return job(data, p, seed)
 
 
 def job(data, p, seed):
@@ -95,10 +103,23 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default='/data')
     ap.add_argument('--jobs', type=int, default=16)
+    ap.add_argument('--conds', nargs='+', default=None)
+    ap.add_argument('--add', action='store_true')
     args = ap.parse_args()
+    global CONDS
+    if args.conds:
+        CONDS = args.conds
     FC.lib()
-    res = Parallel(n_jobs=args.jobs, verbose=5)(delayed(job)(args.data, p, s) for p in EC.SUBJECTS for s in EC.SEEDS)
+    import leaf_external as M                            # workers import the module (module-level CONDS)
+    M.CONDS = CONDS
+    res = Parallel(n_jobs=args.jobs, verbose=5)(delayed(job_conds)(args.data, p, s, CONDS) for p in EC.SUBJECTS
+                                                for s in EC.SEEDS)
     df = pd.DataFrame([r for rs in res for r in rs])
+    path = os.path.join(OUT, 'leaf_external.csv')
+    if args.add and os.path.exists(path):
+        old = pd.read_csv(path)
+        df = pd.concat([old[~old.cond.isin(CONDS)], df], ignore_index=True)
+    CONDS = list(dict.fromkeys(df.cond))
     df.to_csv(os.path.join(OUT, 'leaf_external.csv'), index=False, float_format='%.4f')
     df['ok'] = df.acc * df.n
     acc = (df.groupby(['comp', 'cond', 'subject', 'seed'])[['ok', 'n']].sum().assign(acc=lambda g: g.ok / g.n * 100)
@@ -107,7 +128,7 @@ def main():
     for comp, g in acc.groupby(level='comp'):
         for cond in CONDS:
             row = dict(comp=comp, cond=cond, n=len(g), acc=g[cond].mean())
-            for ref in ('F', 'R'):
+            for ref in [x for x in ('F', 'R') if x in g]:
                 d = g[cond] - g[ref]
                 m, lo, hi = LS.ci(d) if np.any(d != 0) else (0.0, 0.0, 0.0)
                 row.update({f'vs{ref}': m, f'vs{ref}_lo': lo, f'vs{ref}_hi': hi, f'vs{ref}_worst': d.min(),
