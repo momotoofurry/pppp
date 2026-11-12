@@ -1,0 +1,7 @@
+module,text,data,bss
+rt_lda.c,1806,5,40268
+ldacal.c,1424,0,30132
+protocol.c,446,0,0
+features.c,1768,0,20804
+decision.c,324,0,0
+total,5768,5,91204
