@@ -1,0 +1,25 @@
+
+=== leaf counter bench ===
+PC
+leafcal static 79920 B, 100 trees, 12645 internal nodes, 60 labelled rows, 240 test rows
+no counters: counter rows 0 (0 B); correct 215 -> 215 of 240; votes hash 88618b0b -> 88618b0b
+  lc_votes (one-shot)    n= 240  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+  lc_learn (1 window)    n=  60  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+  lc_votes (counters)    n= 240  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+appended trees (k 0): counter rows 322 (1932 B); correct 215 -> 195 of 240; votes hash 88618b0b -> beaebbd1
+  lc_votes (one-shot)    n= 240  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+  lc_learn (1 window)    n=  60  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+  lc_votes (counters)    n= 240  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
++ 10 pre-trained: counter rows 2814 (16884 B); correct 215 -> 190 of 240; votes hash 88618b0b -> da6cb3b7
+  lc_votes (one-shot)    n= 240  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+  lc_learn (1 window)    n=  60  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+  lc_votes (counters)    n= 240  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
++ 25 pre-trained: counter rows 6549 (39294 B); correct 215 -> 187 of 240; votes hash 88618b0b -> 981b5e6b
+  lc_votes (one-shot)    n= 240  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+  lc_learn (1 window)    n=  60  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+  lc_votes (counters)    n= 240  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+all 100 trees: counter rows 12745 (76470 B); correct 215 -> 182 of 240; votes hash 88618b0b -> a8960f9b
+  lc_votes (one-shot)    n= 240  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+  lc_learn (1 window)    n=  60  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+  lc_votes (counters)    n= 240  mean       0 cyc     0.0 us   max       0 cyc     0.0 us   total       0.0 us
+=== done ===
