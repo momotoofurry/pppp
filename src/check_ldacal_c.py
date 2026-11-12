@@ -43,6 +43,8 @@ def build():
     lib.ld_add.argtypes = [ctypes.c_void_p, ctypes.c_int]
     lib.ld_predict.argtypes = [ctypes.c_void_p]
     lib.ld_shrinkage.restype = ctypes.c_float
+    lib.ld_dist2.argtypes = [ctypes.c_void_p, ctypes.c_int]
+    lib.ld_dist2.restype = ctypes.c_float
     lib.ld_static_bytes.restype = ctypes.c_uint
     return lib
 
@@ -65,7 +67,7 @@ def job(subject, shift):
             for row, c in zip(q(Z), yc):
                 lib.ld_add(row.ctypes.data, int(c))
         n = agree = ok_py = ok_c = 0
-        drho = 0.0
+        drho = ddist = 0.0
         for b, (X, y) in enumerate(blocks):
             y = y.astype(np.int64)
             a, u = LS.anchor_split(y)
@@ -82,13 +84,18 @@ def job(subject, shift):
             drho = max(drho, abs(lib.ld_shrinkage() - ref.rho))
             pp = ref.predict(Zu)
             pc = np.array([lib.ld_predict(row.ctypes.data) for row in q(Zu)])
+            Zq = LA.OasLDA.q(Zu)[:40]                               # ld_dist2 against x^T C^-1 x - 2 score
+            C = (1 - ref.rho) * ref.S + ref.rho * np.trace(ref.S) / 80 * np.eye(80)
+            dpy = np.einsum('nd,de,ne->n', Zq, np.linalg.inv(C), Zq) - 2 * ref.scores(Zu[:40])[np.arange(40), pp[:40]]
+            dc = np.array([lib.ld_dist2(row.ctypes.data, int(k)) for row, k in zip(q(Zu[:40]), pp[:40])])
+            ddist = max(ddist, float(np.max(np.abs(dc - dpy) / dpy)))
             if b >= 1:
                 n += len(pp)
                 agree += int(np.sum(pp == pc))
                 ok_py += int(np.sum(pp == y[u]))
                 ok_c += int(np.sum(pc == y[u]))
         rows.append(dict(subject=subject, shift=shift, mode=mode, windows=n, agree=agree, acc_py=ok_py / n * 100,
-                         acc_c=ok_c / n * 100, max_rho_diff=drho, rho_last=ref.rho))
+                         acc_c=ok_c / n * 100, max_rho_diff=drho, max_dist_rel_diff=ddist, rho_last=ref.rho))
     return rows
 
 
@@ -133,7 +140,7 @@ def main():
     df.to_csv(os.path.join(OUT, 'ldacal_c_check.csv'), index=False, float_format='%.6g')
     sm = df.groupby(['shift', 'mode']).agg(runs=('agree', 'size'), windows=('windows', 'sum'), agree=('agree', 'sum'),
                                            acc_py=('acc_py', 'mean'), acc_c=('acc_c', 'mean'),
-                                           max_rho_diff=('max_rho_diff', 'max'), rho_last=('rho_last', 'mean')).reset_index()
+                                           max_rho_diff=('max_rho_diff', 'max'), max_dist_rel_diff=('max_dist_rel_diff', 'max'), rho_last=('rho_last', 'mean')).reset_index()
     sm['agree_pct'] = sm.agree / sm.windows * 100
     sm.to_csv(os.path.join(OUT, 'ldacal_c_summary.csv'), index=False, float_format='%.6g')
     pd.set_option('display.width', 200)

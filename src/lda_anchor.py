@@ -92,7 +92,7 @@ class OasLDA:
     def fit(self):
         d, N = self.G.shape[0], self.n.sum()
         m = self.s / self.n[:, None]
-        S = (self.G - (m.T * self.n) @ m) / N
+        S = self.S = (self.G - (m.T * self.n) @ m) / N
         mu = np.trace(S) / d
         alpha = np.mean(S ** 2)
         num, den = alpha + mu ** 2, (N + 1.0) * (alpha - mu ** 2 / d)

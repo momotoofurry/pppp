@@ -27,5 +27,9 @@ void ld_add(const int16_t *x, int label);
 int ld_fit(void);
 int ld_scores(const int16_t *x, float *scores);      /* LD_CLASSES discriminant values; returns the class */
 int ld_predict(const int16_t *x);
+/* squared Mahalanobis distance of x to the mean of class c under the shrunk covariance of the last ld_fit
+ * (= x^T C^-1 x - 2 score_c). For rejecting windows that are far from everything the model was taught
+ * (report 35.12); uses the Cholesky factor kept by ld_fit, so not while ld_fit is running. */
+float ld_dist2(const int16_t *x, int c);
 float ld_shrinkage(void);                            /* rho of the last ld_fit */
 unsigned ld_static_bytes(void);

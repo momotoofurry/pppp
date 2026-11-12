@@ -141,6 +141,20 @@ int ld_scores(const int16_t *x, float *scores)
     return best;
 }
 
+float ld_dist2(const int16_t *x, int c)
+{
+    const float inv = 1.0f / (float)s_n[c];
+    float d = 0.0f;
+    for (int i = 0; i < LD_DIM; i++) {          /* L z = x - m_c, z kept in s_x */
+        float v = (float)x[i] / LD_Q - s_sum[c][i] * inv;
+        for (int k = 0; k < i; k++)
+            v -= s_l[TRI(i, k)] * s_x[k];
+        s_x[i] = v / s_l[TRI(i, i)];
+        d += s_x[i] * s_x[i];
+    }
+    return d;
+}
+
 int ld_predict(const int16_t *x)
 {
     float s[LD_CLASSES];
