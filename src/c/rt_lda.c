@@ -240,6 +240,7 @@ void rtl_idle(void)
         return;
     const int n = (int)s_cnt.label_windows;
     int r = -3;
+    const uint32_t t0 = now();
     if (n >= RTL_LABEL_MIN) {
         /* z-score of the session = mean and (population) standard deviation of its start-up windows */
         for (int j = 0; j < FE_DIM; j++) {
@@ -268,7 +269,13 @@ void rtl_idle(void)
     dc_reset(&s_dc);
     s_mode = r == 0 ? RTL_MODE_RUN : RTL_MODE_IDLE;
     s_fit_request = 0;
+    status(RTL_EV_FIT_US, (int32_t)(now() - t0));
     status(RTL_EV_FIT, r);
+}
+
+void rtl_status(uint8_t ev, int32_t value)
+{
+    status(ev, value);
 }
 
 int rtl_mode(void)

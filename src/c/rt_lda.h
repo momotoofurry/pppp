@@ -23,7 +23,8 @@
  *   RTL_FORGET (11)                   drop all accumulated labels (ld_reset), e.g. after the band was moved
  * Status events (PK_STATUS): RTL_EV_FIT value = 0 or the error (-1 a gesture has no window in the sums, -2
  *   degenerate data, -3 fewer than RTL_LABEL_MIN session windows); RTL_EV_LOST packets lost; RTL_EV_LABEL_FULL
- *   session buffer full; RTL_EV_FORGOT.
+ *   session buffer full; RTL_EV_FORGOT; RTL_EV_FIT_US value = duration of the fit in microseconds (sent before
+ *   RTL_EV_FIT; 0 without a time base).
  * PK_PRED / PK_COMMAND: the field that carries the vote share for rt.c carries min(65535, margin x 100) here.
  */
 #pragma once
@@ -40,7 +41,9 @@
 
 enum { RTL_STREAM_RESET = 1, RTL_LABEL_START = 2, RTL_LABEL_END = 3, RTL_FIT = 4, RTL_SET_REJECT = 5,
        RTL_SET_REPORT = 6, RTL_FORGET = 11 };
-enum { RTL_EV_FIT = 1, RTL_EV_LOST = 3, RTL_EV_LABEL_FULL = 4, RTL_EV_FORGOT = 16 };
+enum { RTL_EV_FIT = 1, RTL_EV_LOST = 3, RTL_EV_LABEL_FULL = 4, RTL_EV_FORGOT = 16, RTL_EV_FIT_US = 17,
+       /* diagnostics sent by the board main loop (app_rt_lda.c), same numbers as rt.h */
+       RTL_EV_DIAG_RX_HW = 9, RTL_EV_DIAG_STACK = 10, RTL_EV_DIAG_RX_OVF = 11, RTL_EV_DIAG_RX_ERR = 12 };
 enum { RTL_MODE_IDLE = 0, RTL_MODE_LABEL = 1, RTL_MODE_RUN = 2 };
 
 typedef struct {
@@ -62,4 +65,5 @@ void rtl_rx(const uint8_t *bytes, uint32_t n);      /* real-time context */
 void rtl_idle(void);                                /* thread context */
 int rtl_mode(void);
 const rtl_counters_t *rtl_counters(void);
+void rtl_status(uint8_t ev, int32_t value);     /* send a PK_STATUS (thread context: the board's diagnostics) */
 unsigned rtl_static_bytes(void);
