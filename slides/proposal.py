@@ -81,6 +81,25 @@ def load():
     N['t2'] = t2
     t3 = csv('task_sim3_summary.csv').set_index(['struct', 'shift', 'cond'])
     N['t3'] = t3
+    N['t4'] = csv('task_sim4_summary.csv').set_index(['shift', 'e', 'cond'])
+    N['t5'] = csv('task_sim5_summary.csv').set_index(['shift', 'k', 'kind', 'e', 'cond'])
+    sb = open(os.path.join(R, 'lda_soft_bench_board_480mhz_cache.txt'), encoding='utf-8').read().split('soft labels')[1]
+    N['soft_cmd_ms'] = float(re.search(r'per command\s+n=\s*\d+\s+mean\s+\d+ cyc\s+([\d.]+) us', sb).group(1)) / 1000
+    bt = csv('board_replay_lda_task_summary.csv').set_index('Unnamed: 0').value
+    N['btask'] = dict(windows=int(float(bt['scored_windows'])), same=int(float(bt['same_class_as_pc'])),
+                      cmds=int(float(bt['commands_board'])), cmds_eq=str(bt['commands_equal']) == 'True',
+                      upd=int(float(bt['task_updates_board'])), p95=float(bt['latency_p95']),
+                      lost=int(float(bt['lost_packets'])), us_max=float(bt['task_us_max']))
+    rt = csv('rt_task_check.csv').sum()
+    N['rt_task'] = dict(windows=int(rt.windows), agree=int(rt.agree), upd=int(rt.upd_c), same=int(rt.q_arg_same))
+    g = csv('rt_gate_check.csv').sum()
+    N['rt_gate'] = dict(windows=int(g.windows), agree=int(g.agree), gated_agree=int(g.gated_agree))
+    fwg = open(os.path.join(R, 'arm_rt_lda_gate_firmware_size.txt'), encoding='utf-8').read().splitlines()[-1].split()
+    N['fw_gate'] = dict(flash=int(fwg[0]) + int(fwg[1]), ram=int(fwg[1]) + int(fwg[2]))
+    ros = open(os.path.join(R, 'logs', 'test_task_labels_ros.log'), encoding='utf-8').read()
+    m = re.search(r'(\d+) labels .*?: (\d+) applied', ros)
+    N['ros'] = dict(labels=int(m.group(1)), applied=int(m.group(2)),
+                    actions=len(re.findall(r"'end'", ros.split('robot actions')[1])))
     return N
 
 
@@ -403,8 +422,8 @@ def build(out):
     # 7 RQ
     s = d.slide('研究問題', notes='RQ1–RQ3 已有前置結果，RQ4 待做。')
     rqs = [('RQ1 校正策略', '重新配戴後，免標籤適應、短時有標籤校正、任務提供的標籤各能恢復多少準確率？代價是多少？', '已有結果'),
-           ('RQ2 任務標籤', '機器人任務能提供多可靠的標籤？標籤錯誤、任務結構、使用者偏離流程的影響？', '模擬完成'),
-           ('RQ3 可部署性', '整套方法能否在微控制器上即時執行、與 PC 參考逐一相同？記憶體、時間、能量？', '板上實測（能量未量）'),
+           ('RQ2 任務標籤', '機器人任務能提供多可靠的標籤？標籤錯誤、任務結構、使用者偏離流程的影響？', '模擬完成（含和 CIIL 比較、錯標籤掃描）'),
+           ('RQ3 可部署性', '整套方法能否在微控制器上即時執行、與 PC 參考逐一相同？記憶體、時間、能量？', '板上實測完整學習迴路（能量未量）'),
            ('RQ4 驗證', '真人（健常人為主、視情況加病患）與真實機械臂上是否成立？', '待做')]
     for i, (h, b, st) in enumerate(rqs):
         x, y = 0.6 + (i % 2) * 6.15, 1.5 + (i // 2) * 2.65
@@ -479,7 +498,7 @@ def build(out):
     # 11 divider
     s = d.slide(dark=True, notes='以下是目前的結果：MCU 為板上實測；校正策略為開發資料與 Kyranou；任務標籤為模擬。')
     text(s, 0.9, 2.6, 11.5, 1.0, '目前的結果', size=40, bold=True, color=WHITE)
-    text(s, 0.9, 3.7, 11.5, 1.2, ['MCU 可部署性：板上實測', '任務標籤：閉迴路模擬＋Kinova ROS 2 模擬', '負面結果與更正'],
+    text(s, 0.9, 3.7, 11.5, 1.6, ['MCU 可部署性：板上實測', '任務標籤：閉迴路模擬、和 CIIL 比較、標籤出錯時', '完整學習迴路：MCU＋ROS 2 模擬手臂', '負面結果與更正'],
          size=18, color='CFE3E6', space=6)
 
     # 12 MCU
@@ -564,49 +583,121 @@ def build(out):
                                      (f'標籤錯誤率：軟 {min(e):.1f}–{max(e):.1f}%，硬 {min(eh):.1f}–{max(eh):.1f}%', {'bullet': True}),
                                      ('回答「方法是不是只在設計好的任務裡有效」', {'bullet': True})], size=15, space=10)
 
-    # 16 negative results
-    s = d.slide('負面結果與更正（會寫進論文）', notes='出處：report 35.4、35.8、35.9–35.10、35.16、35.17、35.18、35.19。')
+    # 16 CIIL comparison and wrong task labels
+    t4 = N['t4']
+    s = d.slide('結果⑤：和最接近的前人方法（CIIL）比，任務標籤出錯時', notes=(
+        'Campbell 等（2024）的情境式增量學習（CIIL）對應到本研究的閉迴路抓放模擬（report 35.20；task_sim4_summary.csv）。'
+        '先前的硬標籤就是 P+N-CIIL。任務標籤以機率 e 換成隨機的另一個手勢（獨立亂數）。電極偏移半格、使用者 10% 改變主意、一輪提示。'
+        '事先寫定的判準 R1（軟標籤比最好的 CIIL 變體多 2 點以上）不通過：P-CIIL 對隨機錯標籤一樣耐。'
+        'CIIL 原本的更新式（每 10 秒以 α 0.1 混入）在這種稀疏標籤下比只做提示還差，見備註；漏撤銷（錯的動作被當成對的）影響很小（report 35.21）。'))
+    es = [0.0, 0.1, 0.2, 0.3]
+    cd = CategoryChartData()
+    cd.categories = [f'{int(e * 100)}%' for e in es]
+    cue = t4.loc[(0.5, 0.0, 'cue1')].probe_after
+    series = [('只做一輪提示', None, MUTE), ('P+N-CIIL（＝硬標籤）', 'cue1_pn', CORAL), ('P-CIIL', 'cue1_pos', GREY),
+              ('gate 規則', 'cue1_gate', '7FB7B9'), ('軟標籤（本研究）', 'cue1_soft', TEAL)]
+    for name, c, _ in series:
+        cd.add_series(name, [round(cue if c is None else t4.loc[(0.5, e, c)].probe_after, 1) for e in es])
+    gf = s.shapes.add_chart(XL_CHART_TYPE.LINE_MARKERS, Inches(0.6), Inches(1.45), Inches(8.2), Inches(5.0), cd)
+    ch = gf.chart
+    chart_style(ch, legend=True, vmax=94, vmin=78, label_size=11, axis_size=13)
+    ch.plots[0].has_data_labels = False
+    for srs, (_, _, col) in zip(ch.plots[0].series, series):
+        srs.format.line.color.rgb = rgb(col)
+        srs.format.line.width = Pt(3.5 if col in (TEAL, CORAL) else 2.25)
+        srs.smooth = False
+        srs.marker.format.fill.solid()
+        srs.marker.format.fill.fore_color.rgb = rgb(col)
+        srs.marker.format.line.color.rgb = rgb(col)
+    ch.value_axis.visible = True
+    ch.value_axis.tick_labels.font.size = Pt(12)
+    ch.value_axis.has_major_gridlines = True
+    ch.value_axis.major_gridlines.format.line.color.rgb = rgb('E3E8EA')
+    text(s, 0.6, 6.5, 8.2, 0.4, '橫軸：任務標籤隨機出錯的比例；縱軸：重戴後準確率 %（電極偏移半格，一輪提示）', size=12, color=GREY)
+    soft3, pn3 = t4.loc[(0.5, 0.3, 'cue1_soft')].probe_after, t4.loc[(0.5, 0.3, 'cue1_pn')].probe_after
+    box(s, 9.1, 1.6, 3.6, 4.85, fill=LIGHT)
+    text(s, 9.35, 1.8, 3.15, 4.5, [('看到的事', {'size': 19, 'bold': True}),
+                                    ('先前的硬標籤就是 P+N-CIIL：約一成錯標籤就失去好處', {'bullet': True}),
+                                    (f'軟標籤到 30% 錯標籤仍 {soft3:.1f}%（P+N {pn3:.1f}%）', {'bullet': True}),
+                                    ('但 P-CIIL 一樣耐隨機錯標籤：「比所有 CIIL 都好」不成立', {'bullet': True, 'color': CORAL}),
+                                    ('不做提示時，所有 CIIL 變體在偏移下都失敗', {'bullet': True})], size=14, space=8)
+
+    # 17 MCU learning loop end to end
+    bt, rtt, rtg, fg, ros = N['btask'], N['rt_task'], N['rt_gate'], N['fw_gate'], N['ros']
+    s = d.slide('結果⑥：完整學習迴路在 MCU 上跑起來', notes=(
+        f'軟標籤 C 版（report 35.22–35.23）：每學一個任務標籤 {N["soft_cmd_ms"]:.2f} ms（板子實測）。'
+        f'即時迴圈 RTL_TASK_LABEL：機器人只回傳 2 個位元組＋視窗編號（35.24、35.26）。板上 11.5 分鐘重放（35.25）。'
+        f'出力判斷 C 版 RTL_SET_GATE（35.28）。RViz 模擬 Gen3：ros2_kortex mock hardware（35.27）。'
+        '還沒有：真的 Kinova、真人、能量量測、實驗室 C# 橋接的轉送。'))
+    steps = ['手勢', 'MCU 指令', 'ROS 2 手臂動作', '機器人回傳|預期手勢', 'MCU 軟標籤|更新模型']
+    for i, st in enumerate(steps):
+        x = 0.6 + i * 2.5
+        b = box(s, x, 1.5, 2.15, 0.95, fill=TEAL if i in (1, 4) else LIGHT)
+        label_in(b, st.split('|'), size=14, color=WHITE if i in (1, 4) else INK, bold=i in (1, 4))
+        if i < 4:
+            arrow(s, x + 2.19, 1.8, 0.27, 0.35)
+    stats = [(f'{N["soft_cmd_ms"]:.1f} ms', '每學一個任務標籤（板上）'),
+             (f'{bt["same"]:,}／{bt["windows"]:,}', f'板上 11.5 分鐘重放：視窗和 PC 相同；{bt["upd"]} 次任務更新'),
+             (f'{rtg["agree"] / rtg["windows"] * 100:.0f}%', f'出力判斷 C 版：{rtg["windows"]:,} 個視窗和參考相同（三種設定）'),
+             (f'{ros["applied"]}／{ros["labels"]}', f'RViz 模擬手臂：標籤送回並套用；{ros["actions"]} 個動作正常結束'),
+             (f'{fg["flash"] / 1024:.1f} KB', '整個韌體 Flash（四個元件都在）'),
+             (f'{fg["ram"] / 1024:.0f} KB', '整個韌體 RAM（512 KB 的 20%）')]
+    for i, (big, lab) in enumerate(stats):
+        x, y = 0.6 + (i % 3) * 4.1, 2.8 + (i // 3) * 1.85
+        box(s, x, y, 3.85, 1.65, fill=LIGHT)
+        text(s, x + 0.25, y + 0.15, 3.4, 0.75, big, size=30, bold=True, color=TEAL)
+        text(s, x + 0.25, y + 0.9, 3.4, 0.7, lab, size=13, color=GREY)
+    text(s, 0.6, 6.55, 12.1, 0.4, '一輪提示、收縮 LDA、出力判斷、任務軟標籤都有 C 版並和參考逐一相同；還沒有真的 Kinova、真人與能量量測。',
+         size=13, color=GREY)
+
+    # 18 negative results
+    s = d.slide('負面結果與更正（會寫進論文）', notes='出處：report 35.4、35.8、35.9–35.10、35.16–35.21。另：「開機序列第一輪比第二輪差」只在開發資料看得到，已撤回。')
     neg = [('自己提出的葉節點計數', '輸給收縮 LDA，退為對照組'),
            ('沒有用的規則', '只學認錯的視窗、逐手勢門檻、開機序列當裁判、類別中心取中位數、事後修正標籤'),
            ('軟標籤不做提示', '有偏移時比固定模型還差：錯誤自我強化'),
-           ('資料陷阱（已更正）', 'Kyranou 每個手勢連續錄 5 次；緊接著評分會偏樂觀，改看第二個 session 低 2–5 點、結論不變'),
-           ('撤回的發現', '「開機序列第一輪比第二輪差」只在開發資料看得到')]
+           ('不成立的主張', '「軟標籤比所有 CIIL 變體都耐錯標籤」：隨機錯標籤時 P-CIIL 一樣耐'),
+           ('CIIL 原本的更新式', '每 10 秒以 α 0.1 混入，在稀疏標籤下比只做提示還差；累加和才適合'),
+           ('出力判斷的門檻', '原門檻擋掉 6.6% 手勢視窗、完成率 86%；實驗先不開，用真實資料決定'),
+           ('資料陷阱（已更正）', 'Kyranou 每個手勢連續錄 5 次；緊接著評分會偏樂觀，改看第二個 session 低 2–5 點、結論不變')]
     for i, (h, b) in enumerate(neg):
-        y = 1.45 + i * 1.05
-        box(s, 0.6, y, 12.1, 0.9, fill=LIGHT)
-        text(s, 0.85, y + 0.15, 3.6, 0.6, h, size=16, bold=True, color=CORAL if i == 3 else INK, anchor=MSO_ANCHOR.MIDDLE)
-        text(s, 4.5, y + 0.15, 8.0, 0.6, b, size=14, color=GREY, anchor=MSO_ANCHOR.MIDDLE)
+        y = 1.42 + i * 0.77
+        box(s, 0.6, y, 12.1, 0.68, fill=LIGHT)
+        text(s, 0.85, y + 0.06, 3.6, 0.56, h, size=15, bold=True, color=CORAL if i == 3 else INK, anchor=MSO_ANCHOR.MIDDLE)
+        text(s, 4.5, y + 0.06, 8.0, 0.56, b, size=13, color=GREY, anchor=MSO_ANCHOR.MIDDLE)
 
     # 17 contributions
-    s = d.slide('創新與貢獻', notes='「不主張首創」：侵入式腦機介面已有用推斷的意圖重新標記資料（Gilja 等，2012；Jarosiewicz 等，2015）。')
+    s = d.slide('創新與貢獻', notes='兩輪文獻檢索（2026-11-13，文獻搜尋_2026-11-13.md）：任務情境更新 LDA（Campbell 等，2024）、VR 軟標籤（Gagné 等，2025）、'
+                'GAP9 上的情境式學習展示（Orlandi & Rossi，2026）、短校正收縮適應（Vidovic 等，2016）都已有人做。沒找到：實體機械臂、離散稀疏的任務結果、系統性的情境錯誤率掃描。')
     rows = [['貢獻', '狀態', '強度'],
             ['獨立檢驗：免標籤自我校正在重戴資料上沒有確認增益（預先登錄）', '完成', '中（8 人）'],
-            ['指出原方法論文的 LDA 基準缺少收縮估計', '完成', '中（待查是否已有人指出）'],
-            ['同一份重戴資料上直接比較免標籤適應與短時有標籤校正', '完成', '中'],
-            ['任務引導的軟標籤＋出力判斷＋一輪提示的混合校正', '模擬完成', '中高（待實機）'],
-            ['量化任務標籤的可靠度門檻與任務結構的影響', '模擬完成', '中'],
-            ['累加量形式的收縮 LDA 在 MCU 上逐位元驗證、即時運作', '完成', '工程貢獻']]
-    fills = {(i, 1): TEAL_L for i in (1, 2, 3, 6)}
-    fills.update({(i, 1): 'FBE3DD' for i in (4, 5)})
+            ['指出原方法論文的 LDA 基準缺少收縮估計', '完成', '中'],
+            ['任務引導的軟標籤＋出力判斷＋一輪提示，用在離散機械臂指令', '模擬完成', '中高（待實機）'],
+            ['系統性掃描任務標籤錯誤率，並和 CIIL 各策略比較', '模擬完成', '中高（檢索中沒找到別人做過）'],
+            ['量化任務結構強弱的影響', '模擬完成', '中'],
+            ['完整學習迴路在 MCU 上逐一驗證、即時運作；機器人只回傳 2 個位元組', '完成', '工程貢獻']]
+    fills = {(i, 1): TEAL_L for i in (1, 2, 6)}
+    fills.update({(i, 1): 'FBE3DD' for i in (3, 4, 5)})
     table(s, 0.6, 1.5, 12.1, rows, [7.6, 1.6, 2.9], size=14, row_h=0.62, fills=fills)
-    text(s, 0.6, 6.05, 12.1, 0.8, '不主張「首創」：主張精確寫成「離散手勢指令、意圖來自機械臂任務狀態機且不確定、軟標籤、可在 MCU 上以累加量實作」。',
+    text(s, 0.6, 6.05, 12.1, 0.8, '不主張「首創」：任務情境更新 LDA 已有人做（Campbell 等，2024）。本研究補的是實體機械臂、一個指令一個稀疏的結果、標籤會錯時怎麼辦，以及在 MCU 上的實作。',
          size=14, color=GREY)
 
     # 18 related work
-    s = d.slide('與相關研究的差別', notes='相關研究的細節多數只讀到摘要層級（2026-11-13 檢索），寫進論文前要逐篇讀過。')
-    rows = [['', '訊號', '標籤從哪來', '控制', '平台'],
-            ['Jiang 等（2024；2025）', '肌電', '免標籤偽標籤', '離散手勢', 'PC'],
-            ['Campbell 等（2024）', '肌電', '任務情境（游標）', '連續游標', 'PC'],
-            ['Orlandi 等（2026）', '肌電', '任務情境，需已知目標', '—', 'GAP9（CNN）'],
-            ['Gilja 等（2012）；Jarosiewicz 等（2015）', '侵入式腦機介面', '推斷的意圖（已知目標）', '連續游標', '研究用電腦'],
-            ['本研究', '肌電', '機械臂任務狀態機＋軟標籤＋一輪提示', '離散指令（機械臂）', 'Cortex-M7 30 KB']]
-    table(s, 0.6, 1.5, 12.1, rows, [3.4, 1.9, 3.3, 1.9, 1.6], size=14, row_h=0.72,
-          fills={(5, j): TEAL_L for j in range(5)})
+    s = d.slide('與相關研究的差別', notes='逐篇查證過（文獻搜尋_2026-11-13.md）。Orlandi & Rossi（2026）是 RISC-V Summit 的展示摘要，未經同儕審查。'
+                'Campbell 等（2025）讀的是博士論文第 4 章。Vidovic 等（2016）全文付費，公式還沒確認。')
+    rows = [['', '標籤從哪來', '情境多密', '情境出錯', '環境／平台'],
+            ['Campbell 等（2024）CIIL', '任務情境（游標方向）', '每 100 ms', '假設完美', '虛擬游標／PC'],
+            ['Campbell 等（2025）', '同上，從零開始', '每 50 ms', '假設完美', '虛擬游標／PC'],
+            ['Gagné 等（2025）', '接觸物件＋候選握法平均', '每 50 ms', '假設完美', 'VR／PC'],
+            ['Orlandi & Rossi（2026）', '游標靠近目標', '未說明', '—', '虛擬游標／GAP9'],
+            ['Vidovic 等（2016）', '短時提示校正（< 1 分鐘）', '—', '—', '義肢／PC'],
+            ['本研究', '機械臂任務狀態機＋軟標籤', '一個指令一個', '掃 0–30%', '機械臂／Cortex-M7']]
+    table(s, 0.6, 1.5, 12.1, rows, [3.0, 3.4, 1.7, 1.6, 2.4], size=14, row_h=0.68,
+          fills={(6, j): TEAL_L for j in range(5)})
 
     # 19 plan
     s = d.slide('實驗規劃與時程（草案）', notes='時程是草案，待與指導老師討論；病患個案視醫院合作與 IRB 時程，不綁畢業條件。')
-    plan = [('自我測試：實機抓放，量任務標籤的真實錯誤率', 0, 1),
-            ('能量量測；任務標籤移植 MCU；ROS 2', 1, 2),
+    plan = [('自我測試：實機抓放，量機器人成功判斷的錯誤率', 0, 1),
+            ('能量量測；實驗室橋接轉送任務標籤', 1, 2),
             ('先導實驗（健常人、跨日）', 2, 4),
             ('正式實驗（健常人）', 4, 6),
             ('病患個案（視醫院合作與 IRB）', 4, 7),
@@ -622,18 +713,19 @@ def build(out):
         box(s, x0 + a0 * cw, y + 0.08, (a1 - a0) * cw, 0.45, fill=CORAL if i == 0 else TEAL, radius=0.5)
     box(s, 0.6, 6.0, 12.1, 0.8, fill=TEAL_L)
     text(s, 0.85, 6.05, 11.6, 0.7, [([('主要指標：', {'bold': True}),
-                                       '重戴後的準確率與任務成功率、做錯的動作、誤觸發／分鐘、完成時間、使用者主動給標籤的秒數；MCU 的 RAM、時間、能量'], {})],
+                                       '重戴後準確率與任務成功率、active error（Campbell 等，2024）、誤觸發／休息分鐘、完成時間、使用者主動給標籤的秒數、NASA-TLX；MCU 的 RAM、時間、能量'], {})],
          size=14, anchor=MSO_ANCHOR.MIDDLE)
 
     # 20 risks
-    s = d.slide('風險與退路', notes='最關鍵的未知數是真實任務的標籤錯誤率，模擬顯示約 10% 以內方法撐得住、20% 開始明顯變差（report 35.16）。')
+    s = d.slide('風險與退路', notes='最關鍵的未知數是機器人成功判斷本身的錯誤率：隨機錯誤下硬標籤約 10% 就失效，軟標籤到 30% 仍比只做提示好；漏撤銷的影響很小（report 35.20–35.21）。')
     rows = [['風險', '影響', '退路'],
-            ['真實任務的標籤錯誤率高（> 20%）', '任務標籤的效果縮小', '論文以檢驗與短時校正為主，任務標籤寫成可靠度分析'],
+            ['機器人成功判斷常錯（隨機錯誤 > 30%）', '任務標籤的效果縮小', '論文以檢驗與短時校正為主，任務標籤寫成可靠度分析'],
             ['使用者行為比模擬亂', '軟標籤的先驗失準', '加大先驗的不確定度；加入使用者取消重做的證據'],
             ['沒教過的動作造成誤觸發', '安全性', '機器人端狀態過濾、啟動手勢；非控制動作段實測'],
             ['病患收案時程不確定', '驗證規模縮小', '畢業條件只綁健常人實驗'],
+            ['被問「為什麼不用免校正大模型」（Eddy 等，2026）', '主線被質疑', 'Delsys 8 通道配置不同；LDA 可在 MCU 閉式更新'],
             ['方向未獲同意', '—', '檢驗與短時校正本身可銜接原題目']]
-    table(s, 0.6, 1.5, 12.1, rows, [3.6, 2.6, 5.9], size=15, row_h=0.85)
+    table(s, 0.6, 1.5, 12.1, rows, [3.6, 2.6, 5.9], size=15, row_h=0.74)
 
     # 21 decisions
     s = d.slide('需要老師決定的事', dark=True, notes='建議：先導實驗多錄兩輪提示序列即可，不必改實驗設計；所有方法都能用錄下的原始肌電離線重放比較。')
@@ -647,18 +739,21 @@ def build(out):
         text(s, 1.8, y, 10.6, 0.8, t, size=20, color=WHITE, anchor=MSO_ANCHOR.MIDDLE)
 
     # 22 references
-    s = d.slide('參考文獻', notes='標＊者是 2026-11 方向檢索時在搜尋摘要層級看到的，寫進論文前要逐篇打開確認。')
+    s = d.slide('參考文獻', notes='Campbell 2024、2025、Gagné 2025、Orlandi & Rossi 2026、Vidovic 2016、Eddy 2026、Zanghieri 2024 已在 2026-11-13 逐篇查證（文獻搜尋_2026-11-13.md）。標＊者還沒打開原文確認。')
     refs = ['Jiang, Ma, Nazarpour (2024). Posture-invariant myoelectric control with self-calibrating random forests. Frontiers in Neurorobotics.',
             'Jiang et al. (2025). Plug-and-play myoelectric control via a self-calibrating random forest common model. Journal of Neural Engineering.',
             'Kyranou, Szymaniak, Nazarpour (2025). 8-participant two-day Trigno dataset. Scientific Data.',
             'Wang et al. (2024). Review of calibration burden in myoelectric control. Frontiers in Bioengineering and Biotechnology.',
-            'Campbell et al. (2024). Context-informed incremental learning improves both the performance and resilience of myoelectric control. JNER.',
-            'Orlandi et al. (2026). Task-context pseudo-labels for on-device retraining on GAP9. RISC-V Summit poster.',
-            'Zanghieri et al. (2023). Online unsupervised arm posture adaptation. IEEE BioCAS.',
+            'Campbell, Eddy, Bateman, Côté-Allard, Scheme (2024). Context-informed incremental learning improves both the performance and resilience of myoelectric control. JNER 21:70.',
+            'Campbell et al. (2025). Screen guided training does not capture goal-oriented behaviors... IEEE TNSRE 33:332–342.',
+            'Gagné et al. (2025). Context informed incremental learning improves myoelectric control performance in VR object manipulation tasks. EMBC 2025.',
+            'Orlandi, Rossi (2026). On-device context-informed incremental learning for myoelectric control on a RISC-V wearable platform. RISC-V Summit Europe demo.',
+            'Vidovic et al. (2016). Improving the robustness of myoelectric pattern recognition for upper limb prostheses by covariate shift adaptation. IEEE TNSRE 24(9).',
+            'Eddy, Campbell, Scheme, Bateman (2026). Open, accurate, and calibration-free muscle-computer interfaces. CHI 2026.',
+            'Zanghieri et al. (2024). sEMG-driven hand dynamics estimation with incremental online learning on a parallel ultra-low-power microcontroller. IEEE TBioCAS 18(4).',
             '＊Gilja et al. (2012). A high-performance neural prosthesis enabled by control algorithm design. Nature Neuroscience.',
-            '＊Jarosiewicz et al. (2015). Virtual typing by people with tetraplegia using a self-calibrating intracortical BCI. Science Translational Medicine.',
             '＊Chen, Wiesel, Eldar, Hero (2010). Shrinkage algorithms for MMSE covariance estimation. IEEE Transactions on Signal Processing.']
-    text(s, 0.6, 1.45, 12.1, 5.4, refs, size=14, color=INK, space=7)
+    text(s, 0.6, 1.4, 12.1, 5.5, refs, size=12, color=INK, space=4)
 
     d.prs.save(out)
     print(f'{d.n} slides -> {out}')
