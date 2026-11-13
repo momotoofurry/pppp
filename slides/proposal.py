@@ -100,6 +100,15 @@ def load():
     m = re.search(r'(\d+) labels .*?: (\d+) applied', ros)
     N['ros'] = dict(labels=int(m.group(1)), applied=int(m.group(2)),
                     actions=len(re.findall(r"'end'", ros.split('robot actions')[1])))
+    sim = csv('db6_sim.csv')
+    sim = sim[sim.e == 0].groupby(['method', 'subject']).acc.mean().groupby('method').mean()
+    adj = csv('db6_adj.csv')
+    adj = adj[adj.e == 0].groupby(['method', 'subject']).acc_next.mean().groupby('method').mean()
+    N['db6'] = dict(same={m: sim[m] for m in ('fixed', 'LDACMA', 'cue1', 'cue1_soft')},
+                    next={m: adj[m] for m in ('fixed', 'LDACMA', 'cue1', 'cue1_soft')})
+    bg = csv('board_replay_lda_gate_summary.csv').set_index('Unnamed: 0').value
+    N['bgate'] = dict(windows=int(float(bg['scored_windows'])), same=int(float(bg['same_class_as_pc'])),
+                      gsame=int(float(bg['gated_same_as_pc'])), acc=float(bg['acc_board']))
     return N
 
 
@@ -333,7 +342,7 @@ def build(out):
         text(s, x + 0.25, 2.65, 3.3, 1.2, big, size=40, bold=True, color=TEAL if i < 2 else CORAL)
         text(s, x + 0.25, 3.95, 3.3, 0.9, lab, size=17, bold=True)
         text(s, x + 0.25, 4.95, 3.3, 1.1, sub, size=14, color=GREY)
-    text(s, 0.6, 6.45, 12.1, 0.4, '前兩項有外部資料與板上實測；第三項目前只有模擬，要在實機上確認。', size=13, color=GREY)
+    text(s, 0.6, 6.45, 12.1, 0.4, '前兩項有外部資料與板上實測；第三項只有模擬，公開資料（NinaPro DB6）上換下一個 session 評分時不明顯，要在實機上確認。', size=13, color=GREY)
 
     # 3 background
     s = d.slide('研究背景', notes='校正負擔：Wang 等（2024）綜述（使用者文獻清單已有）。原方法：Jiang 等（2024）Front Neurorobot、Jiang 等（2025）J Neural Eng。'
@@ -628,7 +637,7 @@ def build(out):
         f'軟標籤 C 版（report 35.22–35.23）：每學一個任務標籤 {N["soft_cmd_ms"]:.2f} ms（板子實測）。'
         f'即時迴圈 RTL_TASK_LABEL：機器人只回傳 2 個位元組＋視窗編號（35.24、35.26）。板上 11.5 分鐘重放（35.25）。'
         f'出力判斷 C 版 RTL_SET_GATE（35.28）。RViz 模擬 Gen3：ros2_kortex mock hardware（35.27）。'
-        '實驗室 C# 橋接已支援 LDA 韌體與任務標籤轉送（35.29）。還沒有：真的 Kinova、真人、能量量測。'))
+        '實驗室 C# 橋接已支援 LDA 韌體與任務標籤轉送（35.29）。出力判斷上板重放（35.33）。能量量測韌體已在板上試跑，電流 2026-11-14 量（35.34）。還沒有：真的 Kinova、真人。'))
     steps = ['手勢', 'MCU 指令', 'ROS 2 手臂動作', '機器人回傳|預期手勢', 'MCU 軟標籤|更新模型']
     for i, st in enumerate(steps):
         x = 0.6 + i * 2.5
@@ -638,7 +647,7 @@ def build(out):
             arrow(s, x + 2.19, 1.8, 0.27, 0.35)
     stats = [(f'{N["soft_cmd_ms"]:.1f} ms', '每學一個任務標籤（板上）'),
              (f'{bt["same"]:,}／{bt["windows"]:,}', f'板上 11.5 分鐘重放：視窗和 PC 相同；{bt["upd"]} 次任務更新'),
-             (f'{rtg["agree"] / rtg["windows"] * 100:.0f}%', f'出力判斷 C 版：{rtg["windows"]:,} 個視窗和參考相同（三種設定）'),
+             (f'{N["bgate"]["gsame"]:,}／{N["bgate"]["windows"]:,}', '出力判斷上板重放：類別與擋下的視窗都和 PC 相同'),
              (f'{ros["applied"]}／{ros["labels"]}', f'RViz 模擬手臂：標籤送回並套用；{ros["actions"]} 個動作正常結束'),
              (f'{fg["flash"] / 1024:.1f} KB', '整個韌體 Flash（四個元件都在）'),
              (f'{fg["ram"] / 1024:.0f} KB', '整個韌體 RAM（512 KB 的 20%）')]
@@ -647,23 +656,48 @@ def build(out):
         box(s, x, y, 3.85, 1.65, fill=LIGHT)
         text(s, x + 0.25, y + 0.15, 3.4, 0.75, big, size=30, bold=True, color=TEAL)
         text(s, x + 0.25, y + 0.9, 3.4, 0.7, lab, size=13, color=GREY)
-    text(s, 0.6, 6.55, 12.1, 0.4, '一輪提示、收縮 LDA、出力判斷、任務軟標籤都有 C 版並和參考逐一相同；還沒有真的 Kinova、真人與能量量測。',
+    text(s, 0.6, 6.55, 12.1, 0.4, '一輪提示、收縮 LDA、出力判斷、任務軟標籤都有 C 版並在板上和參考逐一相同；能量量測韌體已就緒；還沒有真的 Kinova 與真人。',
          size=13, color=GREY)
 
+    # 18 public real data (NinaPro DB6)
+    sm, nx = N['db6']['same'], N['db6']['next']
+    s = d.slide('結果⑦：真實跨 session 資料（NinaPro DB6）', notes=(
+        'NinaPro DB6（Palermo 等，2017）：10 人、5 天 × 2 個 session、7 種抓握＋休息共 8 類、Delsys Trigno 第一圈 8 通道，'
+        '特徵用本研究的 features.c。第 1 天模型與 z-score 固定；之後 9 個 session 各做一輪提示（每類第 1 次），任務流用第 2–6 次（腳本化：預期抓握＝提示的抓握），'
+        '第 7–12 次評分（report 35.31）。DB6 同一抓握 12 次連續錄，任務流緊接在評分資料之前；所以 35.32 改用下一個 session 評分。'
+        '判準：R8、R9、R10 通過；R11（下一個 session 上任務標籤 ≥ +1 點）未通過：+2.2（−0.7, +5.1），連正確標籤也只有 +2.1。'))
+    cd = CategoryChartData()
+    cd.categories = ['同一個 session 評分', '下一個 session 評分']
+    series = [('固定第 1 天模型', 'fixed', MUTE), ('Vidovic LDACMA', 'LDACMA', GREY),
+              ('一輪提示（累積）', 'cue1', '7FB7B9'), ('一輪提示＋軟標籤', 'cue1_soft', TEAL)]
+    for name, m, _ in series:
+        cd.add_series(name, [round(sm[m], 1), round(nx[m], 1)])
+    gf = s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(0.6), Inches(1.45), Inches(8.2), Inches(5.0), cd)
+    chart_style(gf.chart, legend=True, vmax=80, vmin=0, label_size=12, axis_size=13)
+    color_series(gf.chart, [c for _, _, c in series])
+    text(s, 0.6, 6.5, 8.2, 0.4, '8 類準確率 %，10 人；「下一個」＝在下一次配戴、做提示前評分（去掉時間相鄰）', size=12, color=GREY)
+    box(s, 9.1, 1.6, 3.6, 4.85, fill=LIGHT)
+    text(s, 9.35, 1.8, 3.15, 4.5, [('看到的事', {'size': 19, 'bold': True}),
+                                    (f'真實換次後固定模型只剩 {sm["fixed"]:.0f}%；一輪提示＋累積拉回 {sm["cue1"] - sm["fixed"]:.0f} 點', {'bullet': True}),
+                                    ('只做一輪提示時和 Vidovic 打平', {'bullet': True}),
+                                    (f'任務標籤同次 +{sm["cue1_soft"] - sm["cue1"]:.0f} 點，換下一次只剩 +{nx["cue1_soft"] - nx["cue1"]:.1f}（不顯著）', {'bullet': True, 'color': CORAL}),
+                                    ('DB6 分不出「時間相鄰」和「只適應本次配戴」：要靠先導實驗', {'bullet': True})], size=14, space=8)
+
     # 18 negative results
-    s = d.slide('負面結果與更正（會寫進論文）', notes='出處：report 35.4、35.8、35.9–35.10、35.16–35.21。另：「開機序列第一輪比第二輪差」只在開發資料看得到，已撤回。')
+    s = d.slide('負面結果與更正（會寫進論文）', notes='出處：report 35.4、35.8、35.9–35.10、35.16–35.21、35.31–35.32。另：「開機序列第一輪比第二輪差」只在開發資料看得到，已撤回。')
     neg = [('自己提出的葉節點計數', '輸給收縮 LDA，退為對照組'),
            ('沒有用的規則', '只學認錯的視窗、逐手勢門檻、開機序列當裁判、類別中心取中位數、事後修正標籤'),
            ('軟標籤不做提示', '有偏移時比固定模型還差：錯誤自我強化'),
            ('不成立的主張', '「軟標籤比所有 CIIL 變體都耐錯標籤」：隨機錯標籤時 P-CIIL 一樣耐'),
            ('CIIL 原本的更新式', '每 10 秒以 α 0.1 混入，在稀疏標籤下比只做提示還差；累加和才適合'),
            ('出力判斷的門檻', '原門檻擋掉 6.6% 手勢視窗、完成率 86%；實驗先不開，用真實資料決定'),
-           ('資料陷阱（已更正）', 'Kyranou 每個手勢連續錄 5 次；緊接著評分會偏樂觀，改看第二個 session 低 2–5 點、結論不變')]
+           ('資料陷阱（已更正）', 'Kyranou 每個手勢連續錄 5 次；緊接著評分會偏樂觀，改看第二個 session 低 2–5 點、結論不變'),
+           ('DB6 上的大幅領先', '同次評分比 Vidovic 高 16 點；改在下一個 session 評分時任務標籤只剩 +2.2，不顯著')]
     for i, (h, b) in enumerate(neg):
-        y = 1.42 + i * 0.77
-        box(s, 0.6, y, 12.1, 0.68, fill=LIGHT)
-        text(s, 0.85, y + 0.06, 3.6, 0.56, h, size=15, bold=True, color=CORAL if i == 3 else INK, anchor=MSO_ANCHOR.MIDDLE)
-        text(s, 4.5, y + 0.06, 8.0, 0.56, b, size=13, color=GREY, anchor=MSO_ANCHOR.MIDDLE)
+        y = 1.38 + i * 0.68
+        box(s, 0.6, y, 12.1, 0.6, fill=LIGHT)
+        text(s, 0.85, y + 0.04, 3.6, 0.52, h, size=15, bold=True, color=CORAL if i in (3, 7) else INK, anchor=MSO_ANCHOR.MIDDLE)
+        text(s, 4.5, y + 0.04, 8.0, 0.52, b, size=13, color=GREY, anchor=MSO_ANCHOR.MIDDLE)
 
     # 17 contributions
     s = d.slide('創新與貢獻', notes='兩輪文獻檢索（2026-11-13，文獻搜尋_2026-11-13.md）：任務情境更新 LDA（Campbell 等，2024）、VR 軟標籤（Gagné 等，2025）、'
@@ -671,7 +705,7 @@ def build(out):
     rows = [['貢獻', '狀態', '強度'],
             ['獨立檢驗：免標籤自我校正在重戴資料上沒有確認增益（預先登錄）', '完成', '中（8 人）'],
             ['指出原方法論文的 LDA 基準缺少收縮估計', '完成', '中'],
-            ['任務引導的軟標籤＋出力判斷＋一輪提示，用在離散機械臂指令', '模擬完成', '中高（待實機）'],
+            ['任務引導的軟標籤＋出力判斷＋一輪提示，用在離散機械臂指令', '模擬＋公開資料', '中（換次後效果不明，待實機）'],
             ['系統性掃描任務標籤錯誤率，並和 CIIL 各策略比較', '模擬完成', '中高（檢索中沒找到別人做過）'],
             ['量化任務結構強弱的影響', '模擬完成', '中'],
             ['完整學習迴路在 MCU 上逐一驗證、即時運作；機器人只回傳 2 個位元組', '完成', '工程貢獻']]
@@ -683,13 +717,13 @@ def build(out):
 
     # 18 related work
     s = d.slide('與相關研究的差別', notes='逐篇查證過（文獻搜尋_2026-11-13.md）。Orlandi & Rossi（2026）是 RISC-V Summit 的展示摘要，未經同儕審查。'
-                'Campbell 等（2025）讀的是博士論文第 4 章。Vidovic 等（2016）全文付費，公式還沒確認。')
+                'Campbell 等（2025）讀的是博士論文第 4 章。Vidovic 等（2016）全文已讀，照原文式 6–7 與參數實作（report 35.30–35.31）。')
     rows = [['', '標籤從哪來', '情境多密', '情境出錯', '環境／平台'],
             ['Campbell 等（2024）CIIL', '任務情境（游標方向）', '每 100 ms', '假設完美', '虛擬游標／PC'],
             ['Campbell 等（2025）', '同上，從零開始', '每 50 ms', '假設完美', '虛擬游標／PC'],
             ['Gagné 等（2025）', '接觸物件＋候選握法平均', '每 50 ms', '假設完美', 'VR／PC'],
             ['Orlandi & Rossi（2026）', '游標靠近目標', '未說明', '—', '虛擬游標／GAP9'],
-            ['Vidovic 等（2016）', '短時提示校正（< 1 分鐘）；本資料上低 8 點', '—', '—', '義肢／PC'],
+            ['Vidovic 等（2016）', '短時提示校正（< 1 分鐘）；和一輪提示打平（DB6）', '—', '—', '義肢／PC'],
             ['本研究', '機械臂任務狀態機＋軟標籤', '一個指令一個', '掃 0–30%', '機械臂／Cortex-M7']]
     table(s, 0.6, 1.5, 12.1, rows, [3.0, 3.4, 1.7, 1.6, 2.4], size=14, row_h=0.68,
           fills={(6, j): TEAL_L for j in range(5)})
