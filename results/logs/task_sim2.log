@@ -1,0 +1,76 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 out of 160 | elapsed:   44.6s
+[Parallel(n_jobs=19)]: Done 156 out of 160 | elapsed:  2.7min remaining:    4.1s
+[Parallel(n_jobs=19)]: Done 160 out of 160 | elapsed:  2.7min finished
+shift 0.0, deliberate deviations 0.0; activity gate alone (held-out windows): 96.6 %
+               probe_after  labels  label_err_pct  wrong_action_pct  false_rest_pct  invalid   done  total_s  worst_subject
+cond                                                                                                                       
+fixed                 76.4     0.0            0.0              25.8             2.6     34.5   63.5    169.5           60.7
+fixed_act             76.4     0.0            0.0              24.4             0.7     35.6   63.0    171.5           60.7
+cue1                  90.8     0.0            0.0               3.1             0.3      0.4  100.0     77.5           78.4
+cue2                  93.5     0.0            0.0               1.0             0.1      0.1  100.0     81.6           84.0
+hard                  86.6    30.3            9.2               9.1             6.8      1.1   85.2    101.8           72.7
+gate                  87.0    30.3            8.4               8.9             6.7      0.8   87.0     97.8           74.1
+hard_act              90.7    30.6            0.9               3.1             0.8      0.2   96.5     76.9           81.2
+gate_act              90.8    30.7            0.9               3.1             0.7      0.2   96.5     77.1           80.9
+soft                  84.1    39.2           13.3               9.1             4.7      4.6   81.8    112.4           29.7
+soft_act              86.1    40.1            6.8               3.8             0.6     10.2   88.0     98.5           30.0
+cue1_gate             93.6    30.9            0.7               1.7             0.5      0.2   99.5     75.3           84.8
+cue1_gate_act         93.5    30.2            0.4               1.5             0.3      0.1   97.0     82.7           85.4
+cue1_soft_act         93.6    30.4            0.9               1.8             0.4      0.1   97.0     83.1           87.5
+oracle                93.5    31.3            0.0               2.6             0.7      0.2   99.0     70.0           82.8
+shift 0.0, deliberate deviations 0.25; activity gate alone (held-out windows): 96.6 %
+               probe_after  labels  label_err_pct  wrong_action_pct  false_rest_pct  invalid   done  total_s  worst_subject
+cond                                                                                                                       
+fixed                 76.4     0.0            0.0              23.1             2.9     33.0   65.2    182.1           60.7
+fixed_act             76.4     0.0            0.0              21.7             0.6     33.7   64.8    183.8           60.7
+cue1                  90.8     0.0            0.0               3.1             0.3      0.7  100.0     94.6           78.4
+cue2                  93.5     0.0            0.0               1.1             0.1      0.2  100.0     98.7           84.0
+hard                  83.5    36.6           21.7              12.7             8.5      2.1   81.2    124.9           69.1
+gate                  84.0    36.8           21.0              11.6             7.8      1.9   80.8    126.4           69.2
+hard_act              88.6    39.1           13.8               4.9             0.9      1.2   94.8     97.0           79.8
+gate_act              88.8    40.1           13.7               4.8             0.7      1.2   96.2     94.6           79.5
+soft                  81.3    39.7           15.7              11.0             6.8      4.4   77.8    133.6           28.5
+soft_act              84.0    44.9            9.3               4.0             0.7     10.7   82.0    124.9           30.0
+cue1_gate             90.5    40.4           15.1               4.0             1.4      0.9   97.8     96.8           78.7
+cue1_gate_act         91.4    39.2           13.5               2.8             0.4      0.8   96.8     99.6           82.0
+cue1_soft_act         92.9    39.2            3.0               2.0             0.4      0.4   97.0     98.7           85.8
+oracle                93.5    40.4            0.0               2.1             0.7      0.3   98.8     86.6           85.8
+shift 0.5, deliberate deviations 0.0; activity gate alone (held-out windows): 94.1 %
+               probe_after  labels  label_err_pct  wrong_action_pct  false_rest_pct  invalid   done  total_s  worst_subject
+cond                                                                                                                       
+fixed                 60.4     0.0            0.0              35.1             4.3     80.6   20.5    261.1           35.3
+fixed_act             60.4     0.0            0.0              29.7             0.6     81.6   17.0    267.8           35.3
+cue1                  88.0     0.0            0.0               4.6             0.2      0.6  100.0     80.3           77.0
+cue2                  91.6     0.0            0.0               1.4             0.0      0.2  100.0     82.5           81.9
+hard                  72.9    25.1           23.9              22.9            19.1      2.2   51.8    179.5           54.9
+gate                  73.0    26.6           23.9              22.3            18.9      2.4   55.2    171.8           58.5
+hard_act              82.5    27.9            0.5               3.4             0.4      0.3   85.5    105.0           70.5
+gate_act              82.2    27.8            0.5               3.3             0.4      0.3   85.0    105.9           70.5
+soft                  41.2    74.8           52.8              32.3            13.4     42.6   14.5    267.1           17.9
+soft_act              48.2   130.7           61.0              25.3             0.2     91.3   24.0    245.9           20.0
+cue1_gate             91.1    31.1            1.4               3.0             1.1      0.3   97.8     80.5           79.7
+cue1_gate_act         91.0    27.5            0.2               1.6             0.1      0.2   86.5    109.6           79.8
+cue1_soft_act         91.3    27.9            0.6               2.1             0.2      0.1   86.5    110.5           81.4
+oracle                90.3    31.3            0.0               3.3             0.9      0.3   97.2     75.2           79.6
+shift 0.5, deliberate deviations 0.25; activity gate alone (held-out windows): 94.1 %
+               probe_after  labels  label_err_pct  wrong_action_pct  false_rest_pct  invalid   done  total_s  worst_subject
+cond                                                                                                                       
+fixed                 60.4     0.0            0.0              30.9             3.8     71.1   20.5    266.4           35.3
+fixed_act             60.4     0.0            0.0              27.6             0.7     73.3   17.2    272.0           35.3
+cue1                  88.0     0.0            0.0               4.3             0.2      1.2  100.0     97.3           77.0
+cue2                  91.6     0.0            0.0               1.4             0.1      0.4  100.0     99.2           81.9
+hard                  70.0    26.3           32.2              24.8            18.8      2.6   44.2    204.0           63.1
+gate                  70.6    26.9           32.2              24.7            18.8      2.9   42.8    206.9           55.7
+hard_act              79.6    35.4           11.7               4.8             0.4      1.1   85.0    121.4           68.3
+gate_act              80.0    35.8           11.6               5.1             0.4      1.2   85.8    119.6           69.2
+soft                  38.2    85.8           57.5              35.9            14.5     56.8    5.5    290.3           17.9
+soft_act              46.5   141.1           62.9              29.0             0.1     86.9   12.5    276.2           20.0
+cue1_gate             88.8    40.2           14.8               4.3             1.5      1.1   96.5    100.1           75.2
+cue1_gate_act         89.5    35.1           11.4               3.1             0.2      0.7   86.8    123.4           77.9
+cue1_soft_act         90.6    35.4            3.0               2.1             0.2      0.4   86.8    123.1           80.0
+oracle                90.7    41.1            0.0               2.8             0.8      0.4   98.0     90.6           81.5
+shift 0.5, p_dev 0: soft_act - gate = -24.81 (-34.07, -15.56), better 5 worse 15
+shift 0.5, p_dev 0: cue1_soft_act - cue1_gate = +0.17 (-0.45, +0.79), better 10 worse 10
+shift 0.5, p_dev 0: gate_act - gate = +9.25 (+6.84, +11.66), better 20 worse 0
+shift 0.5, p_dev 0: soft - hard = -31.66 (-40.02, -23.30), better 2 worse 18
