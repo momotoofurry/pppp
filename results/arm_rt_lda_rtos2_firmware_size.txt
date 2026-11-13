@@ -1,0 +1,4 @@
+# arm-none-eabi-size, LDA main line on FreeRTOS V10.6.2, 2 KB task stacks (build/rtos) and the stress build (build/rtos_stress, RTOS_STRESS); report 35.37
+   text	   data	    bss	    dec	    hex	filename
+  31204	    120	 114668	 145992	  23a48	D:/stm32/blink_leaf/build/rtos/blink.elf
+  31260	    120	 140268	 171648	  29e80	D:/stm32/blink_leaf/build/rtos_stress/blink.elf

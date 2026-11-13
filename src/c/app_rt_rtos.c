@@ -20,6 +20,9 @@
  * Static allocation only. Extra diagnostics (STATUS packets, every 10 s): 30 / 31 = stack used by "rx" / "learn"
  * (bytes, from the high-water mark), 32 = deepest MSP use (interrupts; stack painting), 33 / 34 / 35 = CPU share of
  * "rx" / "learn" / idle over the last 10 s (x 100, i.e. 1234 = 12.34 %).
+ * RTOS_STRESS (defined by build_rtos_stm32.sh STRESS=1): the learn task never sleeps; after every rtl_idle it runs
+ * ~5 ms of dummy floating-point work on its own array (the model is not touched), so the CPU is saturated by the
+ * low-priority task: the classification latency must not change (report 35.37).
  * Defines app_rt_run(); built like app_rt_lda.c (-DEMG_APP_RT=ON) in a COPY of the project with the FreeRTOS kernel.
  */
 #include "app_rt.h"
@@ -33,8 +36,8 @@
 #include "stream_buffer.h"
 #include "task.h"
 
-#define RX_STACK_WORDS 2048u
-#define LEARN_STACK_WORDS 2048u
+#define RX_STACK_WORDS 512u                 /* 2 KB: 488 B used in the 35.36 replay (8 KB stacks) */
+#define LEARN_STACK_WORDS 512u              /* 2 KB: 524 B used */
 #define IDLE_STACK_WORDS configMINIMAL_STACK_SIZE
 #define RX_PRIO 3
 #define LEARN_PRIO 1
@@ -188,12 +191,43 @@ static void diagnostics(void)
     last_idle = idle;
 }
 
+#ifdef RTOS_STRESS
+static float s_load_a[80 * 80], s_load_x[80];
+static volatile float s_load_sink;
+
+static void dummy_load(void)                 /* ~5 ms of multiply-adds on its own data */
+{
+    uint32_t t0 = board_time_us();
+    float acc = 0.0f;
+    while (board_time_us() - t0 < 5000u) {
+        for (int i = 0; i < 80; i++) {
+            float r = 0.0f;
+            for (int j = 0; j < 80; j++)
+                r += s_load_a[i * 80 + j] * s_load_x[j];
+            s_load_x[i] = 0.999f * s_load_x[i] + 0.001f * r;
+            acc += r;
+        }
+    }
+    s_load_sink = acc;
+}
+#endif
+
 static void learn_task(void *arg)
 {
     (void)arg;
     uint32_t last = board_time_us();
+#ifdef RTOS_STRESS
+    for (int i = 0; i < 80 * 80; i++)
+        s_load_a[i] = (float)((i * 37) % 101) / 101.0f - 0.5f;
+    for (int i = 0; i < 80; i++)
+        s_load_x[i] = 1.0f;
+#endif
     for (;;) {
+#ifdef RTOS_STRESS
+        dummy_load();
+#else
         (void)ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(10));
+#endif
         rtl_idle();
         if (board_time_us() - last >= APP_RT_DIAG_US) {
             last = board_time_us();
