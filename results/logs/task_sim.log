@@ -1,0 +1,56 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 out of 160 | elapsed:   31.9s
+[Parallel(n_jobs=19)]: Done 156 out of 160 | elapsed:  1.7min remaining:    2.6s
+[Parallel(n_jobs=19)]: Done 160 out of 160 | elapsed:  1.7min finished
+shift 0.0, deliberate deviations 0.0
+                    probe_before  probe_after  labels  label_err_pct  actions  wrong_action_pct  invalid  attempts   done  total_s  probe_after_worst_subject
+cond                                                                                                                                                         
+fixed                       76.4         76.4     0.0            0.0     55.8              25.8     34.5      94.3   63.5    169.5                       60.7
+cue1                        88.0         90.8     0.0            0.0     32.2               3.1      0.4      32.5  100.0     77.5                       78.4
+cue2                        91.1         93.5     0.0            0.0     30.6               1.0      0.1      30.7  100.0     81.6                       84.0
+task_plain                  85.6         86.6    30.3            9.2     29.2               9.1      1.1      55.1   85.2    101.8                       72.7
+task_gate                   85.8         87.0    30.3            8.4     29.5               8.9      0.8      52.4   87.0     97.8                       74.1
+task_gate_ctx               85.2         85.9    30.2           10.1     30.2              12.3      0.0      46.2   90.0     90.1                       70.8
+cue1_task_gate              90.3         93.6    30.9            0.7     30.7               1.7      0.2      31.7   99.5     75.3                       84.8
+cue1_task_gate_ctx          90.2         93.5    30.8            1.1     30.8               2.4      0.0      32.4   99.0     76.4                       84.2
+fixed_ctx                   76.4         76.4     0.0            0.0     63.0              23.3      0.0      69.1   78.5    137.1                       60.7
+oracle                      90.8         93.5    31.3            0.0     31.2               2.6      0.2      33.2   99.0     70.0                       82.8
+shift 0.0, deliberate deviations 0.1
+                    probe_before  probe_after  labels  label_err_pct  actions  wrong_action_pct  invalid  attempts   done  total_s  probe_after_worst_subject
+cond                                                                                                                                                         
+fixed                       76.4         76.4     0.0            0.0     58.2              23.8     33.2      95.9   64.5    173.7                       60.7
+cue1                        88.0         90.8     0.0            0.0     35.5               3.1      0.5      35.9  100.0     83.3                       78.4
+cue2                        91.1         93.5     0.0            0.0     33.8               1.0      0.1      34.0  100.0     87.1                       84.0
+task_plain                  83.9         85.5    32.5           14.5     31.4              10.1      1.1      61.9   83.0    112.4                       70.8
+task_gate                   84.5         85.9    33.7           14.7     32.4              10.3      1.3      55.9   86.8    104.1                       73.4
+task_gate_ctx               83.1         84.2    31.8           16.4     31.8              14.6      0.0      56.1   85.5    105.0                       67.0
+cue1_task_gate              89.6         92.5    34.3            6.8     34.0               2.5      0.4      37.6   98.0     84.9                       82.6
+cue1_task_gate_ctx          89.3         92.5    34.4            7.0     34.4               2.9      0.0      35.5   99.2     81.8                       80.3
+fixed_ctx                   76.4         76.4     0.0            0.0     62.5              21.8      0.0      68.7   83.0    138.3                       60.7
+oracle                      90.8         93.2    34.8            0.0     34.6               2.3      0.2      36.4   99.0     75.4                       86.2
+shift 0.5, deliberate deviations 0.0
+                    probe_before  probe_after  labels  label_err_pct  actions  wrong_action_pct  invalid  attempts   done  total_s  probe_after_worst_subject
+cond                                                                                                                                                         
+fixed                       60.4         60.4     0.0            0.0     59.4              35.1     80.6     147.7   20.5    261.1                       35.3
+cue1                        84.4         88.0     0.0            0.0     33.3               4.6      0.6      34.0  100.0     80.3                       77.0
+cue2                        88.6         91.6     0.0            0.0     30.9               1.4      0.2      31.1  100.0     82.5                       81.9
+task_plain                  70.8         72.9    25.1           23.9     22.9              22.9      2.2     108.9   51.8    179.5                       54.9
+task_gate                   70.6         73.0    26.6           23.9     24.2              22.3      2.4     103.1   55.2    171.8                       58.5
+task_gate_ctx               65.9         66.9    22.1           29.0     22.1              31.5      0.0     111.9   49.0    184.9                       59.5
+cue1_task_gate              87.0         91.1    31.1            1.4     30.7               3.0      0.3      35.0   97.8     80.5                       79.7
+cue1_task_gate_ctx          86.9         90.8    30.8            2.0     30.8               3.9      0.0      34.8   97.8     80.3                       79.2
+fixed_ctx                   60.4         60.4     0.0            0.0     99.0              44.2      0.0     109.0   38.8    225.4                       35.3
+oracle                      86.4         90.3    31.3            0.0     31.0               3.3      0.3      36.7   97.2     75.2                       79.6
+shift 0.5, deliberate deviations 0.1
+                    probe_before  probe_after  labels  label_err_pct  actions  wrong_action_pct  invalid  attempts   done  total_s  probe_after_worst_subject
+cond                                                                                                                                                         
+fixed                       60.4         60.4     0.0            0.0     63.1              33.5     75.0     146.9   20.2    262.8                       35.3
+cue1                        84.4         88.0     0.0            0.0     36.6               4.5      0.8      37.4  100.0     86.1                       77.0
+cue2                        88.6         91.6     0.0            0.0     34.1               1.4      0.3      34.3  100.0     87.9                       81.9
+task_plain                  70.3         72.8    27.4           28.4     25.0              23.8      2.4     105.6   54.8    175.9                       62.5
+task_gate                   69.9         71.7    27.0           27.9     24.5              22.3      2.5     113.3   50.0    187.4                       56.0
+task_gate_ctx               65.0         65.9    21.3           30.2     21.3              31.2      0.0     118.9   45.2    194.9                       56.3
+cue1_task_gate              86.2         90.4    34.7            7.3     34.3               3.3      0.5      39.4   97.5     87.9                       77.5
+cue1_task_gate_ctx          85.9         90.0    34.3            7.8     34.3               4.2      0.0      39.2   97.2     87.6                       78.0
+fixed_ctx                   60.4         60.4     0.0            0.0     98.5              41.2      0.0     108.2   42.2    225.3                       35.3
+oracle                      86.4         90.6    35.1            0.0     34.8               3.1      0.3      38.3   98.5     78.7                       81.4

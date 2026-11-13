@@ -1,0 +1,31 @@
+step,command,intended,sim_dur_s,ros_dur_s,event,note
+0,pose_A,pose_A,1.8,1.78,end,1.8 s status 4 code 0
+1,grip,grip,1.0,0.05,end,status 4 code 0
+2,pose_B,pose_B,3.5,3.507,end,3.5 s status 4 code 0
+3,release,release,1.0,0.051,end,status 4 code 0
+4,home,home,1.8,1.774,end,1.8 s status 4 code 0
+5,pose_A,pose_A,1.8,1.788,end,1.8 s status 4 code 0
+6,grip,grip,1.0,0.052,end,status 4 code 0
+7,pose_B,pose_B,3.5,3.538,end,3.5 s status 4 code 0
+8,release,release,1.0,0.052,end,status 4 code 0
+9,home,rest,1.8,1.757,end,1.8 s status 4 code 0
+10,pose_A,pose_A,1.8,1.8,end,1.8 s status 4 code 0
+11,grip,grip,1.0,0.051,end,status 4 code 0
+12,pose_B,pose_B,3.5,3.536,end,3.5 s status 4 code 0
+13,release,release,1.0,0.051,end,status 4 code 0
+14,home,home,1.8,1.786,end,1.8 s status 4 code 0
+15,pose_A,pose_A,1.8,1.782,end,1.8 s status 4 code 0
+16,grip,grip,1.0,0.051,end,status 4 code 0
+17,pose_B,pose_B,3.5,3.507,end,3.5 s status 4 code 0
+18,release,release,1.0,0.051,end,status 4 code 0
+19,home,rest,1.8,1.777,end,1.8 s status 4 code 0
+20,pose_A,pose_A,1.8,1.78,end,1.8 s status 4 code 0
+21,grip,grip,1.0,0.051,end,status 4 code 0
+22,pose_B,pose_B,3.5,3.508,end,3.5 s status 4 code 0
+23,release,release,1.0,0.051,end,status 4 code 0
+24,home,home,1.8,1.801,end,1.8 s status 4 code 0
+25,pose_A,pose_A,1.8,1.778,end,1.8 s status 4 code 0
+26,grip,grip,1.0,0.052,end,status 4 code 0
+27,pose_B,pose_B,3.5,3.505,end,3.5 s status 4 code 0
+28,release,release,1.0,0.052,end,status 4 code 0
+29,home,home,1.8,1.763,end,1.8 s status 4 code 0
