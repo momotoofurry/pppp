@@ -33,12 +33,16 @@ static uint32_t s_pend_window;
 static uint8_t s_pend_open, s_pend_valid;
 static volatile uint8_t s_task_request;
 static float s_prior[LD_CLASSES];
+/* activity gate */
+static float s_gate_k, s_gate_thr = -1.0f;
+static uint8_t s_gate_mode;
+static float s_act[RTL_LABEL_MAX];
 
 unsigned rtl_static_bytes(void)
 {
     return (unsigned)(sizeof s_cfg + sizeof s_pk + sizeof s_cnt + sizeof s_dc + sizeof s_lab_x + sizeof s_lab_y +
                       sizeof s_mu + sizeof s_inv_sd + sizeof s_feat + sizeof s_q + sizeof s_tx_seq + sizeof s_run +
-                      sizeof s_pend + sizeof s_prior);
+                      sizeof s_pend + sizeof s_prior + sizeof s_act);
 }
 
 static uint32_t now(void)
@@ -99,6 +103,50 @@ void rtl_init(const rtl_config_t *cfg)
     s_pend_n = 0;
     s_pend_cls = -1;
     s_task_request = 0;
+    s_gate_k = 0.0f;
+    s_gate_thr = -1.0f;
+    s_gate_mode = 0;
+}
+
+static float activity(const float *feat)
+{
+    float a = 0.0f;
+    for (int ch = 0; ch < FE_CH; ch++)
+        a += feat[RTL_MAV0 + ch];
+    return a;
+}
+
+/* median of the activity of the cued windows of class c (numpy.median: mean of the two middle values) */
+static float class_median(int n, int c)
+{
+    int m = 0;
+    for (int i = 0; i < n; i++) {
+        if (s_lab_y[i] != c)
+            continue;
+        float v = activity(s_lab_x[i]);
+        int j = m++;
+        while (j > 0 && s_act[j - 1] > v) {
+            s_act[j] = s_act[j - 1];
+            j--;
+        }
+        s_act[j] = v;
+    }
+    if (!m)
+        return -1.0f;
+    return (m & 1) ? s_act[m / 2] : 0.5f * (s_act[m / 2 - 1] + s_act[m / 2]);
+}
+
+static float gate_threshold(int n)
+{
+    float rest = class_median(n, LD_CLASSES - 1), lo = -1.0f;
+    for (int c = 0; c < LD_CLASSES - 1; c++) {
+        float v = class_median(n, c);
+        if (v < 0.0f)
+            return -1.0f;
+        if (lo < 0.0f || v < lo)
+            lo = v;
+    }
+    return rest < 0.0f ? -1.0f : sqrtf(rest * lo);
 }
 
 /* one 100 ms feature vector (real-time context) */
@@ -136,6 +184,13 @@ static void on_window(void)
     if (accepted && s_cfg.dist2)
         accepted = ld_dist2(s_q, top) <= (float)s_cfg.dist2;
     s_cnt.classified++;
+    uint8_t gated = 0;
+    if (s_gate_k > 0.0f && s_gate_thr > 0.0f && activity(s_feat) < s_gate_k * s_gate_thr) {
+        gated = 1;                              /* not contracting: Rest, whatever the LDA says */
+        top = LD_CLASSES - 1;
+        accepted = 1;
+        s_cnt.gated++;
+    }
     /* windows for the task label: the run of agreeing accepted windows; after a command, further windows of the
      * same class are added to that command's windows until the class changes */
     if (accepted) {
@@ -173,7 +228,7 @@ static void on_window(void)
         p[9] = (uint8_t)accepted;
         p[10] = (uint8_t)margin;
         p[11] = (uint8_t)(margin >> 8);
-        p[12] = 0;
+        p[12] = gated;
         p[13] = 0;
         send(PK_PRED, 1, p, 14);
     }
@@ -259,7 +314,14 @@ static void on_control(const uint8_t *p, uint16_t len)
             s_mode = RTL_MODE_IDLE;
             s_new_session = 1;
             s_pend_valid = 0;
+            s_gate_thr = -1.0f;
             status(RTL_EV_FORGOT, 0);
+        }
+        break;
+    case RTL_SET_GATE:
+        if (len >= 4) {
+            s_gate_k = (float)(p[1] | (p[2] << 8)) / 100.0f;
+            s_gate_mode = p[3];
         }
         break;
     case RTL_TASK_LABEL:
@@ -357,6 +419,12 @@ void rtl_idle(void)
             ld_add(s_q, s_lab_y[i]);
         }
         r = ld_fit();
+        if (r == 0 && (s_gate_thr < 0.0f || s_gate_mode == 1)) {
+            const float t = gate_threshold(n);
+            if (t > 0.0f)
+                s_gate_thr = t;
+            status(RTL_EV_GATE_THR, t > 0.0f ? (int32_t)(t * 1e9f + 0.5f) : -1);
+        }
     }
     s_cnt.fit_result = r;
     s_cnt.fits++;

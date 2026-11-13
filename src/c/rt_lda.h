@@ -34,18 +34,27 @@
  *                                     With the optional window (the window number of the COMMAND packet the
  *                                     label is for), a label for an older command than the one kept is refused
  *                                     (-5), so a late label never lands on the windows of a newer command.
+ *   RTL_SET_GATE (13) k_x100 u16, mode u8
+ *                                     activity gate (report 35.18, 35.21, 35.28): activity of a window = sum of
+ *                                     the 8 raw MAV features; below k x threshold the window is Rest whatever the
+ *                                     LDA says (no command, no task-label window). threshold = sqrt(median
+ *                                     activity of the Rest windows x smallest median of a gesture) over the cued
+ *                                     windows of a fit: mode 0 the first fit after init / RTL_FORGET (day 1), mode
+ *                                     1 every fit. k_x100 = 0: off (default). PK_PRED byte 12 = 1 for a gated window.
  * Status events (PK_STATUS): RTL_EV_FIT value = 0 or the error (-1 a gesture has no window in the sums, -2
  *   degenerate data, -3 fewer than RTL_LABEL_MIN session windows); RTL_EV_LOST packets lost; RTL_EV_LABEL_FULL
  *   session buffer full; RTL_EV_FORGOT; RTL_EV_FIT_US value = duration of the fit in microseconds (sent before
  *   RTL_EV_FIT; 0 without a time base). RTL_EV_TASK value = class x 1000 + floor(999 q[class]) of the soft
  *   label's argmax after a task update, or < 0: -1 no command waiting for a label, -2 degenerate data, -4 bad
- *   expected class, -5 the label is for an older command; RTL_EV_TASK_US = duration of the task update in microseconds (sent before RTL_EV_TASK).
+ *   expected class, -5 the label is for an older command; RTL_EV_GATE_THR = the gate threshold in nV after a
+ *   fit that set it (-1: a gesture without cued windows); RTL_EV_TASK_US = duration of the task update in microseconds (sent before RTL_EV_TASK).
  * PK_PRED / PK_COMMAND: the field that carries the vote share for rt.c carries min(65535, margin x 100) here.
  */
 #pragma once
 #include <stdint.h>
 
 #include "decision.h"
+#include "features.h"
 #include "ldacal.h"
 #include "protocol.h"
 
@@ -61,11 +70,12 @@
 #define RTL_P_INVALID 0.01f
 #define RTL_BETA 0.3f
 #define RTL_DECAY 0.97f
+#define RTL_MAV0 (4 * FE_CH)              /* first MAV feature (feature-major, features.h) */
 
 enum { RTL_STREAM_RESET = 1, RTL_LABEL_START = 2, RTL_LABEL_END = 3, RTL_FIT = 4, RTL_SET_REJECT = 5,
-       RTL_SET_REPORT = 6, RTL_FORGET = 11, RTL_TASK_LABEL = 12 };
+       RTL_SET_REPORT = 6, RTL_FORGET = 11, RTL_TASK_LABEL = 12, RTL_SET_GATE = 13 };
 enum { RTL_EV_FIT = 1, RTL_EV_LOST = 3, RTL_EV_LABEL_FULL = 4, RTL_EV_FORGOT = 16, RTL_EV_FIT_US = 17,
-       RTL_EV_TASK = 18, RTL_EV_TASK_US = 19,
+       RTL_EV_TASK = 18, RTL_EV_TASK_US = 19, RTL_EV_GATE_THR = 20,
        /* diagnostics sent by the board main loop (app_rt_lda.c), same numbers as rt.h */
        RTL_EV_DIAG_RX_HW = 9, RTL_EV_DIAG_STACK = 10, RTL_EV_DIAG_RX_OVF = 11, RTL_EV_DIAG_RX_ERR = 12 };
 enum { RTL_MODE_IDLE = 0, RTL_MODE_LABEL = 1, RTL_MODE_RUN = 2 };
@@ -83,6 +93,7 @@ typedef struct {
     uint32_t windows, windows_used, classified, skipped_busy, commands, lost_packets, seq_gaps, label_windows, fits;
     int32_t fit_result;
     uint32_t task_labels;                           /* task updates done */
+    uint32_t gated;                                 /* windows the activity gate made Rest */
 } rtl_counters_t;
 
 void rtl_init(const rtl_config_t *cfg);

@@ -1,0 +1,3 @@
+# arm-none-eabi-size of the LDA firmware with task labels and the activity gate (build/rtl_task, app_rt_lda.c, -DEMG_APP_RT=ON, Release -Os -g); report 35.28
+   text	   data	    bss	    dec	    hex	filename
+  24852	    116	 103024	 127992	  1f3f8	build/rtl_task/blink.elf
