@@ -1,0 +1,668 @@
+"""Proposal deck for the new direction (2026-11-13): 碩論計畫書_MOMO.pptx. Every number is read from results/.
+
+The deck is a single file edited in place from now on (the user's choice, 2026-11-13); this script rebuilds it from
+scratch. Before overwriting, check whether the user has edited the existing file (mtime / md5): if so, build on
+their version instead.
+Usage (container, Downloads mounted at /d):  python slides/proposal.py /d/碩論計畫書_MOMO.pptx
+"""
+import os
+import re
+import sys
+from copy import deepcopy
+
+import numpy as np
+import pandas as pd
+from lxml import etree
+from pptx import Presentation
+from pptx.chart.data import CategoryChartData
+from pptx.dml.color import RGBColor
+from pptx.enum.chart import XL_CHART_TYPE, XL_LABEL_POSITION, XL_LEGEND_POSITION
+from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
+from pptx.oxml.ns import qn
+from pptx.util import Emu, Inches, Pt
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+R = os.path.join(ROOT, 'results')
+FONT = 'Microsoft JhengHei'
+NAVY, TEAL, TEAL_L, CORAL, INK, GREY, LIGHT, WHITE, MUTE = (
+    '0B2E3A', '0F7C80', 'DCEFEF', 'E8573F', '1F2A30', '5B6770', 'F1F5F6', 'FFFFFF', 'A9B4BA')
+W, H = 13.333, 7.5
+DATE = '2026-11-13'
+
+
+# ------------------------------------------------------------------ data (all from results/)
+def csv(name):
+    return pd.read_csv(os.path.join(R, name))
+
+
+def kyr_block1(df, conds, extra=None):
+    d = df[(df.comp == 'A1') & (df.block == 1) & df.cond.isin(conds)]
+    if extra is not None:
+        d = d[extra(d)]
+    return (d.groupby(['cond', 'subject']).acc.mean() * 100).groupby(level='cond').mean()
+
+
+def load():
+    N = {}
+    ex = csv('external_check_summary.csv')
+    r = ex[(ex.span == '0-2s') & (ex.comp == 'A1')].iloc[0]
+    N['pre'] = dict(F=r.F, A=r.A, diff=r['diff'], lo=r.ci_lo, hi=r.ci_hi, n=int(r.n))
+    k = kyr_block1(csv('leaf_external.csv'), ['F', 'A', 'LAonly_a8_za', 'R'])
+    k2 = kyr_block1(csv('lda_main.csv'), ['cum_T2'], lambda d: d.data == 'ext')
+    N['kyr'] = {**k.to_dict(), **k2.to_dict()}
+    la = csv('lda_anchor_summary.csv')
+    la = la[la.stream == 'base'].set_index(['shift', 'cond']).acc
+    N['lda'] = {s: dict(RF=la[(s, 'F')], LDAfix=la[(s, 'LDAfix')], LDAfixS=la[(s, 'LDAfixS')]) for s in (0.0, 0.5)}
+    lm = csv('lda_main_summary.csv')
+    lm = lm[lm.stream == 'base'].set_index(['shift', 'cond']).acc
+    N['cumT2'] = {s: lm[(s, 'cum_T2')] for s in (0.0, 0.5)}
+    a = csv('arm_ldacal_size.csv').iloc[0]
+    N['ldacal'] = dict(text=int(a.text), ram=int(a.bss + a.data))
+    txt = open(os.path.join(R, 'lda_bench_board_480mhz_cache.txt'), encoding='utf-8').read()
+    first = txt.split('60 more rows')[0]
+    us = {m.group(1): float(m.group(2)) for m in re.finditer(r'(ld_\w+)\s+n=\s*\d+\s+mean\s+\d+ cyc\s+([\d.]+) us', first)}
+    tot = {m.group(1): float(m.group(2)) for m in re.finditer(r'(ld_\w+)\s+n=.*total\s+([\d.]+) us', first)}
+    N['bench'] = dict(add_total_ms=tot['ld_add'] / 1000, fit_ms=us['ld_fit'] / 1000, predict_us=us['ld_predict'])
+    fw = open(os.path.join(R, 'arm_rt_lda_firmware_size.txt'), encoding='utf-8').read()
+    sec = {m.group(1): int(m.group(2)) for m in re.finditer(r'^\.(\S+)\s+(\d+)\s+\d+', fw, re.M)}
+    N['fw'] = dict(flash=sum(sec[s] for s in ('isr_vector', 'text', 'rodata', 'ARM', 'init_array', 'fini_array', 'data')),
+                   ram=sec['data'] + sec['bss'], buf=120 * 80 * 4)
+    b = csv('board_replay_lda_all_summary.csv').set_index('Unnamed: 0').value
+    N['board'] = dict(windows=int(float(b['scored_windows'])), same=int(float(b['same_class_as_pc'])),
+                      cmds=int(float(b['commands_board'])), cmds_eq=str(b['commands_equal']) == 'True',
+                      p95=float(b['latency_p95']), lmax=float(b['latency_max']), lost=int(float(b['lost_packets'])))
+    rk = csv('lda_reject_rank.csv')
+    g = rk[(rk.rule == 'margin') & (rk.keep == 0.9)].groupby(['data', 'comp'])[['acc', 'acc_all']].mean()
+    N['reject_gain'] = (g.acc - g.acc_all).min(), (g.acc - g.acc_all).max()
+    op = csv('lda_reject_open.csv').groupby('rule').unknown_trigger.mean()
+    N['open'] = dict(none=csv('lda_reject_open.csv').unknown_trigger_noreject.mean(), margin=op['margin'], both=op['both'])
+    t2 = csv('task_sim2_summary.csv').set_index(['shift', 'p_dev', 'cond'])
+    N['t2'] = t2
+    t3 = csv('task_sim3_summary.csv').set_index(['struct', 'shift', 'cond'])
+    N['t3'] = t3
+    return N
+
+
+# ------------------------------------------------------------------ drawing helpers
+def rgb(h):
+    return RGBColor.from_string(h)
+
+
+def set_ea(rpr):
+    """East Asian and complex-script typefaces next to a:latin, in schema order (latin, ea, cs)"""
+    prev = rpr.find(qn('a:latin'))
+    for tag in ('a:ea', 'a:cs'):
+        el = rpr.find(qn(tag))
+        if el is None:
+            el = etree.SubElement(rpr, qn(tag))
+            if prev is not None:
+                prev.addnext(el)
+        el.set('typeface', FONT)
+        prev = el
+
+
+def style(run, size, bold=False, color=INK, italic=False):
+    f = run.font
+    f.size, f.bold, f.italic, f.name = Pt(size), bold, italic, FONT
+    f.color.rgb = rgb(color)
+    set_ea(run._r.get_or_add_rPr())
+
+
+def text(slide, x, y, w, h, paras, size=16, color=INK, bold=False, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
+         name=None, space=6, bullet=False):
+    """paras: str or list of str / (str, dict) ; dict keys size, bold, color, bullet, italic"""
+    tb = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
+    if name:
+        tb.name = name
+    tf = tb.text_frame
+    tf.word_wrap = True
+    tf.margin_left = tf.margin_right = Inches(0.04)
+    tf.margin_top = tf.margin_bottom = Inches(0.02)
+    tf.vertical_anchor = anchor
+    if isinstance(paras, str):
+        paras = [paras]
+    for i, p in enumerate(paras):
+        t, o = (p, {}) if isinstance(p, str) else p
+        para = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        para.alignment = o.get('align', align)
+        para.space_after = Pt(o.get('space', space))
+        if o.get('bullet', bullet):
+            ppr = para._p.get_or_add_pPr()
+            ppr.set('marL', str(Inches(0.28)))
+            ppr.set('indent', str(-Inches(0.22)))
+            bu = etree.SubElement(ppr, qn('a:buChar'))
+            bu.set('char', '•')
+        runs = t if isinstance(t, list) else [(t, {})]
+        for rt in runs:
+            s, ro = (rt, {}) if isinstance(rt, str) else rt
+            r = para.add_run()
+            r.text = s
+            style(r, ro.get('size', o.get('size', size)), ro.get('bold', o.get('bold', bold)),
+                  ro.get('color', o.get('color', color)), ro.get('italic', o.get('italic', False)))
+    return tb
+
+
+def box(slide, x, y, w, h, fill=LIGHT, shape=MSO_SHAPE.ROUNDED_RECTANGLE, line=None, name=None, radius=0.08):
+    s = slide.shapes.add_shape(shape, Inches(x), Inches(y), Inches(w), Inches(h))
+    if name:
+        s.name = name
+    s.fill.solid()
+    s.fill.fore_color.rgb = rgb(fill)
+    if line:
+        s.line.color.rgb = rgb(line)
+        s.line.width = Pt(1.25)
+    else:
+        s.line.fill.background()
+    s.shadow.inherit = False
+    if shape == MSO_SHAPE.ROUNDED_RECTANGLE:
+        s.adjustments[0] = radius
+    s.text_frame.text = ''
+    return s
+
+
+def label_in(shape, paras, size=14, color=INK, bold=False, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE):
+    tf = shape.text_frame
+    tf.word_wrap = True
+    tf.vertical_anchor = anchor
+    tf.margin_left = tf.margin_right = Inches(0.1)
+    if isinstance(paras, str):
+        paras = [paras]
+    for i, p in enumerate(paras):
+        t, o = (p, {}) if isinstance(p, str) else p
+        para = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        para.alignment = o.get('align', align)
+        r = para.add_run()
+        r.text = t
+        style(r, o.get('size', size), o.get('bold', bold), o.get('color', color))
+
+
+def circle_num(slide, x, y, n, fill=TEAL, d=0.5):
+    c = box(slide, x, y, d, d, fill=fill, shape=MSO_SHAPE.OVAL)
+    label_in(c, str(n), size=16, color=WHITE, bold=True)
+    return c
+
+
+def arrow(slide, x, y, w, h, fill=MUTE, kind=MSO_SHAPE.RIGHT_ARROW):
+    return box(slide, x, y, w, h, fill=fill, shape=kind)
+
+
+class Deck:
+    def __init__(self):
+        self.prs = Presentation()
+        self.prs.slide_width, self.prs.slide_height = Inches(W), Inches(H)
+        self.n = 0
+
+    def slide(self, title=None, dark=False, notes=''):
+        s = self.prs.slides.add_slide(self.prs.slide_layouts[6])
+        self.n += 1
+        bg = s.background.fill
+        bg.solid()
+        bg.fore_color.rgb = rgb(NAVY if dark else WHITE)
+        if title:
+            text(s, 0.6, 0.42, 12.1, 0.8, title, size=30, bold=True, color=WHITE if dark else INK,
+                 anchor=MSO_ANCHOR.MIDDLE, name='Title')
+        if not dark:
+            text(s, 0.6, 7.02, 8, 0.3, f'碩士論文計畫書（草案）｜{DATE}｜方向待指導老師確認', size=10, color=MUTE, name='Footer')
+            text(s, 11.9, 7.02, 0.83, 0.3, str(self.n), size=10, color=MUTE, align=PP_ALIGN.RIGHT, name='Page')
+        if notes:
+            s.notes_slide.notes_text_frame.text = notes
+        return s
+
+
+def chart_style(chart, legend=False, vmax=100, vmin=None, fmt='0.0', label_size=12, axis_size=12):
+    chart.font.size = Pt(axis_size)
+    chart.font.name = FONT
+    tx = chart._chartSpace.find(qn('c:txPr'))
+    if tx is not None:
+        for d in tx.iter(qn('a:defRPr')):
+            set_ea(d)
+    chart.has_title = False
+    chart.has_legend = legend
+    if legend:
+        chart.legend.position = XL_LEGEND_POSITION.TOP
+        chart.legend.include_in_layout = False
+        chart.legend.font.size = Pt(axis_size)
+    plot = chart.plots[0]
+    plot.gap_width = 55
+    plot.has_data_labels = True
+    dl = plot.data_labels
+    dl.number_format, dl.number_format_is_linked = fmt, False
+    dl.font.size = Pt(label_size)
+    dl.font.color.rgb = rgb(INK)
+    dl.position = XL_LABEL_POSITION.OUTSIDE_END
+    va = chart.value_axis
+    va.maximum_scale = vmax
+    if vmin is not None:
+        va.minimum_scale = vmin
+    va.has_major_gridlines = False
+    va.visible = False
+    ca = chart.category_axis
+    ca.tick_labels.font.size = Pt(axis_size)
+    ca.tick_labels.font.color.rgb = rgb(INK)
+    ca.format.line.color.rgb = rgb(MUTE)
+
+
+def color_series(chart, colors):
+    for s, c in zip(chart.plots[0].series, colors):
+        s.format.fill.solid()
+        s.format.fill.fore_color.rgb = rgb(c)
+
+
+def color_points(series, colors):
+    for i, c in enumerate(colors):
+        p = series.points[i]
+        p.format.fill.solid()
+        p.format.fill.fore_color.rgb = rgb(c)
+
+
+def table(slide, x, y, w, rows, widths, size=12, header_fill=TEAL, row_h=0.42, fills=None):
+    t = slide.shapes.add_table(len(rows), len(rows[0]), Inches(x), Inches(y), Inches(w), Inches(row_h * len(rows))).table
+    for j, cw in enumerate(widths):
+        t.columns[j].width = Inches(cw)
+    for i, row in enumerate(rows):
+        t.rows[i].height = Inches(row_h)
+        for j, val in enumerate(row):
+            c = t.cell(i, j)
+            c.margin_left = c.margin_right = Inches(0.08)
+            c.margin_top = c.margin_bottom = Inches(0.04)
+            c.vertical_anchor = MSO_ANCHOR.MIDDLE
+            c.fill.solid()
+            if i == 0:
+                c.fill.fore_color.rgb = rgb(header_fill)
+            else:
+                c.fill.fore_color.rgb = rgb((fills or {}).get((i, j), WHITE if i % 2 else LIGHT))
+            tf = c.text_frame
+            tf.word_wrap = True
+            tf.paragraphs[0].text = ''
+            r = tf.paragraphs[0].add_run()
+            r.text = str(val)
+            style(r, size, bold=(i == 0 or j == 0 and False), color=WHITE if i == 0 else INK)
+    return t
+
+
+# ------------------------------------------------------------------ slides
+def build(out):
+    N = load()
+    d = Deck()
+    k, pre, lda = N['kyr'], N['pre'], N['lda']
+    t2, t3 = N['t2'], N['t3']
+
+    # 1 cover
+    s = d.slide(dark=True, notes='題目與狀態。方向是 2026-11-10～11-13 依實驗結果調整出來的，尚未與指導老師確認；凍結版韌體與 PROTOCOL 未改。')
+    text(s, 0.9, 1.5, 11.5, 0.5, '碩士論文計畫書（草案）', size=18, color='8FD3D0')
+    text(s, 0.9, 2.1, 11.6, 2.0, ['可在微控制器上執行的肌電介面每次配戴校正',
+                                    ('從免標籤適應到機器人任務提供的標籤', {'size': 26, 'bold': False, 'color': 'CFE3E6'})],
+         size=36, bold=True, color=WHITE, space=10)
+    text(s, 0.9, 4.75, 11, 1.2, ['機器人研究所｜生物力學與醫學應用實驗室', '報告人：【待填】　指導教授：【待填】',
+                                  (f'{DATE}　方向尚待指導老師確認', {'color': '8FD3D0'})], size=16, color='CFE3E6', space=4)
+
+    # 2 one page
+    s = d.slide('一頁看懂：關鍵在標籤，不在模型', notes=(
+        f'三個數字的出處：(1) Kyranou 等（2025）跨日重戴資料第二個 session（較嚴格的看法），固定 one-shot 隨機森林 {k["F"]:.1f}%、'
+        f'免標籤自我校正 {k["A"]:.1f}%、收縮 LDA 兩輪提示累積 {k["cum_T2"]:.1f}%（report 35.16；leaf_external.csv、lda_main.csv）。'
+        f'(2) STM32H753 實測（report 35.10）。(3) 閉迴路模擬（report 35.17–35.19），不是實機結果。'))
+    text(s, 0.6, 1.35, 12.1, 0.6, '每天重新戴上肌電介面後準確率會掉。原方法用免標籤自我校正補救，但在獨立的重戴資料上沒有確認效果；'
+         '真正有效的是少量有標籤資料。本研究問：標籤能不能大部分由機器人任務提供？', size=15, color=GREY)
+    cards = [(f'{k["F"]:.0f}% → {k["cum_T2"]:.0f}%', '跨日重戴後，每次配戴 16 秒有標籤校正', f'免標籤自我校正只有 {k["A"]:.0f}%（Kyranou 等，2025）'),
+             (f'{N["ldacal"]["ram"] / 1024:.1f} KB', 'STM32H753 上的 LDA 校正模組',
+              f'每次更新 {N["bench"]["add_total_ms"] + N["bench"]["fit_ms"]:.1f} ms、推論 {N["bench"]["predict_us"]:.1f} µs'),
+             ('8 秒 ≈ 16 秒', '一輪提示＋任務標籤', '效果約等於兩輪提示，使用者主動給的標籤少一半（模擬）')]
+    for i, (big, lab, sub) in enumerate(cards):
+        x = 0.6 + i * 4.1
+        box(s, x, 2.35, 3.8, 3.9, fill=LIGHT)
+        text(s, x + 0.25, 2.65, 3.3, 1.2, big, size=40, bold=True, color=TEAL if i < 2 else CORAL)
+        text(s, x + 0.25, 3.95, 3.3, 0.9, lab, size=17, bold=True)
+        text(s, x + 0.25, 4.95, 3.3, 1.1, sub, size=14, color=GREY)
+    text(s, 0.6, 6.45, 12.1, 0.4, '前兩項有外部資料與板上實測；第三項目前只有模擬，要在實機上確認。', size=13, color=GREY)
+
+    # 3 background
+    s = d.slide('研究背景', notes='校正負擔：Wang 等（2024）綜述（使用者文獻清單已有）。原方法：Jiang 等（2024）Front Neurorobot、Jiang 等（2025）J Neural Eng。'
+                '應用情境與設備：Kinova Gen3＋Robotiq 2F-85＋RealSense、Delsys Trigno 8 通道。')
+    items = [('每天重新配戴', '電極位置、皮膚與姿勢改變，昨天的模型今天就不準'),
+             ('校正是負擔', '每次重新錄每個手勢，使用者容易放棄（Wang 等，2024）'),
+             ('原方法', '預訓練隨機森林＋一次校正＋免標籤自我校正（Jiang 等，2024；2025）'),
+             ('應用情境', '上肢功能受限者用離散手勢指揮輔助機械臂抓放；使用者決定做什麼，機械臂負責怎麼做')]
+    for i, (h, b) in enumerate(items):
+        y = 1.45 + i * 1.32
+        circle_num(s, 0.6, y + 0.12, i + 1)
+        text(s, 1.3, y, 5.3, 0.45, h, size=19, bold=True)
+        text(s, 1.3, y + 0.48, 5.3, 0.75, b, size=14, color=GREY)
+    box(s, 7.2, 1.5, 5.5, 5.15, fill=TEAL_L)
+    text(s, 7.5, 1.75, 4.9, 4.7, [('設備', {'size': 19, 'bold': True}),
+                                   ('Delsys Trigno 8 通道 sEMG（2 kHz），束帶繞前臂一圈', {'bullet': True}),
+                                   ('STM32H753（NUCLEO-H753ZI，Cortex-M7 480 MHz）', {'bullet': True}),
+                                   ('Kinova Gen3 7 軸＋Robotiq 2F-85＋腕部 RealSense', {'bullet': True}),
+                                   ('ROS 2（ros2_kortex），PC 只轉送原始樣本', {'bullet': True}),
+                                   ('6 個手勢 → 5 個指令', {'size': 19, 'bold': True}),
+                                   ('Power＝到 A、Pointer＝到 B、Tripod＝夾、Open＝放、Lateral＝回原位、Rest＝不動', {'bullet': True})],
+         size=15, space=8)
+
+    # 4 motivation 1
+    s = d.slide('動機①：免標籤自我校正在獨立資料上沒有確認效果', notes=(
+        f'預先登錄的外部驗證（report 24；external_check_summary.csv，0–2 s、A1 跨日）：固定 {pre["F"]:.2f}% → 完整系統 {pre["A"]:.2f}%，'
+        f'差 {pre["diff"]:+.2f} 點（95% CI {pre["lo"]:+.2f}, {pre["hi"]:+.2f}），{pre["n"]} 人。'
+        f'較嚴格的看法（第二個 session，report 35.16）：{k["F"]:.1f}% → {k["A"]:.1f}%。開發資料上同一比較是 +4.9 點，但設定是在同一批人上挑的。'))
+    box(s, 0.6, 1.5, 5.6, 4.9, fill=LIGHT)
+    text(s, 0.9, 1.75, 5.0, 0.5, '預先登錄的外部驗證', size=17, bold=True, color=GREY)
+    text(s, 0.9, 2.3, 5.0, 1.2, f'{pre["diff"]:+.2f} 點', size=54, bold=True, color=CORAL)
+    text(s, 0.9, 3.55, 5.0, 0.5, f'95% CI {pre["lo"]:+.2f} 到 {pre["hi"]:+.2f}', size=18, bold=True)
+    text(s, 0.9, 4.2, 5.0, 2.0, [f'Kyranou 等（2025）{pre["n"]} 人兩天、真的重新配戴', '分析計畫在看資料前就 commit',
+                                  '開發資料上看起來有效（+4.9 點），獨立資料上沒有確認'], size=14, color=GREY, bullet=True)
+    cd = CategoryChartData()
+    cd.categories = ['固定模型', '免標籤自我校正']
+    cd.add_series('第二個 session', (round(k['F'], 1), round(k['A'], 1)))
+    gf = s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(6.7), Inches(1.6), Inches(6.0), Inches(4.6), cd)
+    chart_style(gf.chart, vmax=100, vmin=0, label_size=16, axis_size=14)
+    color_points(gf.chart.plots[0].series[0], [MUTE, GREY])
+    text(s, 6.7, 6.25, 6.0, 0.5, '跨日重戴、較嚴格的看法（不含開機序列所在的 session），準確率 %', size=12, color=GREY)
+
+    # 5 motivation 2
+    s = d.slide('動機②：標籤比模型重要', notes=(
+        'Kyranou 跨日資料第二個 session（report 35.16 的更正版本）。葉節點計數＝自己提出的第一個方法（樹不重訓，開機標籤累加到葉節點），'
+        '重做 one-shot＝每次配戴重做原方法的校正，LDA＝收縮估計、兩輪提示、標籤累積。資料已用過，只當一致性檢查。'))
+    cats = ['固定模型（隨機森林）', '免標籤自我校正', '葉節點計數（開機標籤）', '重做 one-shot 校正', '收縮 LDA（兩輪提示）']
+    vals = [k['F'], k['A'], k['LAonly_a8_za'], k['R'], k['cum_T2']]
+    cd = CategoryChartData()
+    cd.categories = cats
+    cd.add_series('準確率', [round(v, 1) for v in vals])
+    gf = s.shapes.add_chart(XL_CHART_TYPE.BAR_CLUSTERED, Inches(0.6), Inches(1.45), Inches(7.6), Inches(5.0), cd)
+    chart_style(gf.chart, vmax=105, vmin=0, label_size=15, axis_size=14)
+    gf.chart.category_axis.reverse_order = True
+    color_points(gf.chart.plots[0].series[0], [MUTE, MUTE, TEAL, TEAL, CORAL])
+    text(s, 0.6, 6.5, 7.6, 0.4, '跨日重戴（Kyranou 等，2025）第二個 session，準確率 %；灰＝沒有標籤，綠＝有標籤', size=12, color=GREY)
+    box(s, 8.6, 1.6, 4.1, 4.85, fill=TEAL_L)
+    text(s, 8.9, 1.85, 3.6, 4.4, [('看到的事', {'size': 19, 'bold': True}),
+                                   (f'沒有標籤：{k["F"]:.0f}% → {k["A"]:.0f}%', {'bullet': True}),
+                                   (f'有標籤：{min(k["LAonly_a8_za"], k["R"]):.0f}–{k["cum_T2"]:.0f}%', {'bullet': True}),
+                                   ('有了標籤之後，用什麼模型差距不大', {'bullet': True}),
+                                   ('所以要問的是', {'size': 19, 'bold': True}),
+                                   ('標籤能不能不由使用者給？', {'size': 17, 'bold': True, 'color': CORAL})], size=15, space=8)
+
+    # 6 motivation 3
+    s = d.slide('動機③：原方法論文的 LDA 基準偏弱', notes=(
+        '原論文的 LDA 基準：sklearn 預設，只用 60 個校正視窗、80 維特徵，共變異數奇異。加 Ledoit-Wolf 收縮後與 one-shot 隨機森林在無偏移時相同（report 35.9；lda_anchor_summary.csv，開發資料 20 人）。'
+        '是否已有文獻指出這點，還要查。'))
+    cd = CategoryChartData()
+    cd.categories = ['無偏移', '電極偏移半格']
+    cd.add_series('one-shot 隨機森林', [round(lda[s_]['RF'], 1) for s_ in (0.0, 0.5)])
+    cd.add_series('LDA（原論文的做法）', [round(lda[s_]['LDAfix'], 1) for s_ in (0.0, 0.5)])
+    cd.add_series('LDA（加收縮估計）', [round(lda[s_]['LDAfixS'], 1) for s_ in (0.0, 0.5)])
+    gf = s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(0.6), Inches(1.45), Inches(7.8), Inches(5.0), cd)
+    chart_style(gf.chart, legend=True, vmax=100, vmin=0, label_size=14, axis_size=14)
+    color_series(gf.chart, [MUTE, CORAL, TEAL])
+    text(s, 0.6, 6.5, 7.8, 0.4, '開發資料 20 人，只用第 1 天校正、不更新，準確率 %', size=12, color=GREY)
+    box(s, 8.8, 1.6, 3.9, 4.85, fill=LIGHT)
+    text(s, 9.1, 1.85, 3.4, 4.4, [('原因', {'size': 19, 'bold': True}),
+                                   ('60 個校正視窗、80 維特徵：共變異數不可逆', {'bullet': True}),
+                                   ('加收縮後，固定 LDA 與隨機森林在無偏移時一樣', {'bullet': True}),
+                                   ('有偏移時隨機森林仍好約 9 點', {'bullet': True}),
+                                   ('意義', {'size': 19, 'bold': True}),
+                                   ('隨機森林的優勢被高估；有了每次配戴的標籤，LDA 更省也更準', {'bullet': True})], size=15, space=8)
+
+    # 7 RQ
+    s = d.slide('研究問題', notes='RQ1–RQ3 已有前置結果，RQ4 待做。')
+    rqs = [('RQ1 校正策略', '重新配戴後，免標籤適應、短時有標籤校正、任務提供的標籤各能恢復多少準確率？代價是多少？', '已有結果'),
+           ('RQ2 任務標籤', '機器人任務能提供多可靠的標籤？標籤錯誤、任務結構、使用者偏離流程的影響？', '模擬完成'),
+           ('RQ3 可部署性', '整套方法能否在微控制器上即時執行、與 PC 參考逐一相同？記憶體、時間、能量？', '板上實測（能量未量）'),
+           ('RQ4 驗證', '真人（健常人為主、視情況加病患）與真實機械臂上是否成立？', '待做')]
+    for i, (h, b, st) in enumerate(rqs):
+        x, y = 0.6 + (i % 2) * 6.15, 1.5 + (i // 2) * 2.65
+        box(s, x, y, 5.95, 2.4, fill=LIGHT)
+        text(s, x + 0.3, y + 0.25, 5.3, 0.5, h, size=20, bold=True, color=TEAL)
+        text(s, x + 0.3, y + 0.85, 5.3, 1.0, b, size=15)
+        text(s, x + 0.3, y + 1.85, 5.3, 0.4, st, size=13, bold=True, color=CORAL if st == '待做' else GREY)
+
+    # 8 architecture
+    s = d.slide('系統架構', notes='PC 在資料路徑上只因 Trigno 基地台只有 USB 輸出，不做肌電運算。機器人回傳任務結果只有幾個位元組。'
+                '資料傳輸：PC→板子每 10 ms 一個 329 B 的封包（約 33 KB/s，921600 baud 的 36%）。')
+    blocks = [(0.6, 'Trigno\n8 通道 sEMG\n2 kHz', LIGHT, INK), (3.0, 'PC\n只轉送\n原始樣本', LIGHT, INK),
+              (5.4, 'STM32H753\n全部肌電運算\n與模型更新', TEAL, WHITE), (8.6, 'ROS 2\n任務狀態機', LIGHT, INK),
+              (11.0, 'Kinova Gen3\n＋夾爪', LIGHT, INK)]
+    for x, t, f, c in blocks:
+        b = box(s, x, 1.7, 2.0 if x != 5.4 else 2.7, 1.45, fill=f)
+        label_in(b, [(ln, {'size': 15 if j else 17, 'bold': j == 0}) for j, ln in enumerate(t.split('\n'))], color=c)
+    for x in (2.65, 5.05, 8.15, 10.65):
+        arrow(s, x, 2.25, 0.32, 0.35)
+    b = box(s, 5.4, 3.65, 6.2, 0.75, fill=TEAL_L, radius=0.3)
+    label_in(b, '← 任務結果回傳（幾個位元組）：這次指令對不對、原本要什麼', size=14)
+    steps = ['濾波、200 ms 視窗', '80 個特徵', '本次配戴 z-score', '收縮 LDA', '出力判斷', '拒絕', '連續 3 視窗成立', '軟標籤更新']
+    for i, st in enumerate(steps):
+        x = 0.6 + i * 1.53
+        b = box(s, x, 5.0, 1.38, 0.95, fill=WHITE, line=TEAL)
+        label_in(b, st, size=13)
+    text(s, 0.6, 4.55, 12, 0.4, 'STM32 上每 100 ms 的流程', size=15, bold=True, color=TEAL)
+    text(s, 0.6, 6.15, 12.1, 0.6, '指令只在當下做得出事時才有效（例如沒夾著東西時「放」無效）；機器人動作中收到的指令忽略。', size=13, color=GREY)
+
+    # 9 method flow
+    s = d.slide('方法：每次配戴的流程', notes='一輪提示序列＝依提示依序做 6 個手勢（約 8 秒）。z-score 用這段的統計量；LDA 的累加量跨次累積，不存樣本。'
+                '只做提示的話要兩輪（約 16 秒）才有同樣效果（report 35.11、35.17）。')
+    flow = [('戴上', '束帶依記號戴好'), ('一輪提示（8 秒）', '依提示做 6 個手勢\n→ 本次 z-score\n→ 加進 LDA 累加量'),
+            ('使用中', '指揮機械臂抓放\n出力判斷擋掉休息時的誤觸發'), ('任務提供標籤', '機器人狀態推出可能的下一步\n→ 軟標籤 → 更新 LDA')]
+    for i, (h, b) in enumerate(flow):
+        x = 0.6 + i * 3.15
+        circle_num(s, x, 1.55, i + 1, fill=CORAL if i == 3 else TEAL, d=0.6)
+        box(s, x, 2.35, 2.85, 2.6, fill=TEAL_L if i == 3 else LIGHT)
+        text(s, x + 0.2, 2.55, 2.45, 0.5, h, size=18, bold=True)
+        text(s, x + 0.2, 3.15, 2.45, 1.7, b.split('\n'), size=14, color=GREY, space=4)
+        if i < 3:
+            arrow(s, x + 2.88, 3.45, 0.24, 0.35)
+    box(s, 0.6, 5.3, 12.1, 1.35, fill=LIGHT)
+    text(s, 0.9, 5.45, 11.5, 1.1, [('收縮 LDA，以累加量表示', {'size': 17, 'bold': True}),
+                                    '每類的和與筆數＋一個 80×80 外積和；OAS 收縮（只需共變異數與筆數）＋Cholesky。可一直累積、不存樣本，30 KB 內可放進 MCU。'],
+         size=14, space=4)
+
+    # 10 method components
+    s = d.slide('方法：任務引導的軟標籤與出力判斷', notes='參數 ε 0.15、p0 0.05、β 0.3 在跑模擬前固定，沒有調（report 35.18）。'
+                '出力判斷：8 通道原始 MAV 加總，門檻＝第 1 天校正 Rest 中位數與最小手勢中位數的幾何平均。')
+    box(s, 0.6, 1.5, 6.0, 3.65, fill=LIGHT)
+    text(s, 0.9, 1.7, 5.4, 0.5, '軟標籤', size=21, bold=True, color=TEAL)
+    text(s, 0.9, 2.3, 5.4, 0.9, 'q(g) ∝ 先驗(g｜機器人狀態) × exp(β × g 的平均判別值)', size=16, bold=True)
+    text(s, 0.9, 3.25, 5.4, 3.2, ['先驗把大部分機率給系統眼中可能的下一步，保留一點給其他有效指令',
+                                   '使用者臨時改主意時，肌電的證據會把機率拉回來',
+                                   '外積和不需要標籤，只有類別的和與筆數按 q 加權：MCU 上成本不變'], size=14, bullet=True, space=8)
+    box(s, 6.9, 1.5, 5.8, 3.65, fill=LIGHT)
+    text(s, 7.2, 1.7, 5.2, 0.5, '出力判斷', size=21, bold=True, color=TEAL)
+    text(s, 7.2, 2.3, 5.2, 0.9, '8 個通道的訊號強度加總 < 門檻 → 當作休息', size=16, bold=True)
+    text(s, 7.2, 3.25, 5.2, 3.2, ['加總對束帶轉動不變：電極偏移時仍可靠',
+                                   '休息時不送指令、也不產生標籤',
+                                   '任務標籤的錯誤主要來自休息時的誤觸發，這一步把它們擋掉'], size=14, bullet=True, space=8)
+    ga0, ga5 = t2.loc[(0.0, 0.0, 'soft_act')].act_gate_acc, t2.loc[(0.5, 0.0, 'soft_act')].act_gate_acc
+    ev = [(f'{ga0:.1f}%', '出力判斷單獨區分「休息／在出力」（無偏移）'), (f'{ga5:.1f}%', '同上，電極偏移半格'),
+          ('不變', 'MCU 上的 RAM 與運算量（軟標籤只是加權）')]
+    for i, (big, lab) in enumerate(ev):
+        x = 0.6 + i * 4.1
+        box(s, x, 5.35, 3.85, 1.35, fill=TEAL_L)
+        text(s, x + 0.25, 5.45, 3.4, 0.6, big, size=26, bold=True, color=TEAL)
+        text(s, x + 0.25, 6.05, 3.4, 0.6, lab, size=13, color=GREY)
+
+    # 11 divider
+    s = d.slide(dark=True, notes='以下是目前的結果：MCU 為板上實測；校正策略為開發資料與 Kyranou；任務標籤為模擬。')
+    text(s, 0.9, 2.6, 11.5, 1.0, '目前的結果', size=40, bold=True, color=WHITE)
+    text(s, 0.9, 3.7, 11.5, 1.2, ['MCU 可部署性：板上實測', '任務標籤：閉迴路模擬＋Kinova ROS 2 模擬', '負面結果與更正'],
+         size=18, color='CFE3E6', space=6)
+
+    # 12 MCU
+    fw, bd = N['fw'], N['board']
+    s = d.slide('結果①：整套方法放得進微控制器', notes=(
+        'NUCLEO-H753ZI，480 MHz＋I/D-cache。ldacal.c：arm_ldacal_size.csv；時間：lda_bench_board_480mhz_cache.txt（第一輪 60 筆）；'
+        '整個韌體：arm_rt_lda_firmware_size.txt；11 分鐘即時串流：board_replay_lda_all_summary.csv（report 35.10、35.14、35.15）。能量尚未量測。'))
+    stats = [(f'{N["ldacal"]["ram"] / 1024:.1f} KB', 'LDA 模組 RAM'), (f'{N["bench"]["add_total_ms"] + N["bench"]["fit_ms"]:.1f} ms', '每次配戴更新（60 筆＋求解）'),
+             (f'{N["bench"]["predict_us"]:.1f} µs', '每次推論'), (f'{fw["flash"] / 1024:.0f} KB', '整個韌體 Flash'),
+             (f'{fw["ram"] / 1024:.0f} KB', f'整個韌體 RAM（含 {fw["buf"] / 1024:.0f} KB 暫存）'), (f'{bd["p95"]:.1f} ms', '延遲 P95（PC 送出 → 收到結果）')]
+    for i, (big, lab) in enumerate(stats):
+        x, y = 0.6 + (i % 3) * 4.1, 1.5 + (i // 3) * 2.05
+        box(s, x, y, 3.85, 1.8, fill=LIGHT)
+        text(s, x + 0.25, y + 0.2, 3.4, 0.85, big, size=34, bold=True, color=TEAL)
+        text(s, x + 0.25, y + 1.1, 3.4, 0.6, lab, size=14, color=GREY)
+    box(s, 0.6, 5.7, 12.1, 1.05, fill=TEAL_L)
+    text(s, 0.9, 5.82, 11.5, 0.85, [(f'即時串流 11 分鐘：{bd["same"]:,}／{bd["windows"]:,} 個視窗、{bd["cmds"]} 個指令和 PC 逐一相同；'
+                                     f'掉封包 {bd["lost"]}；最大延遲 {bd["lmax"]:.1f} ms', {'bold': True}),
+                                    ('能量尚未量測；PC 只轉送原始樣本（Trigno 基地台只有 USB 輸出）', {'color': GREY})], size=15, space=4)
+
+    # 13 closed loop
+    s = d.slide('結果②：閉迴路抓放模擬，標籤由系統自己推', notes=(
+        '模擬：使用者照任務流程做抓放（A→夾→B→放→回原位），25% 的時候臨時改變主意；系統只知道機器人狀態與任務流程，沒有正確答案（report 35.17、35.18；task_sim2_summary.csv）。'
+        '準確率＝配戴結束後在互動沒看過的 trial 上測的視窗準確率。限制：使用者照固定流程、沒有手勢轉換的過渡段。'))
+    cats = ['固定模型', '一輪提示', '一輪＋硬標籤', '一輪＋軟標籤\n＋出力判斷', '兩輪提示', '正確答案（上限）']
+    conds = ['fixed', 'cue1', 'cue1_gate', 'cue1_soft_act', 'cue2', 'oracle']
+    cd = CategoryChartData()
+    cd.categories = cats
+    cd.add_series('無偏移', [round(t2.loc[(0.0, 0.25, c)].probe_after, 1) for c in conds])
+    cd.add_series('電極偏移半格', [round(t2.loc[(0.5, 0.25, c)].probe_after, 1) for c in conds])
+    gf = s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(0.6), Inches(1.45), Inches(8.6), Inches(5.0), cd)
+    chart_style(gf.chart, legend=True, vmax=100, vmin=40, label_size=12, axis_size=12)
+    color_series(gf.chart, [TEAL, CORAL])
+    text(s, 0.6, 6.5, 8.6, 0.4, '20 人 × 2 seed，使用者 25% 臨時改變主意，準確率 %', size=12, color=GREY)
+    a, b2 = t2.loc[(0.5, 0.25, 'cue1_soft_act')], t2.loc[(0.5, 0.25, 'cue1_gate')]
+    box(s, 9.5, 1.6, 3.2, 4.85, fill=LIGHT)
+    text(s, 9.75, 1.85, 2.75, 4.4, [('看到的事', {'size': 19, 'bold': True}),
+                                     ('一輪提示＋軟標籤＋出力判斷 ≈ 兩輪提示 ≈ 上限', {'bullet': True}),
+                                     (f'標籤錯誤率（半格）：硬標籤 {b2.label_err_pct:.1f}% → 軟標籤 {a.label_err_pct:.1f}%', {'bullet': True}),
+                                     ('使用者主動給的標籤少一半', {'bullet': True})], size=15, space=10)
+
+    # 14 activity gate + no cue
+    h0, h1 = t2.loc[(0.5, 0.0, 'hard')], t2.loc[(0.5, 0.0, 'hard_act')]
+    s0, s1 = t2.loc[(0.5, 0.0, 'soft')], t2.loc[(0.5, 0.0, 'cue1')]
+    s = d.slide('結果③：出力判斷有效；完全不做提示則不行', notes=(
+        '電極偏移半格、使用者照流程（report 35.18）。不做提示序列時，任務標籤的錯誤幾乎都來自休息時的誤觸發；出力判斷把它們擋掉。'
+        '軟標籤不做提示時失敗：模型本身不準時，肌電的證據會強化錯誤（類似自我訓練）。'))
+    for i, (big, lab, sub, col) in enumerate([
+            (f'{h0.label_err_pct:.0f}% → {h1.label_err_pct:.1f}%', '任務標籤的錯誤率', '不做提示、半格偏移；加上出力判斷', TEAL),
+            (f'{h0.probe_after:.0f}% → {h1.probe_after:.0f}%', '準確率', '同上', TEAL),
+            (f'{s0.probe_after:.0f}%', '不做提示＋軟標籤', f'比固定模型（{t2.loc[(0.5, 0.0, "fixed")].probe_after:.0f}%）還差', CORAL)]):
+        x = 0.6 + i * 4.1
+        box(s, x, 1.55, 3.85, 3.0, fill=LIGHT)
+        text(s, x + 0.25, 1.8, 3.4, 1.0, big, size=36, bold=True, color=col)
+        text(s, x + 0.25, 2.9, 3.4, 0.5, lab, size=17, bold=True)
+        text(s, x + 0.25, 3.5, 3.4, 0.9, sub, size=14, color=GREY)
+    box(s, 0.6, 4.9, 12.1, 1.25, fill=TEAL_L)
+    text(s, 0.9, 5.05, 11.5, 1.5, [('結論：一輪提示是必要的起點', {'size': 18, 'bold': True}),
+                                    (f'只做一輪提示 {s1.probe_after:.0f}%；模型先夠準，任務標籤才幫得上忙，否則錯誤會自我強化', {'color': INK})],
+         size=15, space=6)
+
+    # 15 task structure
+    labels = {'fixed': '系統知道\n完整流程', 'known_goal': '被告知\n目的地', 'unknown_goal': '不知道\n目的地', 'free': '沒有\n任務模型'}
+    s = d.slide('結果④：任務結構變弱時，軟標籤仍然有效', notes=(
+        '新的任務世界：三個地點、目的地每次隨機（report 35.19；task_sim3_summary.csv）。電極偏移半格、使用者 10% 改變目的地。'
+        '軟標籤在四種結構都比只做提示好（+1.9 到 +3.0 點，95% CI 不含 0）；硬標籤在沒有任務模型時比只做提示差 5.4 點。事後修正的標籤規則沒有用。'))
+    structs = list(labels)
+    cd = CategoryChartData()
+    cd.categories = [labels[x] for x in structs]
+    cd.add_series('一輪提示', [round(t3.loc[(x, 0.5, 'cue1')].probe_after, 1) for x in structs])
+    cd.add_series('一輪＋硬標籤', [round(t3.loc[(x, 0.5, 'cue1_hard')].probe_after, 1) for x in structs])
+    cd.add_series('一輪＋軟標籤', [round(t3.loc[(x, 0.5, 'cue1_soft')].probe_after, 1) for x in structs])
+    gf = s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(0.6), Inches(1.45), Inches(8.6), Inches(5.0), cd)
+    chart_style(gf.chart, legend=True, vmax=100, vmin=60, label_size=12, axis_size=13)
+    color_series(gf.chart, [MUTE, GREY, TEAL])
+    text(s, 0.6, 6.5, 8.6, 0.4, '電極偏移半格，準確率 %；由左到右，系統對任務的了解越來越少', size=12, color=GREY)
+    e = [t3.loc[(x, 0.5, 'cue1_soft')].label_err_pct for x in structs]
+    eh = [t3.loc[(x, 0.5, 'cue1_hard')].label_err_pct for x in structs]
+    box(s, 9.5, 1.6, 3.2, 4.85, fill=LIGHT)
+    text(s, 9.75, 1.85, 2.75, 4.4, [('看到的事', {'size': 19, 'bold': True}),
+                                     ('軟標籤四種情況都比只做提示好', {'bullet': True}),
+                                     (f'標籤錯誤率：軟 {min(e):.1f}–{max(e):.1f}%，硬 {min(eh):.1f}–{max(eh):.1f}%', {'bullet': True}),
+                                     ('回答「方法是不是只在設計好的任務裡有效」', {'bullet': True})], size=15, space=10)
+
+    # 16 negative results
+    s = d.slide('負面結果與更正（會寫進論文）', notes='出處：report 35.4、35.8、35.9–35.10、35.16、35.17、35.18、35.19。')
+    neg = [('自己提出的葉節點計數', '輸給收縮 LDA，退為對照組'),
+           ('沒有用的規則', '只學認錯的視窗、逐手勢門檻、開機序列當裁判、類別中心取中位數、事後修正標籤'),
+           ('軟標籤不做提示', '有偏移時比固定模型還差：錯誤自我強化'),
+           ('資料陷阱（已更正）', 'Kyranou 每個手勢連續錄 5 次；緊接著評分會偏樂觀，改看第二個 session 低 2–5 點、結論不變'),
+           ('撤回的發現', '「開機序列第一輪比第二輪差」只在開發資料看得到')]
+    for i, (h, b) in enumerate(neg):
+        y = 1.45 + i * 1.05
+        box(s, 0.6, y, 12.1, 0.9, fill=LIGHT)
+        text(s, 0.85, y + 0.15, 3.6, 0.6, h, size=16, bold=True, color=CORAL if i == 3 else INK, anchor=MSO_ANCHOR.MIDDLE)
+        text(s, 4.5, y + 0.15, 8.0, 0.6, b, size=14, color=GREY, anchor=MSO_ANCHOR.MIDDLE)
+
+    # 17 contributions
+    s = d.slide('創新與貢獻', notes='「不主張首創」：侵入式腦機介面已有用推斷的意圖重新標記資料（Gilja 等，2012；Jarosiewicz 等，2015）。')
+    rows = [['貢獻', '狀態', '強度'],
+            ['獨立檢驗：免標籤自我校正在重戴資料上沒有確認增益（預先登錄）', '完成', '中（8 人）'],
+            ['指出原方法論文的 LDA 基準缺少收縮估計', '完成', '中（待查是否已有人指出）'],
+            ['同一份重戴資料上直接比較免標籤適應與短時有標籤校正', '完成', '中'],
+            ['任務引導的軟標籤＋出力判斷＋一輪提示的混合校正', '模擬完成', '中高（待實機）'],
+            ['量化任務標籤的可靠度門檻與任務結構的影響', '模擬完成', '中'],
+            ['累加量形式的收縮 LDA 在 MCU 上逐位元驗證、即時運作', '完成', '工程貢獻']]
+    fills = {(i, 1): TEAL_L for i in (1, 2, 3, 6)}
+    fills.update({(i, 1): 'FBE3DD' for i in (4, 5)})
+    table(s, 0.6, 1.5, 12.1, rows, [7.6, 1.6, 2.9], size=14, row_h=0.62, fills=fills)
+    text(s, 0.6, 6.05, 12.1, 0.8, '不主張「首創」：主張精確寫成「離散手勢指令、意圖來自機械臂任務狀態機且不確定、軟標籤、可在 MCU 上以累加量實作」。',
+         size=14, color=GREY)
+
+    # 18 related work
+    s = d.slide('與相關研究的差別', notes='相關研究的細節多數只讀到摘要層級（2026-11-13 檢索），寫進論文前要逐篇讀過。')
+    rows = [['', '訊號', '標籤從哪來', '控制', '平台'],
+            ['Jiang 等（2024；2025）', '肌電', '免標籤偽標籤', '離散手勢', 'PC'],
+            ['Campbell 等（2024）', '肌電', '任務情境（游標）', '連續游標', 'PC'],
+            ['Orlandi 等（2026）', '肌電', '任務情境，需已知目標', '—', 'GAP9（CNN）'],
+            ['Gilja 等（2012）；Jarosiewicz 等（2015）', '侵入式腦機介面', '推斷的意圖（已知目標）', '連續游標', '研究用電腦'],
+            ['本研究', '肌電', '機械臂任務狀態機＋軟標籤＋一輪提示', '離散指令（機械臂）', 'Cortex-M7 30 KB']]
+    table(s, 0.6, 1.5, 12.1, rows, [3.4, 1.9, 3.3, 1.9, 1.6], size=14, row_h=0.72,
+          fills={(5, j): TEAL_L for j in range(5)})
+
+    # 19 plan
+    s = d.slide('實驗規劃與時程（草案）', notes='時程是草案，待與指導老師討論；病患個案視醫院合作與 IRB 時程，不綁畢業條件。')
+    plan = [('自我測試：實機抓放，量任務標籤的真實錯誤率', 0, 1),
+            ('能量量測；任務標籤移植 MCU；ROS 2', 1, 2),
+            ('先導實驗（健常人、跨日）', 2, 4),
+            ('正式實驗（健常人）', 4, 6),
+            ('病患個案（視醫院合作與 IRB）', 4, 7),
+            ('分析與撰寫', 6, 8)]
+    months = ['11月', '12月', '1月', '2月', '3月', '4月', '5月', '6月']
+    x0, cw = 5.6, 0.89
+    for j, m in enumerate(months):
+        text(s, x0 + j * cw, 1.45, cw, 0.35, m, size=12, color=GREY, align=PP_ALIGN.CENTER)
+    for i, (t, a0, a1) in enumerate(plan):
+        y = 1.95 + i * 0.66
+        text(s, 0.6, y, 4.9, 0.6, t, size=15, anchor=MSO_ANCHOR.MIDDLE)
+        box(s, x0, y + 0.08, cw * len(months), 0.45, fill=LIGHT, radius=0.5)
+        box(s, x0 + a0 * cw, y + 0.08, (a1 - a0) * cw, 0.45, fill=CORAL if i == 0 else TEAL, radius=0.5)
+    box(s, 0.6, 6.0, 12.1, 0.8, fill=TEAL_L)
+    text(s, 0.85, 6.05, 11.6, 0.7, [([('主要指標：', {'bold': True}),
+                                       '重戴後的準確率與任務成功率、做錯的動作、誤觸發／分鐘、完成時間、使用者主動給標籤的秒數；MCU 的 RAM、時間、能量'], {})],
+         size=14, anchor=MSO_ANCHOR.MIDDLE)
+
+    # 20 risks
+    s = d.slide('風險與退路', notes='最關鍵的未知數是真實任務的標籤錯誤率，模擬顯示約 10% 以內方法撐得住、20% 開始明顯變差（report 35.16）。')
+    rows = [['風險', '影響', '退路'],
+            ['真實任務的標籤錯誤率高（> 20%）', '任務標籤的效果縮小', '論文以檢驗與短時校正為主，任務標籤寫成可靠度分析'],
+            ['使用者行為比模擬亂', '軟標籤的先驗失準', '加大先驗的不確定度；加入使用者取消重做的證據'],
+            ['沒教過的動作造成誤觸發', '安全性', '機器人端狀態過濾、啟動手勢；非控制動作段實測'],
+            ['病患收案時程不確定', '驗證規模縮小', '畢業條件只綁健常人實驗'],
+            ['方向未獲同意', '—', '檢驗與短時校正本身可銜接原題目']]
+    table(s, 0.6, 1.5, 12.1, rows, [3.6, 2.6, 5.9], size=15, row_h=0.85)
+
+    # 21 decisions
+    s = d.slide('需要老師決定的事', dark=True, notes='建議：先導實驗多錄兩輪提示序列即可，不必改實驗設計；所有方法都能用錄下的原始肌電離線重放比較。')
+    dec = ['主軸從「免標籤自我校正」改為「每次配戴校正與任務提供的標籤」？',
+           'PROTOCOL 與 IRB 要不要改？（建議：先導多錄兩輪提示序列，不改設計）',
+           '病患個案的族群與時程',
+           '硬體主張的範圍（建議：可部署性，不主張穿戴式裝置）']
+    for i, t in enumerate(dec):
+        y = 1.6 + i * 1.2
+        circle_num(s, 0.9, y + 0.1, i + 1, fill=CORAL, d=0.6)
+        text(s, 1.8, y, 10.6, 0.8, t, size=20, color=WHITE, anchor=MSO_ANCHOR.MIDDLE)
+
+    # 22 references
+    s = d.slide('參考文獻', notes='標＊者是 2026-11 方向檢索時在搜尋摘要層級看到的，寫進論文前要逐篇打開確認。')
+    refs = ['Jiang, Ma, Nazarpour (2024). Posture-invariant myoelectric control with self-calibrating random forests. Frontiers in Neurorobotics.',
+            'Jiang et al. (2025). Plug-and-play myoelectric control via a self-calibrating random forest common model. Journal of Neural Engineering.',
+            'Kyranou, Szymaniak, Nazarpour (2025). 8-participant two-day Trigno dataset. Scientific Data.',
+            'Wang et al. (2024). Review of calibration burden in myoelectric control. Frontiers in Bioengineering and Biotechnology.',
+            'Campbell et al. (2024). Context-informed incremental learning improves both the performance and resilience of myoelectric control. JNER.',
+            'Orlandi et al. (2026). Task-context pseudo-labels for on-device retraining on GAP9. RISC-V Summit poster.',
+            'Zanghieri et al. (2023). Online unsupervised arm posture adaptation. IEEE BioCAS.',
+            '＊Gilja et al. (2012). A high-performance neural prosthesis enabled by control algorithm design. Nature Neuroscience.',
+            '＊Jarosiewicz et al. (2015). Virtual typing by people with tetraplegia using a self-calibrating intracortical BCI. Science Translational Medicine.',
+            '＊Chen, Wiesel, Eldar, Hero (2010). Shrinkage algorithms for MMSE covariance estimation. IEEE Transactions on Signal Processing.']
+    text(s, 0.6, 1.45, 12.1, 5.4, refs, size=14, color=INK, space=7)
+
+    d.prs.save(out)
+    print(f'{d.n} slides -> {out}')
+
+
+if __name__ == '__main__':
+    build(sys.argv[1])
