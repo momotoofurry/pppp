@@ -226,3 +226,7 @@ python src/board_replay.py make --blocks 2        (在 Docker 裡；產生 build
 再把 `build/pc/TrignoBridge.exe`、`build/pc/TaskScreen.exe`、`src/pc/kinova_bridge.py`、`lab_kit/*.bat`、`lab_kit/README.md`、`build/board_replay/{stream.bin,schedule.csv,windows.csv}`
 複製到隨身碟的 `lab_kit/`（`board_replay/` 子資料夾）。測試：`src/pc/fake_tcu.py`（Windows 的 Python＋numpy）當 TCU，
 `TrignoBridge.exe run --port file:bridge_out.bin --script script.txt`，再用 `src/pc/check_bridge.py` 檢查。
+
+## 自我測試（report 35.35）
+
+流程見 `SELFTEST.md`；提示畫面用 `selftest_task.bat T00 <天>`。分析：`python src/selftest_analysis.py --dir <資料夾> --days T00_d1_A T00_d2_A`（判準 R12 已事先寫定）。

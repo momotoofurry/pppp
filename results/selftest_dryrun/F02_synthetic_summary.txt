@@ -1,0 +1,57 @@
+F02_d1_A: TCU rate 2148.0 Hz, 6145 windows, cued pass windows [10, 10, 10, 10, 10, 10], probes 3, task trials 80
+F02_d2_A: TCU rate 2148.0 Hz, 6145 windows, cued pass windows [10, 10, 10, 10, 10, 10], probes 3, task trials 80
+
+probe accuracy % (6 classes); P0 right after the cued pass, P1 after task segment 1, P2 after segment 2
+probe                probe0  probe1  probe2
+cond        e   day                        
+cue         0.0 1     75.00   96.67   88.33
+                2     96.67   99.17   91.67
+cue_pn      0.0 1     75.00  100.00   96.67
+                2     99.17   99.17   99.17
+            0.1 1     75.00   91.92   93.04
+                2     96.75   97.83   95.62
+            0.3 1     75.00   79.71   83.62
+                2     92.33   89.21   85.67
+cue_pos     0.0 1     75.00  100.00   96.67
+                2     99.17   99.17   99.17
+            0.1 1     75.00   99.46   95.67
+                2     98.42   99.12   99.17
+            0.3 1     75.00   96.83   94.17
+                2     98.25   99.17   98.88
+cue_soft    0.0 1     75.00  100.00   95.83
+                2     99.17   99.17   99.17
+            0.1 1     75.00   97.29   95.88
+                2     98.54   99.17   99.17
+            0.3 1     75.00   97.71   95.79
+                2     98.54   99.12   99.17
+cue_soft_t1 0.0 1     75.00  100.00   90.83
+                2     99.17   99.17   98.33
+fixed       0.0 1     75.00   96.67   88.33
+                2     90.00   94.17   84.17
+
+R12: D = mean over P1, P2 of (cue_soft - cue), e 0
+  day 1: D = +5.42  (bootstrap 95 % -0.42, +12.50)
+  day 2: D = +3.75  (bootstrap 95 % +0.00, +7.92)
+  D_bar = +4.58, positive on 2/2 days (need 2) -> GO
+
+also reported (mean over days and seeds)
+  cue_soft - cue_pn  at e 0.3, P1-P2: +13.40
+  cue_soft - cue_pos at e 0.3, P1-P2: +0.69
+  cue_soft_t1 - cue at P2 (labels 5-10 min old): +4.58
+  cue - fixed, days 2+, all probes: +6.39
+
+offline task-trial decisions (mean over seeds, all days)
+                   cmd     ok  miss  cmd_acc %
+cond        e                                 
+cue         0.0    0.0    0.0   0.0        NaN
+cue_pn      0.0  160.0  158.0   0.0       98.8
+            0.1  160.0  154.8   0.0       96.8
+            0.3  159.6  140.6   0.4       88.1
+cue_pos     0.0  160.0  158.0   0.0       98.8
+            0.1  160.0  157.2   0.0       98.2
+            0.3  160.0  156.5   0.0       97.8
+cue_soft    0.0  160.0  158.0   0.0       98.8
+            0.1  160.0  157.6   0.0       98.5
+            0.3  160.0  157.8   0.0       98.6
+cue_soft_t1 0.0   80.0   79.0   0.0       98.8
+fixed       0.0    0.0    0.0   0.0        NaN
