@@ -1,0 +1,29 @@
+mean accuracy %, 8 classes, 10 subjects (networks: mean of 3 seeds)
+  method          same session  next session
+  lda_fixed              37.43         37.19
+  lda_cue1               56.77         47.39
+  mlp_fixed              37.39         37.16
+  mlp_ft                 55.15         44.45
+  mlp_ft_cum             54.55         45.42
+  mlp_head_lda           49.66         44.62
+  mlp_retrain            56.71         47.64
+
+paired differences against lda_cue1 (95 % t CI, 10 subjects)
+  [same] mlp_fixed     - lda_cue1 = -19.38 (-26.81, -11.95), 0/10 higher
+  [same] mlp_ft        - lda_cue1 = -1.63 (-3.44, +0.19), 2/10 higher  <- best MCU-updatable
+  [same] mlp_ft_cum    - lda_cue1 = -2.22 (-4.03, -0.42), 2/10 higher
+  [same] mlp_head_lda  - lda_cue1 = -7.11 (-10.57, -3.66), 0/10 higher
+  [same] mlp_retrain   - lda_cue1 = -0.07 (-1.40, +1.27), 5/10 higher
+  [next] mlp_fixed     - lda_cue1 = -10.24 (-15.49, -4.99), 0/10 higher
+  [next] mlp_ft        - lda_cue1 = -2.94 (-4.16, -1.72), 0/10 higher
+  [next] mlp_ft_cum    - lda_cue1 = -1.97 (-3.26, -0.69), 1/10 higher  <- best MCU-updatable
+  [next] mlp_head_lda  - lda_cue1 = -2.77 (-5.56, +0.01), 2/10 higher
+  [next] mlp_retrain   - lda_cue1 = +0.25 (-0.88, +1.38), 6/10 higher
+
+R13: PASS - the LDA is kept
+
+model cost on the MCU (analytic)
+                model  params  flash_float32_B  flash_int8_B  activations_B  MACs_per_window                                                                                                             update
+       MLP 80-64-32-8    7528            30112          7528            640             7424                                     backprop: ~3 x 7,424 MACs x 80 windows x 30 epochs = 53.5 M MACs per cued pass
+       LDA (ldacal.c)     648             2592           648             32              640 closed form: running sums (80 x 80 + 8 x 80 + 8 floats = 27.8 KB) + one 80 x 80 solve (ld_fit 3.9 ms on the board)
+MLP hidden + LDA head    7528            30112          7528            640             7424                                           closed form on 32 activations: sums 32 x 32 + 8 x 32 + 8 floats = 5.0 KB
