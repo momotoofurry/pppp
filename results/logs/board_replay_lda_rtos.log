@@ -1,0 +1,56 @@
+scored_windows         2640
+received               2640
+same_class_as_pc       2640
+same_margin_as_pc      2022
+margin_max_diff        26
+acc_board              94.24242424242424
+acc_pc                 94.24242424242424
+commands_board         228
+commands_pc            228
+commands_equal         True
+latency_p50            6.675000000046566
+latency_p95            7.190049999987968
+latency_max            10.245000000024447
+rx_crc_errors          0
+rx_skipped             0
+fits                   12
+fits_ok                12
+fit_us_min             7868
+fit_us_max             8054
+lost_packets           0
+pc_fits_ok             12
+task_events_board      264
+task_events_pc         264
+task_values_equal      False
+task_updates_board     223
+task_none_board        41
+task_us_min            4145
+task_us_median         4678.0
+task_us_max            4683
+diag_rx_hw_max         106
+diag_stack_max         -1
+diag_rx_ovf_max        0
+diag_rx_err_max        0
+rtos_rx_stack_max      488
+rtos_learn_stack_max   524
+rtos_msp_max           476
+rtos_cpu_rx_median_pct 3.2
+rtos_cpu_rx_max_pct    3.26
+rtos_cpu_learn_median_pct 0.28
+rtos_cpu_learn_max_pct 0.37
+rtos_cpu_idle_median_pct 96.51
+rtos_cpu_idle_max_pct  96.83
+latency_p95_all        7.190049999987968
+           n  acc_board  acc_pc
+block                          
+0      240.0      89.58   89.58
+1      240.0      80.00   80.00
+2      240.0      92.08   92.08
+3      240.0      95.83   95.83
+4      240.0      94.58   94.58
+5      240.0      96.67   96.67
+6      240.0      97.50   97.50
+7      240.0      95.83   95.83
+8      240.0      99.58   99.58
+9      240.0      96.25   96.25
+10     240.0      98.75   98.75

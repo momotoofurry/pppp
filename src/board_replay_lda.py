@@ -47,7 +47,9 @@ FS = 2000.0
 WIN_PER_REC = 19
 PAUSE = 0.5                                              # after FIT: the fit runs in the main loop
 EV = {1: 'fit', 3: 'lost', 4: 'label_full', 9: 'diag_rx_hw', 10: 'diag_stack', 11: 'diag_rx_ovf', 12: 'diag_rx_err',
-      16: 'forgot', 17: 'fit_us', 18: 'task', 19: 'task_us', 20: 'gate_thr'}
+      16: 'forgot', 17: 'fit_us', 18: 'task', 19: 'task_us', 20: 'gate_thr',
+      30: 'rtos_rx_stack', 31: 'rtos_learn_stack', 32: 'rtos_msp', 33: 'rtos_cpu_rx', 34: 'rtos_cpu_learn',
+      35: 'rtos_cpu_idle'}                              # 30-35: app_rt_rtos.c (report 35.36)
 TASK = False
 TASK_PAUSE = 0.05
 GATE = None                                              # (k_x100, mode): RTL_SET_GATE after SET_REPORT
@@ -197,9 +199,16 @@ def decode():
                   gated_pc=int((df.pc_gated == 1).sum()), gated_same_as_pc=int((ok.board_gated == ok.pc_gated).sum()),
                   gated_rest_windows=int(((ok.board_gated == 1) & (ok.label == 5)).sum()),
                   rest_windows=int((ok.label == 5).sum()))
-    for e in ('diag_rx_hw', 'diag_stack', 'diag_rx_ovf', 'diag_rx_err'):
+    for e in ('diag_rx_hw', 'diag_stack', 'diag_rx_ovf', 'diag_rx_err', 'rtos_rx_stack', 'rtos_learn_stack', 'rtos_msp'):
         v = [x for k, x in bs if k == e]
         sm[e + '_max'] = max(v) if v else -1
+    for e in ('rtos_cpu_rx', 'rtos_cpu_learn', 'rtos_cpu_idle'):                # x 100 %, per 10 s
+        v = [x for k, x in bs if k == e]
+        if v:
+            sm[e + '_median_pct'] = float(np.median(v)) / 100
+            sm[e + '_max_pct'] = max(v) / 100
+    if TASK and not ok.empty:                       # latency of windows completed while a task update ran or not
+        sm['latency_p95_all'] = ok.latency_ms.quantile(0.95)
     pd.DataFrame([sm]).T.to_csv(os.path.join(OUT, f'board_replay_lda{TAG}_summary.csv'), header=['value'])
     for k, v in sm.items():
         print(f'{k:22s} {v}')

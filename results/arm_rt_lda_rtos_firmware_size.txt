@@ -1,0 +1,3 @@
+# arm-none-eabi-size of the LDA main line on FreeRTOS V10.6.2 (build/rtos, app_rt_rtos.c, -DEMG_APP_RT=ON, Release); report 35.36
+   text	   data	    bss	    dec	    hex	filename
+  31204	    120	 126956	 158280	  26a48	D:/stm32/blink_leaf/build/rtos/blink.elf
