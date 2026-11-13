@@ -1,0 +1,10 @@
+2369390 bytes, 7256 packets, crc errors 0, skipped 0
+control sub-commands: {1: 36, 2: 6, 3: 6, 4: 1, 6: 1, 11: 1, 12: 4, 13: 1}
+  SET_GATE: payload [13, 50, 0, 0]
+  TASK_LABEL: payload [12, 3, 12, 136, 19, 0, 0], window 5000
+  TASK_LABEL: payload [12, 0, 17, 236, 19, 0, 0], window 5100
+  TASK_LABEL: payload [12, 2, 7, 80, 20, 0, 0], window 5200
+  TASK_LABEL: payload [12, 1, 3]
+  FORGET: payload [11]
+status events: [('gate_thr_nV', 44273), ('fit_us', 0), ('fit', 0), ('task', -5), ('task', -5), ('task', -5), ('task_us', 0), ('task', 3551), ('forgot', 0)]
+PRED 290 (29 test recordings x 10), accuracy 77.59 %, gated windows 14, commands 25

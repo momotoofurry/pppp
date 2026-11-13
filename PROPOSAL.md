@@ -2,6 +2,7 @@
 
 > **狀態**：方向是 2026-11-10 到 11-13 依實驗結果調整出來的，**還沒有和指導老師確認**。凍結版韌體 `pilot-freeze-5`、`PROTOCOL.md`、先導實驗的規劃都沒有改。
 > 所有數字的正本在 `report.md` 第 35 節（本分支 `leaf-refresh`），每一項後面標了節次和結果檔。
+> 大小一律以 1 KB = 1024 bytes 計（2026-11-13 使用者決定）。
 > 2026-11-13 晚更新：加入逐篇查證過的文獻定位（第 9 節，清單在 `文獻搜尋_2026-11-13.md`），以及 35.20–35.22（和 CIIL 比較、任務標籤出錯、軟標籤的 C 版）。
 
 ## 1. 題目
@@ -61,11 +62,11 @@ PC 在資料路徑上只是因為 Trigno 基地台只有 USB 輸出；它不做�
 |---|---|---|
 | LDA 模組 `ldacal.c` | RAM 29.4 KB、程式 1.4 KB；和 float64 參考 192,000 個視窗預測 100% 相同 | 35.10、35.12；`arm_ldacal_size.csv`、`ldacal_c_summary.csv` |
 | 每次配戴的更新 | 60 筆 `ld_add` 3.27 ms ＋ `ld_fit` 3.87 ms；推論 11.5 µs | 35.10；`lda_bench_board_480mhz_cache.txt` |
-| 整個 LDA 韌體 | Flash 約 22 KB、AXI RAM 約 94 KB（含 120 個視窗的暫存 38 KB） | 35.14；`arm_rt_lda_firmware_size.txt` |
+| 整個 LDA 韌體 | Flash 約 22 KB、AXI RAM 約 94 KB（含 120 個視窗的暫存 37.5 KB） | 35.14；`arm_rt_lda_firmware_size.txt` |
 | 即時串流 11 分鐘 | 1,980／1,980 個視窗、169 個指令和 PC 相同；延遲 P95 7.25 ms、最大 10.8 ms；0 掉封包 | 35.15；`board_replay_lda_all_summary.csv` |
 | 軟標籤＋遺忘的 C 版 | 12,000 個指令的 q 最大差 0.00006、保留 trial 預測 100% 相同；不增加 RAM，程式 +512 bytes | 35.22；`soft_c_check.csv`、`arm_ldacal_soft_size.csv` |
 | 軟標籤在板子上 | 每學一個任務標籤 4.66 ms（其中重新擬合 3.86 ms）；雜湊值和 PC 完全相同 | 35.23；`lda_soft_bench_board_480mhz_cache.txt` |
-| 任務標籤接進即時迴圈（`RTL_TASK_LABEL`，機器人只送 2 個位元組） | 用錄好的肌電驅動：52,800 個視窗、4,404 次任務更新都和 float64 參考相同；韌體 Flash 24.2 KB、RAM 102.5 KB（+5.2 KB） | 35.24；`rt_task_check.csv`、`arm_rt_lda_task_firmware_size.txt` |
+| 任務標籤接進即時迴圈（`RTL_TASK_LABEL`，機器人只送 2 個位元組） | 用錄好的肌電驅動：52,800 個視窗、4,404 次任務更新都和 float64 參考相同；韌體 Flash 23.8 KB、RAM 100.2 KB（+5.0 KB） | 35.24；`rt_task_check.csv`、`arm_rt_lda_task_firmware_size.txt` |
 | 含任務標籤的即時重放（板子，11.5 分鐘） | 2,640 個視窗、228 個指令和 PC 相同；223 次任務更新，每次 4.1–4.7 ms；延遲 P95 7.19 ms；0 掉封包 | 35.25；`board_replay_lda_task_summary.csv` |
 | 機器人端送標籤（PC 整合測試） | 任務模型和模擬 20,000 步相同；C 迴圈 → `kinova_bridge.py` → UDP → 橋接 → C 迴圈，11／11 個標籤套用；無效指令不執行；晚到的標籤會被拒 | 35.26；`test_task_labels.log` |
 | 同一條鏈接上 RViz 模擬的 Gen3（ROS 2） | 11／11 個標籤套用；7 個手臂／夾爪動作全部正常結束，移動時間和模擬假設相同 | 35.27；`test_task_labels_ros.log` |
@@ -139,9 +140,11 @@ PC 在資料路徑上只是因為 Trigno 基地台只有 USB 輸出；它不做�
 
    - 出力判斷的 C 版，和參考逐視窗一致（35.28）。
 
+   - 實驗室 C# 橋接支援 LDA 韌體與任務標籤轉送（35.29）。
+
    還剩：
-   - 實驗室 C# 橋接加上任務標籤的轉送與 `RTL_SET_GATE`；
-   - 出力判斷上板執行。
+   - 出力判斷上板執行；
+   - 真的板子＋Trigno＋Kinova 整條接起來。
 4. **先導實驗（健常人）**：跨日、每次配戴錄兩輪提示序列與非控制動作段；所有方法用錄下的原始肌電離線重放比較。
 5. **正式實驗與病患個案**（需 IRB；醫院合作）。
 

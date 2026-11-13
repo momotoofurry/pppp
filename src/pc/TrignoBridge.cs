@@ -38,6 +38,16 @@
 //       the strap mark and redo 'align'; on the second unsure in a row the gate opens with rotation 0 (the
 //       firmware's choice). 'adapt 0' (fixed model) opens the gate. Held commands reach TaskScreen as a status line.
 //       note <text> = free-text note in ops.csv (room / skin temperature, strap offset, ...).
+//       LDA main line (report 35.29; firmware app_rt_lda.c / rt_lda.c, NOT pilot-freeze-5): --firmware lda turns the
+//       alignment gate off (the LDA firmware has no 'align') and adds the commands
+//         forget                      drop all accumulated labels (RTL_FORGET), e.g. after the band was moved
+//         gate <k_x100> <mode>        activity gate (RTL_SET_GATE): k_x100 (0 = off, 100 = k 1.0), mode 0 = threshold
+//                                     of day 1, 1 = new threshold at every calibrate
+//         task <expected> <mask> [window]  task label for the last command (RTL_TASK_LABEL), normally sent by
+//                                     kinova_bridge.py --task-labels through --task-udp
+//       In the LDA firmware cal / calend / calibrate are LABEL_START / LABEL_END / FIT (same numbers).
+//       --task-udp 50559: datagrams "task,<expected>,<valid mask>,<window>" from kinova_bridge.py --task-labels go to
+//       the board as RTL_TASK_LABEL (and into ops.csv as 'task ...').
 //   TrignoBridge replay --port COM5 --dir <board_replay folder>
 //       board test without the Trigno: the recorded stream of src/board_replay.py (stream.bin, schedule.csv,
 //       windows.csv) sent in real time; prints the board's status events and its accuracy per block.
@@ -57,6 +67,7 @@ static class Proto
     public const byte SAMPLES = 0x01, CONTROL = 0x02, COMMAND = 0x81, STATUS = 0x82, PRED = 0x83;
     public const byte STREAM_RESET = 1, CAL_START = 2, CAL_END = 3, CALIBRATE = 4, SET_DECISION = 5, SET_REPORT = 6,
                       ALIGN_START = 7, ALIGN_END = 8, LOAD = 9, SET_ADAPT = 10;
+    public const byte FORGET = 11, TASK_LABEL = 12, SET_GATE = 13;          // LDA firmware (rt_lda.h)
     public const int CH = 8, FRAMES_PER_PACKET = 20, MAX_PAYLOAD = 512, OVERHEAD = 9;
     public const double LSB_VOLT = 2.5e-7;
     public static readonly string[] GESTURES = { "Power", "Lateral", "Tripod", "Pointer", "Open", "Rest" };
@@ -92,6 +103,13 @@ static class Proto
         if (sub == CAL_START || sub == SET_REPORT || sub == SET_ADAPT) return Build(CONTROL, new byte[] { sub, (byte)args[0] });
         if (sub == SET_DECISION)
             return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)(args[0] >> 8), (byte)args[1] });
+        if (sub == SET_GATE)
+            return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)(args[0] >> 8), (byte)args[1] });
+        if (sub == TASK_LABEL && args.Length >= 3)
+            return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)args[1], (byte)args[2], (byte)(args[2] >> 8),
+                                               (byte)(args[2] >> 16), (byte)(args[2] >> 24) });
+        if (sub == TASK_LABEL)
+            return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)args[1] });
         return Build(CONTROL, new byte[] { sub });
     }
 }
@@ -759,9 +777,43 @@ static class Program
         else if (c == "decision" && p.Length == 3) Send(Proto.Control(Proto.SET_DECISION, int.Parse(p[1]), int.Parse(p[2])));
         else if (c == "report" && p.Length == 2) Send(Proto.Control(Proto.SET_REPORT, int.Parse(p[1])));
         else if (c == "status") return true;
-        else { Console.WriteLine("? reset | cal <0-5> | calend | calibrate | load | adapt <0|1> | verify <0-5> | align | decision <tau_permille> <k> | report <0|1> | note <text> | status | quit"); return false; }
+        else if (c == "forget") Send(Proto.Control(Proto.FORGET));
+        else if (c == "gate" && p.Length == 3) {
+            int k = int.Parse(p[1]), mode = int.Parse(p[2]);
+            if (k < 0 || k > 65535 || mode < 0 || mode > 1) { Console.WriteLine("gate <k_x100 0-65535> <mode 0|1>"); return false; }
+            Send(Proto.Control(Proto.SET_GATE, k, mode));
+        }
+        else if (c == "task" && (p.Length == 3 || p.Length == 4)) {
+            int e = int.Parse(p[1]), m = int.Parse(p[2]);
+            if (e < 0 || e > 4 || m < 0 || m > 31) { Console.WriteLine("task <expected 0-4> <valid mask 0-31> [window]"); return false; }
+            Send(p.Length == 4 ? Proto.Control(Proto.TASK_LABEL, e, m, (int)uint.Parse(p[3])) : Proto.Control(Proto.TASK_LABEL, e, m));
+            return true;                                          // quiet: one per robot command
+        }
+        else { Console.WriteLine("? reset | cal <0-5> | calend | calibrate | load | adapt <0|1> | verify <0-5> | align | decision <tau_permille> <k> | report <0|1> | note <text> | status | quit"
+                                 + (lda ? " | forget | gate <k_x100> <mode> | task <e> <mask> [window]" : "")); return false; }
         Console.WriteLine(string.Format(IC, "[{0:F1} s] sent: {1}", clock.Elapsed.TotalSeconds, line.Trim()));
         return true;
+    }
+
+    static bool lda;
+    public static int TaskLabelsSent;
+
+    // "task,<expected>,<mask>,<window>" from kinova_bridge.py --task-labels -> RTL_TASK_LABEL (and ops.csv)
+    static void TaskLabels(int udpPort)
+    {
+        using (var u = new UdpClient(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, udpPort))) {
+            u.Client.ReceiveTimeout = 200;
+            var any = new System.Net.IPEndPoint(System.Net.IPAddress.Any, 0);
+            while (!stop) {
+                byte[] b;
+                try { b = u.Receive(ref any); } catch (SocketException) { continue; }
+                var f = Encoding.ASCII.GetString(b).Trim().Split(',');
+                int e, m; uint w;
+                if (f.Length != 4 || f[0] != "task" || !int.TryParse(f[1], out e) || !int.TryParse(f[2], out m)
+                    || !uint.TryParse(f[3], out w) || e < 0 || e > 4 || m < 0 || m > 31) continue;
+                if (DoCommand(string.Format(IC, "task {0} {1} {2}", e, m, w))) Interlocked.Increment(ref TaskLabelsSent);
+            }
+        }
     }
 
     static void Reader()
@@ -813,6 +865,11 @@ static class Program
         }
         if (type == Proto.STATUS && p.Length >= 8) {
             int ev = p[0], v = BitConverter.ToInt32(p, 4);
+            if (lda && ev >= 16 && ev <= 20) {
+                string[] ln = { "forgot", "fit took (us)", "task label (class x 1000 + 999 q; < 0 refused)", "task update took (us)",
+                                "activity gate threshold (nV)" };
+                return string.Format(IC, "status,,,,,,,,{0},{1}", ln[ev - 16], v);
+            }
             string[] names = { "", "calibrated (0 = ok)", "self-calibration blocks", "packets lost", "calibration windows", "rotation",
                                "alignment too short, rotation unchanged (windows)",
                                "self-calibration start (windows so far)", "self-calibration took (us)", "receive ring high-water (bytes)",
@@ -838,7 +895,9 @@ static class Program
         opsCsv = new StreamWriter(Get(a, "ops-csv", "ops.csv"));
         opsCsv.WriteLine("unix_ms,command,accepted");
         OpenUdp(Get(a, "udp", "50555"));
-        gateOn = Get(a, "gate", "1") != "0";
+        lda = Get(a, "firmware", "freeze") == "lda";
+        gateOn = !lda && Get(a, "gate", "1") != "0";
+        if (lda) Console.WriteLine("firmware lda: LDA main line (rt_lda.c); no alignment gate; extra commands forget | gate | task");
         Console.WriteLine(gateOn ? "alignment gate on: board commands are forwarded only after a good 'align' (--gate 0: off)"
                                  : "alignment gate off");
         if (portName.StartsWith("file:")) {
@@ -850,6 +909,12 @@ static class Program
             port.Open(); port.DiscardInBuffer();
             var reader = new Thread(Reader) { IsBackground = true };
             reader.Start();
+        }
+        int taskPort = int.Parse(Get(a, "task-udp", "0"));
+        if (taskPort > 0) {
+            var tl = new Thread(() => TaskLabels(taskPort)) { IsBackground = true };
+            tl.Start();
+            Console.WriteLine("task labels from kinova_bridge.py on UDP 127.0.0.1:" + taskPort);
         }
         Resampler rs = Math.Abs(rate - 2000) > 1e-6 ? new Resampler(rate, 2000) : null;
         Console.WriteLine(rs == null ? "input 2000 Hz: no resampling" : string.Format(IC, "input {0} Hz -> resampled to 2000 Hz", rate));
@@ -945,6 +1010,7 @@ static class Program
         if (udp != null) udp.Close();
         Console.WriteLine(string.Format(IC, "done: {0} frames in, {1} out, {2} samples clipped, {3} MCU packets ({4} PRED), {5} commands held before alignment",
                                         framesIn, framesOut, clipped, mcuPackets, preds, heldCommands));
+        if (taskPort > 0) Console.WriteLine("task labels forwarded: " + TaskLabelsSent);
         return 0;
     }
 

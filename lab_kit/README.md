@@ -190,6 +190,23 @@ TCU 只能裝在實驗室電腦、程式要在自己筆電跑的話：兩台接�
   回 BIG、送 big-endian）用 Windows 的 Python 跑：`check_bridge.py` 300 個視窗、88.00%、每段 4000 frame、CRC 0，和之前相同。
   （WSL 裡的假 TCU 跑不到 2000 Hz，腳本時間會錯開，那時是 52.40%，不是程式的問題。）
 
+## LDA 主線（分支 `leaf-refresh`，report 35.29；凍結版的流程不受影響）
+
+板子要燒 LDA 韌體（`app_rt_lda.c`），不是 `pilot-freeze-5`。
+
+```
+TrignoBridge.exe run --port COM5 --firmware lda --task-udp 50559 --udp 50555,50556 --emg-csv T00_emg.csv --mcu-csv T00_mcu.csv --ops-csv T00_ops.csv
+python kinova_bridge.py run --ip 192.168.1.10 --task-labels 127.0.0.1:50559 --poses poses.json
+```
+
+- `--firmware lda`：沒有對齊閘門（LDA 韌體沒有 `align`）。
+  - `cal <g>`／`calibrate` 就是一輪提示與 FIT。
+  - 額外指令：`forget`（換位置或重戴後清掉累積的標籤）、`gate <k_x100> <0|1>`（出力判斷；錄資料時先不開）、`task <預期> <遮罩> [視窗]`。
+- `--task-udp 50559`：收 `kinova_bridge.py --task-labels` 的任務標籤，轉給板子，同時記在 `ops.csv`。
+- 開始前先讓手臂回到已知姿勢（report 35.27）。
+- 已測（2026-11-13）：假 TCU＋檔案輸出，封包內容正確、PC 版 `rt_lda.c` 照預期回應；凍結版回歸 88.00%。
+  **還沒接真的板子、Trigno 和 Kinova。**
+
 ## 還沒在真機上確認的
 
 - 真的 TCU 的協定（版本字串、START／STOP 的回應、16 通道 float32 的格式）是照 pytrigno 寫的。第 2 步就是在確認這件事：
