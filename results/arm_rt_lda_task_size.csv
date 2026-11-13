@@ -1,7 +1,7 @@
 module,text,data,bss
-rt_lda.c,2586,13,45427
+rt_lda.c,2622,13,45431
 ldacal.c,1936,0,30132
 protocol.c,446,0,0
 features.c,1768,0,20804
 decision.c,324,0,0
-total,7060,13,96363
+total,7096,13,96367

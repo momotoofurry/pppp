@@ -29,6 +29,7 @@ static int16_t s_run[RTL_CMD_MAX][FE_DIM];
 static int s_run_n, s_run_cls = -1;
 static int16_t s_pend[RTL_CMD_MAX][FE_DIM];
 static int s_pend_n, s_pend_cls = -1;
+static uint32_t s_pend_window;
 static uint8_t s_pend_open, s_pend_valid;
 static volatile uint8_t s_task_request;
 static float s_prior[LD_CLASSES];
@@ -189,6 +190,7 @@ static void on_window(void)
         memcpy(s_pend, s_run, (size_t)s_run_n * sizeof s_run[0]);
         s_pend_n = s_run_n;
         s_pend_cls = top;
+        s_pend_window = s_cnt.windows;
         s_pend_open = 1;
         s_pend_valid = 1;
     }
@@ -269,6 +271,10 @@ static void on_control(const uint8_t *p, uint16_t len)
         }
         if (!s_pend_valid || s_mode != RTL_MODE_RUN || s_pend_n < 1) {
             status(RTL_EV_TASK, -1);
+            break;
+        }
+        if (len >= 7 && (uint32_t)(p[3] | (p[4] << 8) | ((uint32_t)p[5] << 16) | ((uint32_t)p[6] << 24)) != s_pend_window) {
+            status(RTL_EV_TASK, -5);
             break;
         }
         {

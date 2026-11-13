@@ -21,6 +21,11 @@ Modes:
                            NOT tested yet: no robot here. Check on the lab robot with the arm in a free space first.
   teach --ip ... --name pose_A [--poses poses.json]
                            store the robot's current joint angles under a name (move the arm by hand / web app).
+Task labels (LDA main line, report 35.26): --task-labels [127.0.0.1:50559] keeps the pick-and-place task model of
+  task_labels.py; for every command that arrives while the robot is idle it sends the datagram
+  "task,<expected>,<valid mask>,<window>" to the serial bridge (trigno_bridge.py --task-udp), which passes it to the MCU as
+  RTL_TASK_LABEL. A command that is not valid in the task (e.g. grip with an empty hand away from the object) is
+  labelled but NOT executed (robot.csv: 'invalid'), as in the simulation.
 Usage: python kinova_bridge.py run (--sim | --ip IP) [--udp 50556] [--out robot.csv] [--poses poses.json]
 """
 import argparse
@@ -35,6 +40,9 @@ try:
     import msvcrt                               # Windows console keys
 except ImportError:                             # pragma: no cover
     msvcrt = None
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import task_labels as TL  # noqa: E402
 
 COMMANDS = ('grip', 'release', 'pose_A', 'pose_B', 'home')
 
@@ -222,6 +230,12 @@ def run(args):
             return 'joints', poses[cmd]
         return None, None
 
+    task, tl_addr = None, None
+    if args.task_labels:
+        task = TL.PickPlace()
+        host, port = args.task_labels.rsplit(':', 1)
+        tl_addr = (host, int(port))
+        log('task_labels', note=f'pick-and-place model; labels to {args.task_labels}')
     udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     udp.bind(('127.0.0.1', args.udp))
     udp.settimeout(0.2)
@@ -263,6 +277,15 @@ def run(args):
                     log('busy' if state['busy'] else 'ignored_estop', cmd, window, board_ms)
                     print(f'{cmd}: ignored ({"robot moving" if state["busy"] else "emergency stop"})')
                     continue
+                if task is not None and cmd in TL.CLASS:
+                    e, mask, ok = task.label(cmd)
+                    if e is not None:
+                        udp.sendto(TL.datagram(e, mask, int(window)), tl_addr)
+                        log('task_label', cmd, window, board_ms, note=f'expected {TL.COMMAND[e]} valid {mask}')
+                    if not ok:
+                        log('invalid', cmd, window, board_ms)
+                        print(f'{cmd}: not valid in the task now, not executed')
+                        continue
                 state['busy'], state['cur'] = True, cmd
                 log('start', cmd, window, board_ms, kind)
                 print(f'{cmd} (window {window}) -> {kind}')
@@ -299,6 +322,8 @@ def main():
     ap.add_argument('--grip-close', type=float, default=0.8)
     ap.add_argument('--grip-open', type=float, default=0.0)
     ap.add_argument('--seconds', type=float, default=0, help='stop after this many seconds (tests)')
+    ap.add_argument('--task-labels', nargs='?', const='127.0.0.1:50559',
+                    help='send task labels for the LDA firmware to the serial bridge (UDP)')
     ap.add_argument('--name')
     args = ap.parse_args()
     if not args.sim and not args.ip and not args.ros:

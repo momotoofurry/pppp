@@ -1,9 +1,9 @@
 [Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
 rt_lda static bytes (PC build, without ldacal / features): 45408
-[Parallel(n_jobs=19)]: Done 12 out of 40 | elapsed:   15.4s remaining:   35.9s
-[Parallel(n_jobs=19)]: Done 21 out of 40 | elapsed:   19.5s remaining:   17.6s
-[Parallel(n_jobs=19)]: Done 30 out of 40 | elapsed:   20.2s remaining:    6.7s
-[Parallel(n_jobs=19)]: Done 40 out of 40 | elapsed:   21.9s finished
+[Parallel(n_jobs=19)]: Done 12 out of 40 | elapsed:   14.7s remaining:   34.3s
+[Parallel(n_jobs=19)]: Done 21 out of 40 | elapsed:   17.7s remaining:   16.0s
+[Parallel(n_jobs=19)]: Done 30 out of 40 | elapsed:   18.7s remaining:    6.2s
+[Parallel(n_jobs=19)]: Done 40 out of 40 | elapsed:   20.1s finished
                                    0             1
 margin_x100                 0.000000    340.000000
 dist2                       0.000000    150.000000

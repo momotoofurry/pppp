@@ -1,0 +1,3 @@
+PASS model: 20000 commands, 2767 cycles, same labels and states as task_sim.World
+PASS late label: window 448 refused (-5), window 449 applied (3997)
+PASS chain: 13 commands from the C loop in real time; robot side took 11 while idle (pose_A, grip, pose_B, release, home, grip, grip, pose_B, release, home, grip), 1 arrived while it moved; 11 labels kinova_bridge.py -> UDP -> trigno_bridge forwarder -> rt_lda.c: 11 applied, 0 refused as late for an older command; 7 executed, 4 not valid in the task and not executed

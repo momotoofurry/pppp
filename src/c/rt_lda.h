@@ -21,7 +21,7 @@
  *   RTL_SET_REJECT (5) margin_x100 u16, dist2 u16 (0 = off), k u8
  *   RTL_SET_REPORT (6) flags u8       bit 0: PK_PRED for every classified window
  *   RTL_FORGET (11)                   drop all accumulated labels (ld_reset), e.g. after the band was moved
- *   RTL_TASK_LABEL (12) expected u8, valid u8
+ *   RTL_TASK_LABEL (12) expected u8, valid u8 [, window u32]
  *                                     task label for the last command (report 35.18, 35.24): the robot side
  *                                     tells which gesture the task expected (class 0-4) and which other gestures
  *                                     were valid commands at that moment (bit c = class c). The MCU kept the
@@ -31,12 +31,15 @@
  *                                     RTL_P0, the rest RTL_P_INVALID; 1 - RTL_P0 if no other is valid), computes
  *                                     the soft label q (ld_soft_q, beta RTL_BETA), forgets (ld_decay RTL_DECAY),
  *                                     adds the windows with q (ld_add_soft) and refits. One label per command.
+ *                                     With the optional window (the window number of the COMMAND packet the
+ *                                     label is for), a label for an older command than the one kept is refused
+ *                                     (-5), so a late label never lands on the windows of a newer command.
  * Status events (PK_STATUS): RTL_EV_FIT value = 0 or the error (-1 a gesture has no window in the sums, -2
  *   degenerate data, -3 fewer than RTL_LABEL_MIN session windows); RTL_EV_LOST packets lost; RTL_EV_LABEL_FULL
  *   session buffer full; RTL_EV_FORGOT; RTL_EV_FIT_US value = duration of the fit in microseconds (sent before
  *   RTL_EV_FIT; 0 without a time base). RTL_EV_TASK value = class x 1000 + floor(999 q[class]) of the soft
  *   label's argmax after a task update, or < 0: -1 no command waiting for a label, -2 degenerate data, -4 bad
- *   expected class; RTL_EV_TASK_US = duration of the task update in microseconds (sent before RTL_EV_TASK).
+ *   expected class, -5 the label is for an older command; RTL_EV_TASK_US = duration of the task update in microseconds (sent before RTL_EV_TASK).
  * PK_PRED / PK_COMMAND: the field that carries the vote share for rt.c carries min(65535, margin x 100) here.
  */
 #pragma once

@@ -13,9 +13,9 @@ none_c                   876
 task_labels_counter     4404
 agree 100.0000 %, commands as decision.c 5280/5280, updates C 4404 Python 4404, argmax same 4404/4404, max |floor(999q)| diff 1, acc C 93.06 Python 93.06
     module  text  data   bss
-  rt_lda.c  2586    13 45427
+  rt_lda.c  2622    13 45431
   ldacal.c  1936     0 30132
 protocol.c   446     0     0
 features.c  1768     0 20804
 decision.c   324     0     0
-     total  7060    13 96363
+     total  7096    13 96367

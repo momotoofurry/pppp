@@ -16,6 +16,8 @@ Gestures: 0 Power, 1 Lateral, 2 Tripod, 3 Pointer, 4 Open, 5 Rest.
   python trigno_bridge.py --tcu 127.0.0.1 --port COM5 --emg-csv emg.csv --mcu-csv mcu.csv
   python trigno_bridge.py --tcu 127.0.0.1 --port file:out.bin      (no MCU: write the serial bytes to a file)
   python trigno_bridge.py --tcu 127.0.0.1 --port tcp:127.0.0.1:7000  (a TCP socket instead of the serial port)
+  --task-udp 50559   LDA firmware only (report 35.26): datagrams "task,<expected>,<valid mask>,<window>" from
+                     kinova_bridge.py --task-labels are sent to the MCU as RTL_TASK_LABEL control packets
 """
 import argparse
 import csv
@@ -29,6 +31,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import mcu_logger  # noqa: E402
 import protocol as PR  # noqa: E402
+import task_labels as TL  # noqa: E402
 
 TCU_CHANNELS = 16
 FRAME_BYTES = TCU_CHANNELS * 4
@@ -138,6 +141,26 @@ def parse_control(line):
     raise ValueError(line)
 
 
+def task_forwarder(port, link, enc, lock, stop, counter=None):
+    """UDP 127.0.0.1:<port> 'task,<e>,<mask>,<window>' -> RTL_TASK_LABEL on the link (thread)"""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.bind(('127.0.0.1', port))
+    s.settimeout(0.1)
+    while not stop.is_set():
+        try:
+            b, _ = s.recvfrom(256)
+        except socket.timeout:
+            continue
+        lab = TL.parse_datagram(b)
+        if lab is None:
+            continue
+        with lock:
+            link.write(TL.packet(enc, *lab))
+        if counter is not None:
+            counter.append(lab)
+    s.close()
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument('--tcu', default='127.0.0.1', help='host running the Trigno Control Utility')
@@ -150,6 +173,7 @@ def main(argv=None):
     ap.add_argument('--mcu-csv', default='mcu.csv')
     ap.add_argument('--max-frames', type=int, default=0, help='stop after this many frames (0: until quit / end)')
     ap.add_argument('--no-start', action='store_true', help='do not send START (TCU already streaming)')
+    ap.add_argument('--task-udp', type=int, default=0, help='forward task labels from kinova_bridge.py (LDA firmware)')
     args = ap.parse_args(argv)
     if args.channels != PR.CH:
         sys.exit('the MCU expects 8 channels')
@@ -185,6 +209,8 @@ def main(argv=None):
                     link.write(enc.control(*c))
 
     threading.Thread(target=reader, daemon=True).start()
+    if args.task_udp:
+        threading.Thread(target=task_forwarder, args=(args.task_udp, link, enc, lock, stop), daemon=True).start()
     if sys.stdin.isatty():
         threading.Thread(target=controls, daemon=True).start()
     if not args.no_start:
