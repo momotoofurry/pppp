@@ -1,0 +1,19 @@
+
+=== LDA re-calibration bench ===
+STM32H7 HAL, SYSCLK 480 MHz, I-cache on, D-cache on
+ldacal static 30132 B, 80 features, 6 classes, 60 labelled rows, 240 test rows
+new LDA from 60 rows: fit 0, rho x 1e6 371847, correct 178 of 240, predictions 27 69 17 56 41 30, hash 9f3896cc
+  ld_add       n=  60  mean    26133 cyc     54.4 us   max    26722 cyc     55.6 us   total     3266.6 us
+  ld_fit       n=   1  mean  1854614 cyc   3863.7 us   max  1854614 cyc   3863.7 us   total     3863.7 us
+  ld_predict   n= 240  mean     5518 cyc     11.4 us   max     5743 cyc     11.9 us   total     2759.1 us
+60 more rows (120): fit 0, rho x 1e6 187460, correct 179 of 240, predictions 28 68 17 56 41 30, hash c86395e7
+  ld_add       n=  60  mean    26244 cyc     54.6 us   max    29756 cyc     61.9 us   total     3280.5 us
+  ld_fit       n=   1  mean  1855482 cyc   3865.5 us   max  1855482 cyc   3865.5 us   total     3865.5 us
+  ld_predict   n= 240  mean     5518 cyc     11.4 us   max     5715 cyc     11.9 us   total     2759.3 us
+soft labels, 24 commands: fit failures 0, q argmax hash 6c9bda11, correct 222 of 240, hash 6c60ae7f
+  ld_soft_q    n=  24  mean    56848 cyc    118.4 us   max    56980 cyc    118.7 us   total     2842.4 us
+  ld_decay     n=  24  mean    17263 cyc     35.9 us   max    17501 cyc     36.4 us   total      863.1 us
+  ld_add_soft  n= 240  mean    30962 cyc     64.5 us   max    33483 cyc     69.7 us   total    15481.4 us
+  ld_fit       n=  24  mean  1854431 cyc   3863.3 us   max  1854989 cyc   3864.5 us   total    92721.5 us
+  per command  n=  24  mean  2238466 cyc   4663.4 us   max  2240796 cyc   4668.3 us   total   111923.3 us
+=== done ===

@@ -4,6 +4,9 @@
  * testing_block0, Q5.10.
  *   pass 1  ld_reset, 60 x ld_add, ld_fit, 240 x ld_predict          (a new LDA from one start-up sequence)
  *   pass 2  the same 60 rows added again (120 in the sums), ld_fit, 240 x ld_predict   (accumulating)
+ *   pass 3  soft task labels (report 35.22): 24 commands of 10 test rows each; per command ld_soft_q over the 10
+ *           rows (prior: 0.85 on the class of the first row, 0.05 each on the next two classes, 0.05 Rest, 0.01
+ *           the rest; beta 0.3), ld_decay(0.97), 10 x ld_add_soft, ld_fit; then 240 x ld_predict
  * Each call is timed with bench_cycles(). Predictions are hashed; the PC run (bench_pc.c + this file) prints the
  * same lines with zero timings. float32 on both sides, but the ARM build may contract a*b+c into FMA, so the
  * discriminant values can differ in the last bits; the prediction counts are what must agree.
@@ -77,6 +80,54 @@ static void pass(const char *name)
     report("ld_predict", &s_pred);
 }
 
+static void soft_pass(void)
+{
+    stage_t s_q = {0}, s_dec = {0}, s_add = {0}, s_fit = {0}, s_cmd = {0};
+    float q[LD_CLASSES], prior[LD_CLASSES];
+    uint32_t hq = 2166136261u;
+    int fails = 0;
+    for (int k = 0; k + 10 <= LR_NU; k += 10) {
+        const int e = lr_use_y[k];
+        for (int c = 0; c < LD_CLASSES; c++)
+            prior[c] = 0.01f;
+        prior[e] = 0.85f;
+        prior[(e + 1) % 5] = 0.05f;
+        prior[(e + 2) % 5] = 0.05f;
+        prior[5] = 0.05f;
+        uint32_t tc = bench_cycles(), t0 = tc;
+        int a = ld_soft_q(lr_use[k], 10, prior, 0.3f, q);
+        add(&s_q, bench_cycles() - t0);
+        hq = (hq ^ (uint32_t)a) * 16777619u;
+        t0 = bench_cycles();
+        ld_decay(0.97f);
+        add(&s_dec, bench_cycles() - t0);
+        for (int r = 0; r < 10; r++) {
+            t0 = bench_cycles();
+            ld_add_soft(lr_use[k + r], q);
+            add(&s_add, bench_cycles() - t0);
+        }
+        t0 = bench_cycles();
+        fails += ld_fit() != 0;
+        add(&s_fit, bench_cycles() - t0);
+        add(&s_cmd, bench_cycles() - tc);
+    }
+    uint32_t h = 2166136261u;
+    unsigned correct = 0;
+    for (int i = 0; i < LR_NU; i++) {
+        int p = ld_predict(lr_use[i]);
+        h = (h ^ (uint32_t)p) * 16777619u;
+        correct += p == lr_use_y[i];
+    }
+    snprintf(s_line, sizeof s_line, "soft labels, %d commands: fit failures %d, q argmax hash %08lx, correct %u of %d, hash %08lx\r\n",
+             (int)s_cmd.n, fails, (unsigned long)hq, correct, LR_NU, (unsigned long)h);
+    bench_print(s_line);
+    report("ld_soft_q", &s_q);
+    report("ld_decay", &s_dec);
+    report("ld_add_soft", &s_add);
+    report("ld_fit", &s_fit);
+    report("per command", &s_cmd);
+}
+
 void bench_run(uint32_t cpu_hz)
 {
     s_hz = cpu_hz;
@@ -86,5 +137,6 @@ void bench_run(uint32_t cpu_hz)
     ld_reset();
     pass("new LDA from 60 rows");
     pass("60 more rows (120)");
+    soft_pass();
     bench_print("=== done ===\r\n");
 }

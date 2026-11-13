@@ -10,4 +10,10 @@ new LDA from 60 rows: fit 0, rho x 1e6 371847, correct 178 of 240, predictions 2
   ld_add       n=  60  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
   ld_fit       n=   1  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
   ld_predict   n= 240  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
+soft labels, 24 commands: fit failures 0, q argmax hash 6c9bda11, correct 222 of 240, hash 6c60ae7f
+  ld_soft_q    n=  24  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
+  ld_decay     n=  24  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
+  ld_add_soft  n= 240  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
+  ld_fit       n=  24  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
+  per command  n=  24  mean        0 cyc      0.0 us   max        0 cyc      0.0 us   total        0.0 us
 === done ===
