@@ -25,5 +25,5 @@ R13: PASS - the LDA is kept
 model cost on the MCU (analytic)
                 model  params  flash_float32_B  flash_int8_B  activations_B  MACs_per_window                                                                                                             update
        MLP 80-64-32-8    7528            30112          7528            640             7424                                     backprop: ~3 x 7,424 MACs x 80 windows x 30 epochs = 53.5 M MACs per cued pass
-       LDA (ldacal.c)     648             2592           648             32              640 closed form: running sums (80 x 80 + 8 x 80 + 8 floats = 27.8 KB) + one 80 x 80 solve (ld_fit 3.9 ms on the board)
+       LDA (ldacal.c)     648             2592           648             32              640 closed form: running sums (80 x 80 + 8 x 80 + 8 floats = 27.5 KB, 1 KB = 1024 B) + one 80 x 80 solve (ld_fit 3.9 ms on the board)
 MLP hidden + LDA head    7528            30112          7528            640             7424                                           closed form on 32 activations: sums 32 x 32 + 8 x 32 + 8 floats = 5.0 KB

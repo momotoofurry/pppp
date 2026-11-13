@@ -28,7 +28,7 @@ FONT = 'Microsoft JhengHei'
 NAVY, TEAL, TEAL_L, CORAL, INK, GREY, LIGHT, WHITE, MUTE = (
     '0B2E3A', '0F7C80', 'DCEFEF', 'E8573F', '1F2A30', '5B6770', 'F1F5F6', 'FFFFFF', 'A9B4BA')
 W, H = 13.333, 7.5
-DATE = '2026-11-13'
+DATE = '2026-11-14'
 
 
 # ------------------------------------------------------------------ data (all from results/)
@@ -107,6 +107,22 @@ def load():
     N['db6'] = dict(same={m: sim[m] for m in ('fixed', 'LDACMA', 'cue1', 'cue1_soft')},
                     next={m: adj[m] for m in ('fixed', 'LDACMA', 'cue1', 'cue1_soft')})
     bg = csv('board_replay_lda_gate_summary.csv').set_index('Unnamed: 0').value
+    def lat(tag):
+        x = csv(f'board_replay_lda{tag}_windows.csv').latency_ms.dropna()
+        return [float(x.quantile(q)) for q in (0.5, 0.95, 0.99)]
+    rt = {k: csv(f'board_replay_lda{t}_summary.csv').set_index('Unnamed: 0').value for k, t in (('rtos', '_rtos2'), ('stress', '_rtos_stress'))}
+    N['rtos'] = dict(lat={k: lat(t) for k, t in (('bare', '_task'), ('rtos', '_rtos2'), ('stress', '_rtos_stress'))},
+                     same=int(float(rt['stress']['same_class_as_pc'])), windows=int(float(rt['stress']['scored_windows'])),
+                     idle=float(rt['rtos']['rtos_cpu_idle_median_pct']), idle_stress=float(rt['stress']['rtos_cpu_idle_median_pct']),
+                     learn_stress=float(rt['stress']['rtos_cpu_learn_median_pct']),
+                     rx_stack=int(float(rt['rtos']['rtos_rx_stack_max'])), learn_stack=int(float(rt['rtos']['rtos_learn_stack_max'])))
+    nn = csv('nn_compare.csv')
+    N['nn'] = {k: nn.groupby(['method', 'subject'])[k].mean().groupby('method').mean() for k in ('same', 'next')}
+    mb = open(os.path.join(R, 'mlp_bench_board_480mhz_cache.txt'), encoding='utf-8').read()
+    us = {m.group(1).strip(): float(m.group(2)) for m in re.finditer(r'^  (\S.*?)\s+n=\s*\d+\s+mean\s+([\d.]+) us', mb, re.M)}
+    N['mlpb'] = dict(lda_pred=us['ld_predict'], mlp_pred=us['mlp_predict'], lda_upd=us['lda cue update'] / 1000,
+                     mlp_upd=us['mlp fine-tune'] / 1000, lda_ram=int(re.search(r'ldacal static (\d+) B', mb).group(1)),
+                     mlp_ram=int(re.search(r'mlp static (\d+) B', mb).group(1)))
     N['bgate'] = dict(windows=int(float(bg['scored_windows'])), same=int(float(bg['same_class_as_pc'])),
                       gsame=int(float(bg['gated_same_as_pc'])), acc=float(bg['acc_board']))
     return N
@@ -683,6 +699,58 @@ def build(out):
                                     (f'任務標籤同次 +{sm["cue1_soft"] - sm["cue1"]:.0f} 點，換下一次只剩 +{nx["cue1_soft"] - nx["cue1"]:.1f}（不顯著）', {'bullet': True, 'color': CORAL}),
                                     ('DB6 分不出「時間相鄰」和「只適應本次配戴」：要靠先導實驗', {'bullet': True})], size=14, space=8)
 
+    # 19 FreeRTOS
+    rt = N['rtos']
+    s = d.slide('結果⑧：即時架構改用 FreeRTOS：學習再忙也不拖慢控制', notes=(
+        'report 35.36–35.37。FreeRTOS V10.6.2（STM32CubeH7 附），全部靜態配置；rt_lda.c 等核心與 CubeMX 檔案都沒改。'
+        '同一段 11.5 分鐘錄音（受試者 0，含任務標籤）在板上重放三次：裸機、RTOS、RTOS＋低優先 task 人工滿載（idle 0%）。'
+        '延遲在 PC 端量（送出完成視窗的封包到收到 PRED，含 USB），偶發 10–25 ms 的最大值每次都有、裸機也有。'))
+    layers = [('USART3 中斷（最高）', '收樣本 → 環形緩衝', LIGHT, INK), ('rx task（高優先）', '特徵、分類、指令', TEAL, WHITE),
+              ('learn task（低優先）', 'LDA 求解、任務標籤更新', TEAL_L, INK), ('idle', 'WFI 睡眠', LIGHT, INK)]
+    for i, (h_, b_, fill, col) in enumerate(layers):
+        bx = box(s, 0.6, 1.5 + i * 0.98, 4.2, 0.82, fill=fill)
+        label_in(bx, [(h_, {'bold': True}), b_], size=13, color=col)
+    text(s, 0.6, 5.5, 4.2, 1.0, [f'實測 stack：rx {rt["rx_stack"]} B、learn {rt["learn_stack"]} B（各配 2 KB）',
+                                  f'平常 CPU idle {rt["idle"]:.1f}%'], size=13, color=GREY, space=4)
+    cd = CategoryChartData()
+    cd.categories = ['P50', 'P95', 'P99']
+    for name, k in (('裸機', 'bare'), ('FreeRTOS', 'rtos'), (f'FreeRTOS＋學習滿載（idle {rt["idle_stress"]:.0f}%）', 'stress')):
+        cd.add_series(name, [round(v, 2) for v in rt['lat'][k]])
+    gf = s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(5.1), Inches(1.45), Inches(7.6), Inches(4.3), cd)
+    chart_style(gf.chart, legend=True, vmax=9, vmin=0, fmt='0.00', label_size=11, axis_size=13)
+    color_series(gf.chart, [MUTE, '7FB7B9', TEAL])
+    text(s, 5.1, 5.75, 7.6, 0.4, '分類延遲（ms，PC 送出 → 收到結果）', size=12, color=GREY)
+    box(s, 5.1, 6.1, 7.6, 0.7, fill=TEAL_L)
+    text(s, 5.3, 6.15, 7.3, 0.6, f'三種版本都 {rt["same"]:,}／{rt["windows"]:,} 視窗和 PC 相同；學習 task 佔 {rt["learn_stress"]:.0f}% CPU 時延遲不變',
+         size=14, bold=True, anchor=MSO_ANCHOR.MIDDLE)
+
+    # 20 why LDA, not a neural network
+    nn, mb = N['nn'], N['mlpb']
+    s = d.slide('結果⑨：為什麼用 LDA，不用神經網路', notes=(
+        'report 35.38–35.39。DB6 10 人 8 類，每次配戴只有一輪提示（每類 10 個視窗）。MLP 80-64-32-8，設定事先寫定、未調參，3 個 seed。'
+        '判準 R13（可在 MCU 更新的網路最好的一個沒有贏 LDA ≥ 2 點）通過。板上實測：DB6 受試者 1，同一份資料，C 版與 float64 參考預測完全相同。'
+        '未比：原始訊號 CNN、int8 CMSIS-NN、跨使用者大模型。'))
+    cd = CategoryChartData()
+    cd.categories = ['同一個 session', '下一個 session']
+    series = [('LDA 一輪提示＋累加（本研究）', 'lda_cue1', TEAL), ('MLP 微調', 'mlp_ft', '7FB7B9'), ('MLP 累積微調', 'mlp_ft_cum', GREY),
+              ('MLP＋LDA 輸出層', 'mlp_head_lda', CORAL), ('MLP 重新訓練（MCU 做不到）', 'mlp_retrain', MUTE)]
+    for name, m, _ in series:
+        cd.add_series(name, [round(nn['same'][m], 1), round(nn['next'][m], 1)])
+    gf = s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(0.6), Inches(1.45), Inches(6.9), Inches(4.6), cd)
+    chart_style(gf.chart, legend=True, vmax=62, vmin=30, label_size=10, axis_size=12)
+    color_series(gf.chart, [c for _, _, c in series])
+    text(s, 0.6, 6.05, 6.9, 0.4, 'NinaPro DB6 8 類準確率 %，10 人', size=12, color=GREY)
+    rows = [['板上實測（480 MHz）', 'LDA', 'MLP'],
+            ['分類一個視窗', f'{mb["lda_pred"]:.1f} µs', f'{mb["mlp_pred"]:.1f} µs'],
+            ['一次提示輪更新', f'{mb["lda_upd"]:.1f} ms', f'{mb["mlp_upd"]:,.0f} ms'],
+            ['靜態 RAM', f'{mb["lda_ram"] / 1024:.1f} KB', f'{mb["mlp_ram"] / 1024:.1f} KB'],
+            ['更新方式', '閉式解', '反向傳播 30 epoch']]
+    table(s, 7.8, 1.5, 4.9, rows, [2.1, 1.3, 1.5], size=13, row_h=0.62, fills={(i, 1): TEAL_L for i in range(1, 5)})
+    box(s, 7.8, 4.85, 4.9, 1.6, fill=LIGHT)
+    text(s, 8.0, 4.95, 4.55, 1.45, [('能在 MCU 上更新的 MLP 都沒贏 LDA；相同資料從頭重訓也只打平', {'bold': True}),
+                                    (f'LDA 更新快約 {mb["mlp_upd"] / mb["lda_upd"]:.0f} 倍、分類快約 {mb["mlp_pred"] / mb["lda_pred"]:.0f} 倍', {'color': TEAL, 'bold': True}),
+                                    ('未比：原始訊號 CNN、int8 CMSIS-NN', {'color': GREY, 'size': 12})], size=14, space=5)
+
     # 18 negative results
     s = d.slide('負面結果與更正（會寫進論文）', notes='出處：report 35.4、35.8、35.9–35.10、35.16–35.21、35.31–35.32。另：「開機序列第一輪比第二輪差」只在開發資料看得到，已撤回。')
     neg = [('自己提出的葉節點計數', '輸給收縮 LDA，退為對照組'),
@@ -708,7 +776,7 @@ def build(out):
             ['任務引導的軟標籤＋出力判斷＋一輪提示，用在離散機械臂指令', '模擬＋公開資料', '中（換次後效果不明，待實機）'],
             ['系統性掃描任務標籤錯誤率，並和 CIIL 各策略比較', '模擬完成', '中高（檢索中沒找到別人做過）'],
             ['量化任務結構強弱的影響', '模擬完成', '中'],
-            ['完整學習迴路在 MCU 上逐一驗證、即時運作；機器人只回傳 2 個位元組', '完成', '工程貢獻']]
+            ['完整學習迴路在 MCU 上逐一驗證（裸機與 FreeRTOS）；和 MLP 的板上比較', '完成', '工程貢獻']]
     fills = {(i, 1): TEAL_L for i in (1, 2, 6)}
     fills.update({(i, 1): 'FBE3DD' for i in (3, 4, 5)})
     table(s, 0.6, 1.5, 12.1, rows, [7.6, 1.6, 2.9], size=14, row_h=0.62, fills=fills)
@@ -728,13 +796,38 @@ def build(out):
     table(s, 0.6, 1.5, 12.1, rows, [3.0, 3.4, 1.7, 1.6, 2.4], size=14, row_h=0.68,
           fills={(6, j): TEAL_L for j in range(5)})
 
+    # self-test (next step)
+    s = d.slide('下一步：自我測試——任務標籤在同一次配戴中有沒有用', notes=(
+        'report 35.35；lab_kit/SELFTEST.md、src/selftest_analysis.py（判準在錄之前已 commit）。DB6 回答不了這個問題（同一手勢連續錄，35.32）。'
+        '用自己的筆電：Trigno SDK（TCU）已安裝；板子已燒 LDA 韌體。自我測試的資料只用來決定方向；要發表需 IRB 核准的先導實驗。'))
+    steps = [('提示輪', '8 秒、中立姿勢'), ('P0', '提示手勢 6×2'), ('T1', '任務指令 40 次'), ('P1', '提示手勢 6×2'),
+             ('T2', '任務指令 40 次'), ('P2', '提示手勢 6×2')]
+    for i, (h_, b_) in enumerate(steps):
+        x = 0.6 + i * 2.07
+        bx = box(s, x, 1.5, 1.8, 1.05, fill=TEAL if h_ in ('T1', 'T2') else LIGHT)
+        label_in(bx, [(h_, {'bold': True}), b_], size=13, color=WHITE if h_ in ('T1', 'T2') else INK)
+        if i < 5:
+            arrow(s, x + 1.83, 1.85, 0.2, 0.32)
+    text(s, 0.6, 2.65, 12.1, 0.4, 'T1 之後的段落改用操作機器人的姿勢（往前伸、抬高、往外），每 10 次換一次；手勢隨機穿插', size=13, color=GREY)
+    box(s, 0.6, 3.25, 5.9, 2.75, fill=LIGHT)
+    text(s, 0.85, 3.4, 5.5, 2.5, [('比較（同一份錄音離線重放）', {'size': 17, 'bold': True}),
+                                  ('只做提示輪 vs 加任務軟標籤', {'bullet': True}),
+                                  ('也比硬標籤、P-CIIL，以及只用 T1 的標籤（5–10 分鐘前的標籤還有沒有用）', {'bullet': True}),
+                                  ('第 2 天起：自己真實的跨日重戴效果', {'bullet': True})], size=14, space=6)
+    box(s, 6.8, 3.25, 5.9, 2.75, fill=TEAL_L)
+    text(s, 7.05, 3.4, 5.5, 2.5, [('判準 R12（錄之前已寫定）', {'size': 17, 'bold': True}),
+                                  ([('GO', {'bold': True, 'color': TEAL}), '：P1、P2 平均多 ≥ 2 點且多數天為正 → 任務標籤留在主軸'], {'bullet': True}),
+                                  ([('NO-GO', {'bold': True, 'color': CORAL}), '：≤ 0 → 寫成負面結果，主軸改為短提示＋MCU 部署'], {'bullet': True}),
+                                  ('其他或天花板 → 交給多人先導實驗', {'bullet': True})], size=14, space=6)
+    text(s, 0.6, 6.25, 12.1, 0.5, '自己 1 人、2–4 天、每天約 20 分鐘；不需要 Kinova；只用來決定方向，要發表需 IRB 核准的多人實驗', size=13, color=GREY)
+
     # 19 plan
     s = d.slide('實驗規劃與時程（草案）', notes='時程是草案，待與指導老師討論；病患個案視醫院合作與 IRB 時程，不綁畢業條件。')
-    plan = [('自我測試：實機抓放，量機器人成功判斷的錯誤率', 0, 1),
-            ('能量量測；真機整條接起來', 1, 2),
-            ('先導實驗（健常人、跨日）', 2, 4),
-            ('正式實驗（健常人）', 4, 6),
-            ('病患個案（視醫院合作與 IRB）', 4, 7),
+    plan = [('自我測試；12 月中進度報告', 0, 2),
+            ('EMBC 2027 投稿（公開資料：獨立檢驗）', 1, 3),
+            ('IRB；能量量測；真 Kinova 整條接起來', 1, 3),
+            ('先導實驗（健常人、跨日）', 3, 5),
+            ('正式實驗／病患個案（視 IRB）', 5, 7),
             ('分析與撰寫', 6, 8)]
     months = ['11月', '12月', '1月', '2月', '3月', '4月', '5月', '6月']
     x0, cw = 5.6, 0.89

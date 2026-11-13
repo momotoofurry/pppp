@@ -219,7 +219,7 @@ def costs():
     rows = [('MLP 80-64-32-8', params, params * 4, params, act, macs,
              f'backprop: ~3 x {macs:,} MACs x 80 windows x {EPF} epochs = {3 * macs * 80 * EPF / 1e6:.1f} M MACs per cued pass'),
             ('LDA (ldacal.c)', 80 * 8 + 8, (80 * 8 + 8) * 4, 80 * 8 + 8, 8 * 4, 80 * 8,
-             'closed form: running sums (80 x 80 + 8 x 80 + 8 floats = 27.8 KB) + one 80 x 80 solve (ld_fit 3.9 ms on the board)'),
+             'closed form: running sums (80 x 80 + 8 x 80 + 8 floats = 27.5 KB, 1 KB = 1024 B) + one 80 x 80 solve (ld_fit 3.9 ms on the board)'),
             ('MLP hidden + LDA head', params, params * 4, params, act, macs,
              f'closed form on 32 activations: sums 32 x 32 + 8 x 32 + 8 floats = {(32 * 32 + 8 * 32 + 8) * 4 / 1024:.1f} KB')]
     return pd.DataFrame(rows, columns=['model', 'params', 'flash_float32_B', 'flash_int8_B', 'activations_B',
