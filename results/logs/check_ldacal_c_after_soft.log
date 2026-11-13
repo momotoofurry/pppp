@@ -1,0 +1,15 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+static bytes (PC build): 30132
+PASS ld_fit refuses when a class has no window
+PASS zero covariance: refused (-2), no crash
+[Parallel(n_jobs=19)]: Done  12 out of  40 | elapsed:   10.4s remaining:   24.4s
+[Parallel(n_jobs=19)]: Done  21 out of  40 | elapsed:   10.8s remaining:    9.7s
+[Parallel(n_jobs=19)]: Done  30 out of  40 | elapsed:   12.0s remaining:    4.0s
+[Parallel(n_jobs=19)]: Done  40 out of  40 | elapsed:   12.9s finished
+ shift mode  runs  windows  agree    acc_py     acc_c  max_rho_diff  max_dist_rel_diff  rho_last  agree_pct
+   0.0  cum    20    48000  48000 91.404167 91.404167      0.000001           0.000012  0.062037      100.0
+   0.0    r    20    48000  48000 84.977083 84.977083      0.000002           0.000004  0.413228      100.0
+   0.5  cum    20    48000  48000 88.452083 88.452083      0.000001           0.000018  0.049592      100.0
+   0.5    r    20    48000  48000 81.968750 81.968750      0.000001           0.000005  0.356880      100.0
+ text  data   bss  max_stack_frame
+ 1936     0 30132               96

@@ -1,0 +1,7 @@
+       subjects  commands  max_q_diff  q_argmax_same  agree_min  agree_mean   acc_py    acc_c
+shift                                                                                        
+0.0          20      6000    0.000063          100.0      100.0       100.0  92.9875  92.9875
+0.5          20      6000    0.000040          100.0      100.0       100.0  90.4875  90.4875
+Cortex-M7 ldacal.o with the soft-label functions:
+ text  data   bss  max_stack_frame
+ 1936     0 30132               96

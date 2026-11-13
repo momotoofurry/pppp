@@ -33,3 +33,10 @@ int ld_predict(const int16_t *x);
 float ld_dist2(const int16_t *x, int c);
 float ld_shrinkage(void);                            /* rho of the last ld_fit */
 unsigned ld_static_bytes(void);
+/* Soft task labels (report 35.18, 35.22). A command's windows are learned with a weight q[c] per class instead of
+ * one label: the outer-product sum needs no label, only the class sums and weights are weighted, so the memory is
+ * unchanged. ld_soft_q computes q(c) ~ prior(c) exp(beta * mean discriminant of c over the rows) with the current
+ * model and returns argmax q; ld_decay(f) scales all sums by f (forgetting, 0.97 per learned command on the PC). */
+void ld_add_soft(const int16_t *x, const float *q);
+void ld_decay(float f);
+int ld_soft_q(const int16_t *rows, int nrows, const float *prior, float beta, float *q);

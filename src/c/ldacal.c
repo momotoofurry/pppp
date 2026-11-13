@@ -8,7 +8,7 @@
 
 static float s_g[LD_TRI];                       /* sum of x x^T over all labelled windows */
 static float s_sum[LD_CLASSES][LD_DIM];
-static uint32_t s_n[LD_CLASSES];
+static float s_n[LD_CLASSES];                   /* weight per class (a count with hard labels) */
 static float s_l[LD_TRI];                       /* work: covariance, then its Cholesky factor */
 static float s_w[LD_CLASSES][LD_DIM];
 static float s_b[LD_CLASSES];
@@ -41,7 +41,7 @@ void ld_add(const int16_t *x, int label)
             *g++ += xi * s_x[j];
         s_sum[label][i] += xi;
     }
-    s_n[label]++;
+    s_n[label] += 1.0f;
 }
 
 float ld_shrinkage(void)
@@ -51,19 +51,19 @@ float ld_shrinkage(void)
 
 int ld_fit(void)
 {
-    uint32_t n_all = 0;
+    float n_all = 0.0f;
     for (int c = 0; c < LD_CLASSES; c++) {
-        if (!s_n[c])
+        if (!(s_n[c] > 0.0f))
             return -1;
         n_all += s_n[c];
     }
-    const float inv_n = 1.0f / (float)n_all;
+    const float inv_n = 1.0f / n_all;
     /* S = (G - sum_c s_c s_c^T / n_c) / N */
     for (int i = 0; i < LD_DIM; i++)
         for (int j = 0; j <= i; j++) {
             float v = s_g[TRI(i, j)];
             for (int c = 0; c < LD_CLASSES; c++)
-                v -= s_sum[c][i] * s_sum[c][j] / (float)s_n[c];
+                v -= s_sum[c][i] * s_sum[c][j] / s_n[c];
             s_l[TRI(i, j)] = v * inv_n;
         }
     /* OAS shrinkage */
@@ -82,7 +82,7 @@ int ld_fit(void)
         tot += s_g[TRI(i, i)];
     if (!(mu > 1e-5f * tot * inv_n / LD_DIM))
         return -2;
-    const float num = alpha + mu * mu, den = ((float)n_all + 1.0f) * (alpha - mu * mu / LD_DIM);
+    const float num = alpha + mu * mu, den = (n_all + 1.0f) * (alpha - mu * mu / LD_DIM);
     float rho = (den == 0.0f || num / den > 1.0f) ? 1.0f : num / den;
     for (int k = 0; k < LD_TRI; k++)
         s_l[k] *= 1.0f - rho;
@@ -105,7 +105,7 @@ int ld_fit(void)
     /* w_c = C^-1 m_c, b_c = -m_c.w_c / 2 */
     for (int c = 0; c < LD_CLASSES; c++) {
         float *w = s_w[c];
-        const float inv = 1.0f / (float)s_n[c];
+        const float inv = 1.0f / s_n[c];
         for (int i = 0; i < LD_DIM; i++) {      /* L y = m */
             float v = s_sum[c][i] * inv;
             for (int k = 0; k < i; k++)
@@ -143,7 +143,7 @@ int ld_scores(const int16_t *x, float *scores)
 
 float ld_dist2(const int16_t *x, int c)
 {
-    const float inv = 1.0f / (float)s_n[c];
+    const float inv = 1.0f / s_n[c];
     float d = 0.0f;
     for (int i = 0; i < LD_DIM; i++) {          /* L z = x - m_c, z kept in s_x */
         float v = (float)x[i] / LD_Q - s_sum[c][i] * inv;
@@ -159,4 +159,62 @@ int ld_predict(const int16_t *x)
 {
     float s[LD_CLASSES];
     return ld_scores(x, s);
+}
+
+void ld_add_soft(const int16_t *x, const float *q)
+{
+    for (int i = 0; i < LD_DIM; i++)
+        s_x[i] = (float)x[i] / LD_Q;
+    float *g = s_g;
+    for (int i = 0; i < LD_DIM; i++) {
+        const float xi = s_x[i];
+        for (int j = 0; j <= i; j++)
+            *g++ += xi * s_x[j];
+    }
+    for (int c = 0; c < LD_CLASSES; c++) {
+        if (q[c] == 0.0f)
+            continue;
+        for (int i = 0; i < LD_DIM; i++)
+            s_sum[c][i] += q[c] * s_x[i];
+        s_n[c] += q[c];
+    }
+}
+
+void ld_decay(float f)
+{
+    for (int k = 0; k < LD_TRI; k++)
+        s_g[k] *= f;
+    for (int c = 0; c < LD_CLASSES; c++) {
+        for (int i = 0; i < LD_DIM; i++)
+            s_sum[c][i] *= f;
+        s_n[c] *= f;
+    }
+}
+
+int ld_soft_q(const int16_t *rows, int nrows, const float *prior, float beta, float *q)
+{
+    float m[LD_CLASSES] = {0}, s[LD_CLASSES];
+    for (int r = 0; r < nrows; r++) {
+        ld_scores(rows + r * LD_DIM, s);
+        for (int c = 0; c < LD_CLASSES; c++)
+            m[c] += s[c];
+    }
+    float top = m[0] / (float)nrows;
+    for (int c = 0; c < LD_CLASSES; c++) {
+        m[c] /= (float)nrows;
+        if (m[c] > top)
+            top = m[c];
+    }
+    float tot = 0.0f;
+    int best = 0;
+    for (int c = 0; c < LD_CLASSES; c++) {
+        q[c] = prior[c] * expf(beta * (m[c] - top));
+        tot += q[c];
+    }
+    for (int c = 0; c < LD_CLASSES; c++) {
+        q[c] /= tot;
+        if (q[c] > q[best])
+            best = c;
+    }
+    return best;
 }
