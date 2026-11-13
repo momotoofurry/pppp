@@ -15,6 +15,23 @@
 - 隨身碟的 `lab_kit`：`TrignoBridge.exe`、`TaskScreen.exe`、`run.bat`、`selftest_task.bat`。
 - 不需要 Kinova。
 
+## 用自己的筆電（建議）
+這台筆電已經裝了 Trigno SDK：TCU 本體是 `C:\Program Files (x86)\Delsys, Inc\Trigno SDK\TPMControlUtility.exe`，Trigno 驅動也在。工具在 `Downloads\lab_kit_selftest`（2026-11-14 用最新原始碼編譯）。
+
+好處：
+- TCU、橋接程式、提示畫面、板子都在同一台電腦上，不用隨身碟。
+- 錄之前可以在同一台電腦燒好 LDA 韌體，錄完馬上分析、還原凍結版。
+- 板子在這台電腦上是 **COM6**。
+
+**第一次先做（只做一次，約 10 分鐘，可以在正式錄的前一天）**：
+1. Trigno 基地台用 USB 接筆電，開電源。開 `TPMControlUtility.exe`，確認 8 個感測器都配對、燈有亮。只開 TCU，不要同時開 EMGworks。
+2. `probe.bat`：產生 `tcu_probe.txt`。
+   - 這是**第一次在真的 TCU 上確認通訊協定**。之前的程式是照 pytrigno 寫的，沒接過真機。
+   - 有任何錯誤，把這個檔給我。
+3. 戴上 1–2 個感測器，執行 `check.bat`（錄 60 秒）。它會報出實際的採樣率和每個通道的電壓範圍。
+   - 舊版 Trigno 基地台通常不是 2000 Hz，例如約 1926 Hz；以量到的數字為準。
+   - 之後的 `run.bat` 要加 `--rate <量到的數字>`。
+
 ## 姿勢（規則的一部分，要照做）
 - **中立**：前臂平放在桌上，手肘約 90°。
 - **操作姿勢**，三種輪流：
@@ -30,10 +47,10 @@
 1. 戴好 Trigno，**在帶子上做記號**，記下位置（照片或量距離）。第 2 天以後照記號戴，但不必刻意對準。
 2. 板子接電腦，開橋接程式：
    ```
-   run.bat COM5 T00_d1_A --firmware lda
+   run.bat COM6 T00_d1_A --firmware lda --rate <check.bat 量到的數字>
    ```
-   - COM 號碼看裝置管理員；第 2 天改成 `T00_d2_A`，第 3 天 `T00_d3_A`。
-   - TCU 不是 2000 Hz 時，照 `check.bat` 量到的加 `--rate <數字>`。
+   - 用自己的筆電時板子是 COM6，其他電腦看裝置管理員。第 2 天改成 `T00_d2_A`，第 3 天 `T00_d3_A`。
+   - TCU 剛好是 2000 Hz 時，可以不加 `--rate`。
 3. **一輪提示**，中立姿勢。在橋接視窗依序輸入，每個做 2 秒，畫面出現 `calend (auto, 2 s): you can relax` 再做下一個：
    ```
    cal 0   握拳（Power）
