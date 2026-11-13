@@ -15,7 +15,12 @@ rt_lda.c for comparison. Exploratory; the frozen firmware is restored afterwards
           duration, lost packets, diagnostics), and the latency = time the PRED packet arrived - time the packet
           completing the window was sent (PC clock, both ends).
           Writes results/board_replay_lda_windows.csv and board_replay_lda_summary.csv.
-Usage (in the container): python src/board_replay_lda.py make [--blocks 3]; ... decode
+  --task  (report 35.25) task labels: per block only the FIRST recording of every gesture is the cued start-up
+          sequence (one pass, 60 windows); after every other recording the robot side's RTL_TASK_LABEL (expected =
+          the recording's gesture with probability 0.8, else a random other one; valid = expected + two random
+          others; as check_rt_task.py) and a pause of TASK_PAUSE s. decode then also compares the RTL_EV_TASK
+          values (argmax of the soft label and floor(999 q)) of board and PC and reports the update times.
+Usage (in the container): python src/board_replay_lda.py make [--blocks 3] [--task --tag _task]; ... decode
 """
 import argparse
 import ctypes
@@ -40,7 +45,9 @@ FS = 2000.0
 WIN_PER_REC = 19
 PAUSE = 0.5                                              # after FIT: the fit runs in the main loop
 EV = {1: 'fit', 3: 'lost', 4: 'label_full', 9: 'diag_rx_hw', 10: 'diag_stack', 11: 'diag_rx_ovf', 12: 'diag_rx_err',
-      16: 'forgot', 17: 'fit_us'}
+      16: 'forgot', 17: 'fit_us', 18: 'task', 19: 'task_us'}
+TASK = False
+TASK_PAUSE = 0.05
 
 
 def make(blocks):
@@ -71,18 +78,25 @@ def make(blocks):
         t += PAUSE
 
     out.append((CR.ctl(enc, CR.SET_REPORT, bytes([1])), t))
+    rng = np.random.default_rng(SUBJECT)
     q, lab = CR.recordings(SUBJECT, 'calibration')
     for rec, y in zip(q, lab):
         recording(rec, y)
     fit()
     for b in range(blocks):
         q, lab = CR.recordings(SUBJECT, f'testing_block{b}')
-        anc = np.sort(np.concatenate([np.flatnonzero(lab == c)[:2] for c in range(6)]))
+        anc = np.sort(np.concatenate([np.flatnonzero(lab == c)[:1 if TASK else 2] for c in range(6)]))
         for r in anc:
             recording(q[r], lab[r])
         fit()
         for r in np.setdiff1d(np.arange(len(lab)), anc):
             recording(q[r], None, dict(block=b, rec=int(r), label=int(lab[r])))
+            if TASK:
+                g = int(lab[r])
+                e = g if (g < 5 and rng.random() < 0.8) else int(rng.choice([c for c in range(5) if c != g]))
+                mask = (1 << e) | sum(1 << int(c) for c in rng.choice([c for c in range(5) if c != e], 2, replace=False))
+                out.append((CR.ctl(enc, 12, bytes([e, mask])), t))
+                t += TASK_PAUSE
     os.makedirs(D, exist_ok=True)
     with open(os.path.join(D, 'stream.bin'), 'wb') as fh:
         fh.write(b''.join(p for p, _ in out))
@@ -162,6 +176,13 @@ def decode():
     sm.update(fits=len(fits), fits_ok=int(sum(v == 0 for v in fits)), fit_us_min=min(fus), fit_us_max=max(fus),
               lost_packets=int(sum(v for e, v in bs if e == 'lost')),
               pc_fits_ok=int(sum(v == 0 for e, v in ps if e == 'fit')))
+    if TASK:
+        bt, pt = [v for e, v in bs if e == 'task'], [v for e, v in ps if e == 'task']
+        tus = [v for e, v in bs if e == 'task_us']
+        sm.update(task_events_board=len(bt), task_events_pc=len(pt), task_values_equal=bt == pt,
+                  task_updates_board=int(sum(v >= 0 for v in bt)), task_none_board=int(sum(v == -1 for v in bt)),
+                  task_us_min=min(tus) if tus else -1, task_us_median=float(np.median(tus)) if tus else -1,
+                  task_us_max=max(tus) if tus else -1)
     for e in ('diag_rx_hw', 'diag_stack', 'diag_rx_ovf', 'diag_rx_err'):
         v = [x for k, x in bs if k == e]
         sm[e + '_max'] = max(v) if v else -1
@@ -177,9 +198,10 @@ def main():
     ap.add_argument('mode', choices=['make', 'decode'])
     ap.add_argument('--blocks', type=int, default=3)
     ap.add_argument('--tag', default='', help='e.g. _all: build/board_replay_lda_all, results/board_replay_lda_all_*')
+    ap.add_argument('--task', action='store_true')
     args = ap.parse_args()
-    global D, TAG
-    D, TAG = D + args.tag, args.tag
+    global D, TAG, TASK
+    D, TAG, TASK = D + args.tag, args.tag, args.task
     make(args.blocks) if args.mode == 'make' else decode()
 
 
