@@ -62,7 +62,9 @@ class FakeLink:
         return b
 
 
-def test_chain():
+def test_chain(ros=None):
+    """ros = 'host:port' of src/pc/sim/ros_relay.py: the simulated Gen3 in RViz instead of --sim (arm moves take
+    seconds at 20 deg/s, so the user rests ROS_REST_S after every gesture; the robot.csv end events are checked)"""
     import check_features_c as FC
     import check_rt_lda as R
     FC.lib()
@@ -104,10 +106,12 @@ def test_chain():
     tmp = tempfile.mkdtemp()
     p_cmd, p_task = 50656, 50659
     out_csv = os.path.join(tmp, 'robot.csv')
-    proc = subprocess.Popen([sys.executable, os.path.join(HERE, 'kinova_bridge.py'), 'run', '--sim', '--sim-s', '0.5',
-                             '--udp', str(p_cmd), '--task-labels', f'127.0.0.1:{p_task}', '--out', out_csv,
+    robot = ['--ros', ros, '--speed', '20'] if ros else ['--sim', '--sim-s', '0.5']
+    rest_s, seconds = (ROS_REST_S, 200) if ros else (0.6, 45)
+    proc = subprocess.Popen([sys.executable, os.path.join(HERE, 'kinova_bridge.py'), 'run'] + robot +
+                            ['--udp', str(p_cmd), '--task-labels', f'127.0.0.1:{p_task}', '--out', out_csv,
                              '--poses', os.path.join(HERE, 'sim', 'poses_sim.json'),
-                             '--seconds', '45'], stdout=subprocess.DEVNULL)
+                             '--seconds', str(seconds)], stdout=subprocess.DEVNULL)
     link, stop, got = FakeLink(), threading.Event(), []
     fw = threading.Thread(target=TB.task_forwarder, args=(p_task, link, PR.Encoder(), threading.Lock(), stop, got),
                           daemon=True)
@@ -141,12 +145,13 @@ def test_chain():
                 send(enc.packet(PR.SAMPLES, frames[i:i + PR.FRAMES_PER_PACKET].tobytes()))
                 pump()
                 time.sleep(max(0.0, t0 + (i + PR.FRAMES_PER_PACKET) / 2000.0 - time.time()))
-            for _ in range(60):                      # 0.6 s rest: the robot finishes, late labels arrive
+            t1 = time.time() + rest_s                # rest: the robot finishes, late labels arrive
+            while time.time() < t1:
                 pump()
                 time.sleep(0.01)
     finally:
         stop.set()
-        proc.wait(timeout=60)
+        proc.wait(timeout=seconds + 30)
     # the reference: an independent PickPlace fed with the commands the robot side took while idle (robot.csv)
     rows = [r.split(',') for r in open(out_csv).read().splitlines()[1:]]
     ref, want, j = TL.PickPlace(), [], 0
@@ -157,6 +162,8 @@ def test_chain():
                 e, mask, ok = ref.label(rows[j][2])
                 want.append((rows[j][2], int(rows[j][3]), e, mask, ok))
         j += 1
+    assert proc.returncode == 0, f'kinova_bridge.py exited with {proc.returncode}'
+    assert want, 'the robot side took no command'
     labels_sent = [(e, m, w) for _, w, e, m, _ in want if e is not None]
     assert got == labels_sent, (got, labels_sent)
     assert len(task_ev) == len(labels_sent), (task_ev, labels_sent)
@@ -167,6 +174,14 @@ def test_chain():
     busy = [r[2] for r in rows if r[1] == 'busy']
     assert invalid == [n for n, _, _, _, ok in want if not ok], (invalid, want)
     assert started == [n for n, _, _, _, ok in want if ok], (started, want)
+    ends = [r for r in rows if r[1] in ('end', 'abort')]
+    durations = []
+    for r in rows:
+        if r[1] == 'start':
+            t_start = float(r[0])
+        elif r[1] in ('end', 'abort'):
+            durations.append((r[2], r[1], round((float(r[0]) - t_start) / 1000, 2)))
+    assert len(ends) == len(started) and all(r[1] == 'end' for r in ends), ends
     # a late label: a new command is kept on the MCU, a label for an older window must be refused, the right one taken
     c0 = len(cmds)
     for g in (3, 0, 2):
@@ -187,9 +202,15 @@ def test_chain():
           f'({", ".join(n for n, *_ in want)}), {len(busy)} arrived while it moved; {len(labels_sent)} labels '
           f'kinova_bridge.py -> UDP -> trigno_bridge forwarder -> rt_lda.c: {applied} applied, {stale} refused as '
           f'late for an older command; {len(started)} executed, {len(invalid)} not valid in the task and not executed')
+    print('robot actions (command, event, seconds):', durations)
     return want
 
 
+ROS_REST_S = 5.0
+
 if __name__ == '__main__':
-    test_model()
-    test_chain()
+    if '--ros' in sys.argv:
+        test_chain(sys.argv[sys.argv.index('--ros') + 1])
+    else:
+        test_model()
+        test_chain()
