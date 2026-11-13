@@ -211,7 +211,12 @@ def session(mdl, cfg, pools, apools, thr, rng, rng_e, p_dev, e, kind='random'):
         busy = t < busy_until
         if hasattr(mdl, 'tick'):
             mdl.tick()
-        pred = int(np.argmax(mdl.scores(row[None])[0]))
+        sc = mdl.scores(row[None])[0]
+        pred = int(np.argmax(sc))
+        if cfg.get('rej'):                                # Scheme et al. 2013: LDA posterior below the threshold -> no motion
+            pz = np.exp(sc - sc.max())
+            if pz.max() / pz.sum() < cfg['rej']:
+                pred = REST
         if cfg.get('act') and a < thr:
             pred = REST
         if pred == last:

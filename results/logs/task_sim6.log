@@ -1,0 +1,60 @@
+shift 0.0: grid-best (tau, lambda) on this data = (np.float64(0.6), np.float64(0.9)), 86.67 %
+LDAMA (tau 0.7, lambda 0.0)                            82.85
+LDACMA (tau 0.8, lambda 0.8)                           85.50
+LDAnew (tau 1.0, lambda 1.0)                           82.50
+grid best (tau 0.6, lambda 0.9), tuned on this data    86.67
+ours: fixed                                            76.41
+ours: cue1                                             90.80
+ours: cue2                                             93.49
+ours: cue1_soft                                        93.17
+  cue1 - LDACMA (tau 0.8, lambda 0.8): +5.30 (+3.61, +6.98), better 19 worse 1
+  cue1_soft - LDACMA (tau 0.8, lambda 0.8): +7.67 (+5.76, +9.58), better 20 worse 0
+  cue1 - grid best (tau 0.6, lambda 0.9), tuned on this data: +4.13 (+2.69, +5.57), better 19 worse 1
+  cue1_soft - grid best (tau 0.6, lambda 0.9), tuned on this data: +6.50 (+4.79, +8.22), better 20 worse 0
+
+shift 0.5: grid-best (tau, lambda) on this data = (np.float64(0.7), np.float64(0.7)), 82.60 %
+LDAMA (tau 0.7, lambda 0.0)                            78.57
+LDACMA (tau 0.8, lambda 0.8)                           82.40
+LDAnew (tau 1.0, lambda 1.0)                           79.86
+grid best (tau 0.7, lambda 0.7), tuned on this data    82.60
+ours: fixed                                            60.43
+ours: cue1                                             88.04
+ours: cue2                                             91.59
+ours: cue1_soft                                        90.85
+  cue1 - LDACMA (tau 0.8, lambda 0.8): +5.65 (+4.14, +7.15), better 20 worse 0
+  cue1_soft - LDACMA (tau 0.8, lambda 0.8): +8.46 (+6.50, +10.41), better 20 worse 0
+    R6: PASS
+  cue1 - grid best (tau 0.7, lambda 0.7), tuned on this data: +5.44 (+3.96, +6.92), better 20 worse 0
+  cue1_soft - grid best (tau 0.7, lambda 0.7), tuned on this data: +8.25 (+6.25, +10.25), better 19 worse 1
+
+                       probe_after  false_rest_pct  wrong_action_pct    done  total_s  rest_open  gesture_blocked  thr_ratio
+shift base      front                                                                                                       
+0.0   cue1_soft act          93.17            0.36              1.94   96.75    89.51       8.72             2.30       1.00
+                act_s        93.24            0.45              1.92   98.75    84.11      33.45             0.98       0.77
+                none         93.27            0.30              1.83  100.00    80.74       8.72             0.00       1.00
+                rej          92.81            0.29              1.70   99.25    84.45       8.72             0.00       1.00
+      pn        act          89.80            0.78              3.44   96.00    84.02       8.72             2.30       1.00
+                act_s        88.57            2.57              4.99   97.00    81.24      33.45             0.98       0.77
+                none         85.53            7.57             10.09   83.00   112.36       8.72             0.00       1.00
+                rej          86.59            2.88              4.92   81.00   120.28       8.72             0.00       1.00
+0.5   cue1_soft act          90.85            0.16              2.21   87.00   114.79       2.05             6.62       1.00
+                act_s        90.99            0.32              2.40   93.75    98.56      15.48             3.92       0.77
+                none         91.26            0.40              2.44  100.00    81.79       2.05             0.00       1.00
+                rej          90.46            0.27              2.16   98.00    89.71       2.05             0.00       1.00
+      pn        act          80.89            0.29              3.78   84.75   112.33       2.05             6.62       1.00
+                act_s        80.14            1.56              4.77   91.75    95.12      15.48             3.92       0.77
+                none         72.76           19.78             23.76   54.75   175.87       2.05             0.00       1.00
+                rej          71.75            8.59             11.17   59.50   169.40       2.05             0.00       1.00
+  shift 0.0 pn: probe act - act_s = +1.23 (+0.33, +2.12)
+  shift 0.0 pn: probe act - rej = +3.21 (+1.83, +4.59)
+  shift 0.0 pn: probe act - none = +4.26 (+2.40, +6.13)
+  shift 0.0 cue1_soft: probe act - act_s = -0.06 (-0.50, +0.37)
+  shift 0.0 cue1_soft: probe act - rej = +0.36 (-0.05, +0.78)
+  shift 0.0 cue1_soft: probe act - none = -0.10 (-0.36, +0.17)
+  shift 0.5 pn: probe act - act_s = +0.75 (-0.26, +1.76)
+  shift 0.5 pn: probe act - rej = +9.14 (+6.72, +11.56)
+  shift 0.5 pn: probe act - none = +8.13 (+5.81, +10.45)
+  shift 0.5 cue1_soft: probe act - act_s = -0.14 (-0.55, +0.27)
+  shift 0.5 cue1_soft: probe act - rej = +0.39 (-0.32, +1.10)
+  shift 0.5 cue1_soft: probe act - none = -0.40 (-0.99, +0.18)
+R7: no cued pass, shift 0.5: false_rest act 0.29 % vs act_s 1.56 %, probe act - act_s +0.75 -> KEEP our threshold

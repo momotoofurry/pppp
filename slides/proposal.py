@@ -485,7 +485,7 @@ def build(out):
     text(s, 7.2, 2.3, 5.2, 0.9, '8 個通道的訊號強度加總 < 門檻 → 當作休息', size=16, bold=True)
     text(s, 7.2, 3.25, 5.2, 3.2, ['加總對束帶轉動不變：電極偏移時仍可靠',
                                    '休息時不送指令、也不產生標籤',
-                                   '任務標籤的錯誤主要來自休息時的誤觸發，這一步把它們擋掉'], size=14, bullet=True, space=8)
+                                   '同類想法：Scheme 等（2013）的出力門檻；本研究的門檻誤觸發較少（35.30）'], size=14, bullet=True, space=8)
     ga0, ga5 = t2.loc[(0.0, 0.0, 'soft_act')].act_gate_acc, t2.loc[(0.5, 0.0, 'soft_act')].act_gate_acc
     ev = [(f'{ga0:.1f}%', '出力判斷單獨區分「休息／在出力」（無偏移）'), (f'{ga5:.1f}%', '同上，電極偏移半格'),
           ('不變', 'MCU 上的 RAM 與運算量（軟標籤只是加權）')]
@@ -689,7 +689,7 @@ def build(out):
             ['Campbell 等（2025）', '同上，從零開始', '每 50 ms', '假設完美', '虛擬游標／PC'],
             ['Gagné 等（2025）', '接觸物件＋候選握法平均', '每 50 ms', '假設完美', 'VR／PC'],
             ['Orlandi & Rossi（2026）', '游標靠近目標', '未說明', '—', '虛擬游標／GAP9'],
-            ['Vidovic 等（2016）', '短時提示校正（< 1 分鐘）', '—', '—', '義肢／PC'],
+            ['Vidovic 等（2016）', '短時提示校正（< 1 分鐘）；本資料上低 8 點', '—', '—', '義肢／PC'],
             ['本研究', '機械臂任務狀態機＋軟標籤', '一個指令一個', '掃 0–30%', '機械臂／Cortex-M7']]
     table(s, 0.6, 1.5, 12.1, rows, [3.0, 3.4, 1.7, 1.6, 2.4], size=14, row_h=0.68,
           fills={(6, j): TEAL_L for j in range(5)})
@@ -750,6 +750,7 @@ def build(out):
             'Orlandi, Rossi (2026). On-device context-informed incremental learning for myoelectric control on a RISC-V wearable platform. RISC-V Summit Europe demo.',
             'Vidovic et al. (2016). Improving the robustness of myoelectric pattern recognition for upper limb prostheses by covariate shift adaptation. IEEE TNSRE 24(9).',
             'Eddy, Campbell, Scheme, Bateman (2026). Open, accurate, and calibration-free muscle-computer interfaces. CHI 2026.',
+            'Scheme, Hudgins, Englehart (2013). Confidence-based rejection for improved pattern recognition myoelectric control. IEEE TBME 60(6).',
             'Zanghieri et al. (2024). sEMG-driven hand dynamics estimation with incremental online learning on a parallel ultra-low-power microcontroller. IEEE TBioCAS 18(4).',
             '＊Gilja et al. (2012). A high-performance neural prosthesis enabled by control algorithm design. Nature Neuroscience.',
             '＊Chen, Wiesel, Eldar, Hero (2010). Shrinkage algorithms for MMSE covariance estimation. IEEE Transactions on Signal Processing.']
