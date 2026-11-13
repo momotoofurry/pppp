@@ -24,11 +24,20 @@ static uint8_t s_report;
 static uint16_t s_tx_seq[3];                    /* COMMAND, PRED, STATUS */
 static float s_feat[FE_DIM];
 static int16_t s_q[FE_DIM];
+/* task labels: the current run of agreeing accepted windows, and the windows of the last command */
+static int16_t s_run[RTL_CMD_MAX][FE_DIM];
+static int s_run_n, s_run_cls = -1;
+static int16_t s_pend[RTL_CMD_MAX][FE_DIM];
+static int s_pend_n, s_pend_cls = -1;
+static uint8_t s_pend_open, s_pend_valid;
+static volatile uint8_t s_task_request;
+static float s_prior[LD_CLASSES];
 
 unsigned rtl_static_bytes(void)
 {
     return (unsigned)(sizeof s_cfg + sizeof s_pk + sizeof s_cnt + sizeof s_dc + sizeof s_lab_x + sizeof s_lab_y +
-                      sizeof s_mu + sizeof s_inv_sd + sizeof s_feat + sizeof s_q + sizeof s_tx_seq);
+                      sizeof s_mu + sizeof s_inv_sd + sizeof s_feat + sizeof s_q + sizeof s_tx_seq + sizeof s_run +
+                      sizeof s_pend + sizeof s_prior);
 }
 
 static uint32_t now(void)
@@ -64,6 +73,9 @@ static void stream_reset(void)
     fe_reset();
     dc_reset(&s_dc);
     s_win_since_reset = 0;
+    s_run_n = 0;
+    s_run_cls = -1;
+    s_pend_open = 0;                            /* the windows of the last command are kept for its label */
 }
 
 void rtl_init(const rtl_config_t *cfg)
@@ -82,6 +94,10 @@ void rtl_init(const rtl_config_t *cfg)
     s_new_session = 1;
     s_have_seq = 0;
     s_report = 0;
+    s_pend_valid = 0;
+    s_pend_n = 0;
+    s_pend_cls = -1;
+    s_task_request = 0;
 }
 
 /* one 100 ms feature vector (real-time context) */
@@ -91,7 +107,7 @@ static void on_window(void)
     if (s_win_since_reset++ < s_cfg.warmup)
         return;
     s_cnt.windows_used++;
-    if (s_fit_request) {                        /* the fit owns the session buffer and the model */
+    if (s_fit_request || s_task_request) {      /* the fit owns the session buffer and the model */
         s_cnt.skipped_busy++;
         return;
     }
@@ -119,6 +135,27 @@ static void on_window(void)
     if (accepted && s_cfg.dist2)
         accepted = ld_dist2(s_q, top) <= (float)s_cfg.dist2;
     s_cnt.classified++;
+    /* windows for the task label: the run of agreeing accepted windows; after a command, further windows of the
+     * same class are added to that command's windows until the class changes */
+    if (accepted) {
+        if (top != s_run_cls) {
+            s_run_cls = top;
+            s_run_n = 0;
+        }
+        if (s_run_n < RTL_CMD_MAX)
+            memcpy(s_run[s_run_n++], s_q, sizeof s_q);
+    } else {
+        s_run_n = 0;
+        s_run_cls = -1;
+    }
+    if (s_pend_open) {
+        if (accepted && top == s_pend_cls) {
+            if (s_pend_n < RTL_CMD_MAX)
+                memcpy(s_pend[s_pend_n++], s_q, sizeof s_q);
+        } else {
+            s_pend_open = 0;
+        }
+    }
     /* decision.c: k-window agreement and latch; an accepted window gives all the votes to its class, a rejected
      * one gives none (share 0 < 0.5: rejected, the run is broken) */
     uint16_t votes[DC_CLASSES] = {0};
@@ -149,6 +186,11 @@ static void on_window(void)
         p[11] = (uint8_t)(margin >> 8);
         send(PK_COMMAND, 0, p, 12);
         s_cnt.commands++;
+        memcpy(s_pend, s_run, (size_t)s_run_n * sizeof s_run[0]);
+        s_pend_n = s_run_n;
+        s_pend_cls = top;
+        s_pend_open = 1;
+        s_pend_valid = 1;
     }
 }
 
@@ -210,11 +252,39 @@ static void on_control(const uint8_t *p, uint16_t len)
             s_report = p[1];
         break;
     case RTL_FORGET:
-        if (!s_fit_request) {
+        if (!s_fit_request && !s_task_request) {
             ld_reset();
             s_mode = RTL_MODE_IDLE;
             s_new_session = 1;
+            s_pend_valid = 0;
             status(RTL_EV_FORGOT, 0);
+        }
+        break;
+    case RTL_TASK_LABEL:
+        if (len < 3 || s_fit_request || s_task_request)
+            break;
+        if (p[1] >= LD_CLASSES - 1) {
+            status(RTL_EV_TASK, -4);
+            break;
+        }
+        if (!s_pend_valid || s_mode != RTL_MODE_RUN || s_pend_n < 1) {
+            status(RTL_EV_TASK, -1);
+            break;
+        }
+        {
+            const int e = p[1];
+            int others = 0;
+            for (int c = 0; c < LD_CLASSES - 1; c++)
+                others += c != e && ((p[2] >> c) & 1u);
+            for (int c = 0; c < LD_CLASSES; c++)
+                s_prior[c] = RTL_P_INVALID;
+            s_prior[e] = others ? 1.0f - RTL_EPS : 1.0f - RTL_P0;
+            for (int c = 0; c < LD_CLASSES - 1; c++)
+                if (c != e && ((p[2] >> c) & 1u))
+                    s_prior[c] = RTL_EPS / (float)others;
+            s_prior[LD_CLASSES - 1] = RTL_P0;
+            s_pend_open = 0;
+            s_task_request = 1;
         }
         break;
     }
@@ -234,8 +304,28 @@ void rtl_rx(const uint8_t *bytes, uint32_t n)
     pk_feed(&s_pk, bytes, n, on_packet, 0);
 }
 
+static void task_update(void)
+{
+    const uint32_t t0 = now();
+    float q[LD_CLASSES];
+    const int a = ld_soft_q(s_pend[0], s_pend_n, s_prior, RTL_BETA, q);
+    ld_decay(RTL_DECAY);
+    for (int i = 0; i < s_pend_n; i++)
+        ld_add_soft(s_pend[i], q);
+    const int r = ld_fit();
+    s_pend_valid = 0;
+    s_cnt.task_labels++;
+    status(RTL_EV_TASK_US, (int32_t)(now() - t0));
+    status(RTL_EV_TASK, r == 0 ? a * 1000 + (int32_t)(q[a] * 999.0f) : r);
+    s_task_request = 0;
+}
+
 void rtl_idle(void)
 {
+    if (s_task_request) {
+        task_update();
+        return;
+    }
     if (!s_fit_request)
         return;
     const int n = (int)s_cnt.label_windows;

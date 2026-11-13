@@ -21,10 +21,22 @@
  *   RTL_SET_REJECT (5) margin_x100 u16, dist2 u16 (0 = off), k u8
  *   RTL_SET_REPORT (6) flags u8       bit 0: PK_PRED for every classified window
  *   RTL_FORGET (11)                   drop all accumulated labels (ld_reset), e.g. after the band was moved
+ *   RTL_TASK_LABEL (12) expected u8, valid u8
+ *                                     task label for the last command (report 35.18, 35.24): the robot side
+ *                                     tells which gesture the task expected (class 0-4) and which other gestures
+ *                                     were valid commands at that moment (bit c = class c). The MCU kept the
+ *                                     windows that made the command (the agreeing run, then further windows of
+ *                                     the same class, at most RTL_CMD_MAX). In thread context it builds the
+ *                                     prior (expected 1 - RTL_EPS, the other valid ones share RTL_EPS, Rest
+ *                                     RTL_P0, the rest RTL_P_INVALID; 1 - RTL_P0 if no other is valid), computes
+ *                                     the soft label q (ld_soft_q, beta RTL_BETA), forgets (ld_decay RTL_DECAY),
+ *                                     adds the windows with q (ld_add_soft) and refits. One label per command.
  * Status events (PK_STATUS): RTL_EV_FIT value = 0 or the error (-1 a gesture has no window in the sums, -2
  *   degenerate data, -3 fewer than RTL_LABEL_MIN session windows); RTL_EV_LOST packets lost; RTL_EV_LABEL_FULL
  *   session buffer full; RTL_EV_FORGOT; RTL_EV_FIT_US value = duration of the fit in microseconds (sent before
- *   RTL_EV_FIT; 0 without a time base).
+ *   RTL_EV_FIT; 0 without a time base). RTL_EV_TASK value = class x 1000 + floor(999 q[class]) of the soft
+ *   label's argmax after a task update, or < 0: -1 no command waiting for a label, -2 degenerate data, -4 bad
+ *   expected class; RTL_EV_TASK_US = duration of the task update in microseconds (sent before RTL_EV_TASK).
  * PK_PRED / PK_COMMAND: the field that carries the vote share for rt.c carries min(65535, margin x 100) here.
  */
 #pragma once
@@ -38,10 +50,19 @@
 #define RTL_LABEL_MAX 120               /* two cued passes of 6 gestures, 10 windows each */
 #endif
 #define RTL_LABEL_MIN 12
+#ifndef RTL_CMD_MAX
+#define RTL_CMD_MAX 16                  /* windows kept per command for its task label */
+#endif
+#define RTL_EPS 0.15f
+#define RTL_P0 0.05f
+#define RTL_P_INVALID 0.01f
+#define RTL_BETA 0.3f
+#define RTL_DECAY 0.97f
 
 enum { RTL_STREAM_RESET = 1, RTL_LABEL_START = 2, RTL_LABEL_END = 3, RTL_FIT = 4, RTL_SET_REJECT = 5,
-       RTL_SET_REPORT = 6, RTL_FORGET = 11 };
+       RTL_SET_REPORT = 6, RTL_FORGET = 11, RTL_TASK_LABEL = 12 };
 enum { RTL_EV_FIT = 1, RTL_EV_LOST = 3, RTL_EV_LABEL_FULL = 4, RTL_EV_FORGOT = 16, RTL_EV_FIT_US = 17,
+       RTL_EV_TASK = 18, RTL_EV_TASK_US = 19,
        /* diagnostics sent by the board main loop (app_rt_lda.c), same numbers as rt.h */
        RTL_EV_DIAG_RX_HW = 9, RTL_EV_DIAG_STACK = 10, RTL_EV_DIAG_RX_OVF = 11, RTL_EV_DIAG_RX_ERR = 12 };
 enum { RTL_MODE_IDLE = 0, RTL_MODE_LABEL = 1, RTL_MODE_RUN = 2 };
@@ -58,6 +79,7 @@ typedef struct {
 typedef struct {
     uint32_t windows, windows_used, classified, skipped_busy, commands, lost_packets, seq_gaps, label_windows, fits;
     int32_t fit_result;
+    uint32_t task_labels;                           /* task updates done */
 } rtl_counters_t;
 
 void rtl_init(const rtl_config_t *cfg);
