@@ -1,0 +1,82 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done  34 out of 320 | elapsed:   33.2s
+[Parallel(n_jobs=19)]: Done 124 out of 320 | elapsed:  1.3min
+[Parallel(n_jobs=19)]: Done 250 out of 320 | elapsed:  2.3min
+[Parallel(n_jobs=19)]: Done 320 out of 320 | elapsed:  3.0min finished
+shift 0.0: probe accuracy after the session (%)
+struct       fixed  known_goal  unknown_goal  free
+cond                                              
+fixed_model   76.4        76.4          76.4  76.4
+cue1          90.8        90.8          90.8  90.8
+oracle        90.9        90.6          90.7  90.6
+hard          90.4        87.6          88.1  84.3
+retro         89.5        84.2          87.8  81.4
+soft          85.5        84.5          85.2  79.4
+cue1_hard     92.8        90.8          92.7  91.0
+cue1_retro    92.2        89.4          92.3  91.2
+cue1_soft     93.3        92.9          92.9  92.6
+label error (%)
+struct      fixed  known_goal  unknown_goal  free
+cond                                             
+hard          6.3        13.3           1.7  12.6
+retro         9.1        18.5           6.8  17.7
+soft          7.9         9.8           9.2  18.0
+cue1_hard     5.5        13.0           0.6   3.1
+cue1_retro    8.0        15.9           3.9   5.9
+cue1_soft     1.5         1.1           1.1   2.3
+labels per executed action
+struct      fixed  known_goal  unknown_goal   free
+cond                                              
+hard         1.02        1.03          0.99   0.98
+retro        1.03        1.07          1.03   1.03
+soft        10.97       14.07         10.99  19.41
+cue1_hard    1.01        1.02          1.00   0.99
+cue1_retro   1.01        1.02          1.01   1.01
+cue1_soft    1.01        1.01          1.01   1.02
+shift 0.5: probe accuracy after the session (%)
+struct       fixed  known_goal  unknown_goal  free
+cond                                              
+fixed_model   60.4        60.4          60.4  60.4
+cue1          88.0        88.0          88.0  88.0
+oracle        83.7        82.7          82.9  83.0
+hard          82.0        74.0          61.9  48.5
+retro         80.9        69.4          56.7  49.1
+soft          45.4        47.3          46.9  45.9
+cue1_hard     90.7        86.0          88.9  82.6
+cue1_retro    89.9        85.6          87.7  83.7
+cue1_soft     91.0        90.7          90.5  89.9
+label error (%)
+struct      fixed  known_goal  unknown_goal  free
+cond                                             
+hard          5.4        19.0          13.9  42.2
+retro         8.8        24.9          17.7  42.9
+soft         66.5        62.0          63.3  58.9
+cue1_hard     5.1        16.3           1.6  11.3
+cue1_retro    7.6        17.4           6.6  12.9
+cue1_soft     1.2         1.4           1.3   3.4
+labels per executed action
+struct      fixed  known_goal  unknown_goal   free
+cond                                              
+hard         1.02        1.04          0.92   0.96
+retro        1.04        1.12          1.09   1.01
+soft        69.81       68.37         76.18  60.51
+cue1_hard    1.01        1.02          0.99   0.99
+cue1_retro   1.02        1.04          1.03   1.02
+cue1_soft    1.01        1.02          1.01   1.02
+plausible set size: {'fixed': 1.0, 'free': 2.82, 'known_goal': 0.99, 'unknown_goal': 1.62}
+shift 0.5 fixed         cue1_retro - cue1 = +1.89 (+0.58, +3.19)
+shift 0.5 fixed         cue1_soft - cue1 = +2.99 (+1.78, +4.20)
+shift 0.5 fixed         cue1_hard - cue1 = +2.63 (+1.27, +3.98)
+shift 0.5 fixed         retro - hard = -1.05 (-1.62, -0.49)
+shift 0.5 known_goal    cue1_retro - cue1 = -2.43 (-4.44, -0.41)
+shift 0.5 known_goal    cue1_soft - cue1 = +2.67 (+1.65, +3.68)
+shift 0.5 known_goal    cue1_hard - cue1 = -2.03 (-5.00, +0.94)
+shift 0.5 known_goal    retro - hard = -4.53 (-7.05, -2.01)
+shift 0.5 unknown_goal  cue1_retro - cue1 = -0.35 (-2.22, +1.51)
+shift 0.5 unknown_goal  cue1_soft - cue1 = +2.50 (+1.50, +3.51)
+shift 0.5 unknown_goal  cue1_hard - cue1 = +0.87 (-0.25, +2.00)
+shift 0.5 unknown_goal  retro - hard = -5.19 (-8.74, -1.64)
+shift 0.5 free          cue1_retro - cue1 = -4.34 (-7.51, -1.18)
+shift 0.5 free          cue1_soft - cue1 = +1.86 (+0.47, +3.26)
+shift 0.5 free          cue1_hard - cue1 = -5.40 (-8.81, -1.99)
+shift 0.5 free          retro - hard = +0.59 (-2.87, +4.04)

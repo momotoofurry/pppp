@@ -1,0 +1,16 @@
+# arm-none-eabi-size of the LDA main-line firmware (D:/stm32/blink_leaf/build/rtl/blink.elf, app_rt_lda.c, -DEMG_APP_RT=ON, Release -Os -g, gnu-tools-for-stm32 14.3.1); report 35.14
+.isr_vector            664   134217728
+.text                21044   134218392
+.rodata                648   134239440
+.ARM.extab               0   134240088
+.ARM                     8   134240088
+.init_array              4   134240096
+.fini_array              4   134240100
+.data                  104   603979776
+.bss                 95832   603979880
+._user_heap_stack     1536   536870912
+.ARM.attributes         46           0
+Total               385333
+
+   text	   data	    bss	    dec	    hex	filename
+  22372	    104	  97368	 119844	  1d424	build/rtl/blink.elf
