@@ -1,0 +1,3 @@
+# arm-none-eabi-size of the energy measurement firmware (build/energy, energy_bench.c + features.c + ldacal.c, Release); report 35.34
+   text	   data	    bss	    dec	    hex	filename
+  73080	    100	  58640	 131820	  202ec	build/energy/blink.elf

@@ -20,6 +20,8 @@ rt_lda.c for comparison. Exploratory; the frozen firmware is restored afterwards
           the recording's gesture with probability 0.8, else a random other one; valid = expected + two random
           others; as check_rt_task.py) and a pause of TASK_PAUSE s. decode then also compares the RTL_EV_TASK
           values (argmax of the soft label and floor(999 q)) of board and PC and reports the update times.
+  --gate K_X100 MODE  (report 35.32) RTL_SET_GATE right after SET_REPORT: the activity gate on the board; decode
+          compares the gated flag (PRED byte 12) of every scored window and the RTL_EV_GATE_THR values (nV).
 Usage (in the container): python src/board_replay_lda.py make [--blocks 3] [--task --tag _task]; ... decode
 """
 import argparse
@@ -45,9 +47,10 @@ FS = 2000.0
 WIN_PER_REC = 19
 PAUSE = 0.5                                              # after FIT: the fit runs in the main loop
 EV = {1: 'fit', 3: 'lost', 4: 'label_full', 9: 'diag_rx_hw', 10: 'diag_stack', 11: 'diag_rx_ovf', 12: 'diag_rx_err',
-      16: 'forgot', 17: 'fit_us', 18: 'task', 19: 'task_us'}
+      16: 'forgot', 17: 'fit_us', 18: 'task', 19: 'task_us', 20: 'gate_thr'}
 TASK = False
 TASK_PAUSE = 0.05
+GATE = None                                              # (k_x100, mode): RTL_SET_GATE after SET_REPORT
 
 
 def make(blocks):
@@ -78,6 +81,8 @@ def make(blocks):
         t += PAUSE
 
     out.append((CR.ctl(enc, CR.SET_REPORT, bytes([1])), t))
+    if GATE:
+        out.append((CR.ctl(enc, 13, struct.pack('<HB', *GATE)), t))
     rng = np.random.default_rng(SUBJECT)
     q, lab = CR.recordings(SUBJECT, 'calibration')
     for rec, y in zip(q, lab):
@@ -116,7 +121,8 @@ def parse(data):
             pos += PR.OVERHEAD + len(p)
             if t == PR.PRED:
                 w, tus, cls, acc, m = struct.unpack('<IIBBH', p[:12])
-                preds[w] = dict(cls=cls, accepted=acc, margin=m, t_us=tus, end=pos + dec.skipped)
+                preds[w] = dict(cls=cls, accepted=acc, margin=m, t_us=tus, end=pos + dec.skipped,
+                                gated=p[12] if len(p) > 12 else -1)
             elif t == PR.COMMAND:
                 w, tus, cmd, cls, m = struct.unpack('<IIBBH', p[:12])
                 cmds.append((w, cmd))
@@ -156,7 +162,8 @@ def decode():
         row = dict(block=w.block, rec=w.rec, label=w.label, win=w.win, window=w.window,
                    board=b['cls'] if b else -1, pc=p['cls'] if p else -1,
                    board_accepted=b['accepted'] if b else -1, board_margin=b['margin'] if b else -1,
-                   pc_margin=p['margin'] if p else -1)
+                   pc_margin=p['margin'] if p else -1, board_gated=b['gated'] if b else -1,
+                   pc_gated=p['gated'] if p else -1)
         if b:
             arrive = rxl.ms[np.searchsorted(rxl.end.values, b['end'])]
             row['latency_ms'] = arrive - txl[w.packet]
@@ -183,6 +190,13 @@ def decode():
                   task_updates_board=int(sum(v >= 0 for v in bt)), task_none_board=int(sum(v == -1 for v in bt)),
                   task_us_min=min(tus) if tus else -1, task_us_median=float(np.median(tus)) if tus else -1,
                   task_us_max=max(tus) if tus else -1)
+    if GATE:
+        bg, pg = [v for e, v in bs if e == 'gate_thr'], [v for e, v in ps if e == 'gate_thr']
+        sm.update(gate_k_x100=GATE[0], gate_mode=GATE[1], gate_thr_board_nV=bg, gate_thr_pc_nV=pg,
+                  gate_thr_equal=bg == pg, gated_board=int((ok.board_gated == 1).sum()),
+                  gated_pc=int((df.pc_gated == 1).sum()), gated_same_as_pc=int((ok.board_gated == ok.pc_gated).sum()),
+                  gated_rest_windows=int(((ok.board_gated == 1) & (ok.label == 5)).sum()),
+                  rest_windows=int((ok.label == 5).sum()))
     for e in ('diag_rx_hw', 'diag_stack', 'diag_rx_ovf', 'diag_rx_err'):
         v = [x for k, x in bs if k == e]
         sm[e + '_max'] = max(v) if v else -1
@@ -199,9 +213,11 @@ def main():
     ap.add_argument('--blocks', type=int, default=3)
     ap.add_argument('--tag', default='', help='e.g. _all: build/board_replay_lda_all, results/board_replay_lda_all_*')
     ap.add_argument('--task', action='store_true')
+    ap.add_argument('--gate', type=int, nargs=2, metavar=('K_X100', 'MODE'),
+                    help='report 35.32: activity gate on, e.g. --gate 100 0')
     args = ap.parse_args()
-    global D, TAG, TASK
-    D, TAG, TASK = D + args.tag, args.tag, args.task
+    global D, TAG, TASK, GATE
+    D, TAG, TASK, GATE = D + args.tag, args.tag, args.task, args.gate
     make(args.blocks) if args.mode == 'make' else decode()
 
 

@@ -1,0 +1,56 @@
+scored_windows         2640
+received               2640
+same_class_as_pc       2640
+same_margin_as_pc      2001
+margin_max_diff        16
+acc_board              94.50757575757575
+acc_pc                 94.50757575757575
+commands_board         223
+commands_pc            223
+commands_equal         True
+latency_p50            6.67850000000908
+latency_p95            7.2110000000102445
+latency_max            16.943000000028405
+rx_crc_errors          0
+rx_skipped             0
+fits                   12
+fits_ok                12
+fit_us_min             7853
+fit_us_max             8037
+lost_packets           0
+pc_fits_ok             12
+task_events_board      264
+task_events_pc         264
+task_values_equal      False
+task_updates_board     220
+task_none_board        44
+task_us_min            4141
+task_us_median         4672.0
+task_us_max            4679
+gate_k_x100            100
+gate_mode              0
+gate_thr_board_nV      [44273]
+gate_thr_pc_nV         [44273]
+gate_thr_equal         True
+gated_board            436
+gated_pc               436
+gated_same_as_pc       2640
+gated_rest_windows     419
+rest_windows           440
+diag_rx_hw_max         242
+diag_stack_max         948
+diag_rx_ovf_max        0
+diag_rx_err_max        1
+           n  acc_board  acc_pc
+block                          
+0      240.0      90.00   90.00
+1      240.0      86.67   86.67
+2      240.0      92.50   92.50
+3      240.0      95.83   95.83
+4      240.0      90.83   90.83
+5      240.0      97.92   97.92
+6      240.0      93.75   93.75
+7      240.0      95.83   95.83
+8      240.0     100.00  100.00
+9      240.0      97.92   97.92
+10     240.0      98.33   98.33

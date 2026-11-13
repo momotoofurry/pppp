@@ -1,0 +1,26 @@
+
+=== energy states ===
+STM32H7 HAL, SYSCLK 480 MHz, I-cache on, D-cache on
+first fit 0, hold 30000 ms per state, update every 2000 ms in state 7
+unit timings:
+  fit      n=  50  mean   3867.0 us   max   3868.2 us
+  update   n=  50  mean   4664.5 us   max   4669.5 us
+  window   n=  50  mean   2728.2 us   max   2777.9 us
+--- cycle 1 ---
+state 1 spin     start (hold 30 s)
+state 1 spin     end: 0 - in 30000 ms = 0.00 per s
+state 2 wfi      start (hold 30 s)
+state 2 wfi      end: 0 - in 30000 ms = 0.00 per s
+state 3 fit      start (hold 30 s)
+state 3 fit      end: 7759 fits in 30003 ms = 258.60 per s
+state 4 update   start (hold 30 s)
+state 4 update   end: 6431 updates in 30000 ms = 214.36 per s
+state 5 window   start (hold 30 s)
+state 5 window   end: 10804 windows in 30002 ms = 360.10 per s
+state 6 realtime start (hold 30 s)
+state 6 realtime end: 29999 ticks in 30000 ms = 999.96 per s
+state 7 rt+upd   start (hold 30 s)
+state 7 rt+upd   end: 29999 ticks in 30000 ms = 999.96 per s
+=== done ===
+--- cycle 2 ---
+state 1 spin     start (hold 30 s)
