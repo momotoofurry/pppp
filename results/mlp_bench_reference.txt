@@ -1,0 +1,5 @@
+# float64 references (src/check_mlp_bench.py)
+lda day-1: correct 237 of 480, hash 52ecb9cd
+lda cue: correct 295 of 480, hash 333c7a07
+mlp day-1: correct 240 of 480, hash a1845890
+mlp fine-tuned: correct 313 of 480, hash 04449d4b

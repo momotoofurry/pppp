@@ -1,0 +1,28 @@
+lda day-1: correct 237 of 480, hash 52ecb9cd
+lda cue: correct 295 of 480, hash 333c7a07
+mlp day-1: correct 240 of 480, hash a1845890
+mlp fine-tuned: correct 313 of 480, hash 04449d4b
+
+=== MLP vs LDA bench ===
+PC
+ldacal static 31428 B (8 classes); mlp static 121568 B, 7528 parameters (30112 B float32)
+lda day-1 fit 0
+lda day-1: correct 237 of 480, hash 52ecb9cd
+lda cue fit 0
+lda cue: correct 295 of 480, hash 333c7a07
+  ld_add         n= 960  mean        0.0 us   max        0.0 us   total         0.0 us
+  ld_fit         n=   1  mean        0.0 us   max        0.0 us   total         0.0 us
+  ld_predict     n= 480  mean        0.0 us   max        0.0 us   total         0.0 us
+  lda cue update n=   1  mean        0.0 us   max        0.0 us   total         0.0 us
+mlp day-1: correct 240 of 480, hash a1845890
+mlp fine-tuned: correct 313 of 480, hash 04449d4b
+mlp weights after fine-tuning, hash of round-to-1e-3 da0d1cba
+  mlp_predict    n= 480  mean        0.0 us   max        0.0 us   total         0.0 us
+  mlp epoch      n=  30  mean        0.0 us   max        0.0 us   total         0.0 us
+  mlp fine-tune  n=   1  mean        0.0 us   max        0.0 us   total         0.0 us
+=== done ===
+
+lda day-1       C float32 correct 237 hash 52ecb9cd | float64 correct 237 hash 52ecb9cd | same predictions
+lda cue         C float32 correct 295 hash 333c7a07 | float64 correct 295 hash 333c7a07 | same predictions
+mlp day-1       C float32 correct 240 hash a1845890 | float64 correct 240 hash a1845890 | same predictions
+mlp fine-tuned  C float32 correct 313 hash 04449d4b | float64 correct 313 hash 04449d4b | same predictions

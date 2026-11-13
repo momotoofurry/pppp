@@ -1,0 +1,3 @@
+# arm-none-eabi-size of the MLP vs LDA bench (build/mlp: mlp_bench.c, mlp.c, ldacal.c with 8 classes, DB6 rows; Release); report 35.39
+   text	   data	    bss	    dec	    hex	filename
+ 294700	     96	 159500	 454296	  6ee98	D:/stm32/blink_leaf/build/mlp/blink.elf

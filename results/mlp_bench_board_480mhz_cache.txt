@@ -1,0 +1,19 @@
+
+=== MLP vs LDA bench ===
+STM32H7 HAL, SYSCLK 480 MHz, I-cache on, D-cache on
+ldacal static 31428 B (8 classes); mlp static 121568 B, 7528 parameters (30112 B float32)
+lda day-1 fit 0
+lda day-1: correct 237 of 480, hash 52ecb9cd
+lda cue fit 0
+lda cue: correct 295 of 480, hash 333c7a07
+  ld_add         n= 960  mean       54.3 us   max       56.2 us   total     52164.3 us
+  ld_fit         n=   1  mean     4537.7 us   max     4537.7 us   total      4537.7 us
+  ld_predict     n= 480  mean       15.2 us   max       16.4 us   total      7315.7 us
+  lda cue update n=   1  mean     9153.4 us   max     9153.4 us   total      9153.4 us
+mlp day-1: correct 240 of 480, hash a1845890
+mlp fine-tuned: correct 313 of 480, hash 04449d4b
+mlp weights after fine-tuning, hash of round-to-1e-3 da0d1cba
+  mlp_predict    n= 480  mean      140.9 us   max      150.4 us   total     67675.7 us
+  mlp epoch      n=  30  mean    35107.1 us   max    35126.3 us   total   1053213.5 us
+  mlp fine-tune  n=   1  mean  1053214.6 us   max  1053214.6 us   total   1053214.6 us
+=== done ===
