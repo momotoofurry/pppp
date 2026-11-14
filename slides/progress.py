@@ -129,6 +129,12 @@ def data():
     f['fr'] = f.false_rest / f.actions.clip(lower=1) * 100
     f = f[(f['shift'] == 0.5) & (f.base == 'pn')]
     N['front'] = f.groupby(['front', 'subject']).fr.mean().groupby('front').mean()
+    fc = csv('features_c_check.csv')
+    N['featchk'] = float(fc.rel_med.median())
+    lc = csv('ldacal_c_check.csv')
+    N['ldachk'] = (int(lc.windows.sum()), int(lc.agree.sum()))
+    sz = open(os.path.join(P.R, 'arm_rt_lda_rtos2_firmware_size.txt'), encoding='utf-8').read().splitlines()
+    N['fwrtos'] = [int(v) for v in next(ln for ln in sz if ln.strip().endswith('build/rtos/blink.elf')).split()[:3]]
     return N
 
 
@@ -392,6 +398,146 @@ def build(out):
         text(s, 1.65, y + 0.12, 10.8, 0.45, f'{q}：{a1}', size=16, bold=True)
         text(s, 1.65, y + 0.58, 10.8, 0.45, a2, size=14, color=GREY)
     text(s, 0.6, 6.45, 12.1, 0.4, '不論 RQ2 結果如何，RQ1＋RQ3 已足以構成論文；RQ2 決定任務標籤能不能成為主要貢獻', size=14)
+
+    # ================================================================ implementation details
+    s = d.slide(dark=True, notes='系統實作細節：最後收斂的系統怎麼做出來。來源：src/c/*.h 檔頭註解、report 6、7、35.10–35.29、35.36。')
+    text(s, 0.9, 2.3, 11.5, 0.9, '系統實作細節', size=40, bold=True, color=WHITE)
+    text(s, 0.9, 3.4, 11.5, 0.9, '訊號 → 特徵 → 模型 → 決策 → 機器人 → 標籤，以及怎麼驗證每一步', size=20, color='CFE3E6')
+
+    s = story(d, '系統架構：PC 只轉送，MCU 做全部運算', '一個指令從肌電到機械臂、再把任務標籤送回 MCU 的路徑', notes='report 7.3、35.13、35.24–35.27；src/c/protocol.h、rt_lda.h、src/pc/TrignoBridge.cs、kinova_bridge.py。')
+    chain = [('Delsys Trigno', '8 通道、2 kHz'), ('PC 橋接', 'TrignoBridge（C#）'), ('STM32H753', '480 MHz、Cortex-M7'),
+             ('PC／ROS 2', 'kinova_bridge'), ('Kinova Gen3', '＋Robotiq 夾爪')]
+    for i, (h_, b_) in enumerate(chain):
+        x = 0.6 + i * 2.5
+        bx = box(s, x, 2.0, 2.15, 1.05, fill=TEAL if i == 2 else LIGHT)
+        label_in(bx, [(h_, {'bold': True}), (b_, {'size': 12})], size=15, color=WHITE if i == 2 else INK)
+        if i < 4:
+            arrow(s, x + 2.18, 2.37, 0.3, 0.32)
+    back = box(s, 3.1, 3.35, 9.65, 0.6, fill=PINK, shape=P.MSO_SHAPE.LEFT_ARROW)
+    label_in(back, '任務標籤：預期的手勢＋當下合理的手勢＋指令的視窗編號（3–7 bytes）', size=14)
+    cols = [('PC 橋接', ['只轉送原始樣本，不做運算', 'int16，1 LSB = 0.25 µV', '每 10 ms 一個封包（20 個樣本）']),
+            ('MCU', ['濾波、特徵、z-score', 'LDA 分類、指令決策', '提示輪校正與任務標籤學習']),
+            ('機器人端', ['依指令移動手臂', '知道任務流程與目前狀態', '回傳「預期的手勢」當標籤'])]
+    for i, (h_, lines) in enumerate(cols):
+        x = 0.6 + i * 4.1
+        box(s, x, 4.2, 3.85, 1.65, fill=LIGHT)
+        text(s, x + 0.2, 4.28, 3.5, 1.55, [(h_, {'bold': True, 'size': 15})] + [(ln, {'bullet': True}) for ln in lines], size=13, space=3)
+    conclude(s, '演算法全部在 MCU 上；Trigno 基地台只有 USB 輸出，所以 PC 只當轉接')
+
+    fc = N['featchk']
+    s = story(d, '特徵擷取：串流計算，和原論文的程式一致', '每 100 ms 從 8 個通道算出一個 80 維的特徵向量', notes='src/c/features.h；report 6.4；results/features_c_check.csv（C 和上游 Python 特徵逐一比對）。')
+    steps = [('帶通濾波', '10–500 Hz、4 階 Butterworth'), ('切視窗', '長 200 ms、每 100 ms 一個'),
+             ('每通道 10 個特徵', '時域 6 個＋頻域 4 個'), ('80 維向量', '10 特徵 × 8 通道')]
+    for i, (h_, b_) in enumerate(steps):
+        x = 0.6 + i * 3.08
+        bx = box(s, x, 1.95, 2.8, 1.25, fill=TEAL if i == 3 else TEAL_L)
+        label_in(bx, [(h_, {'bold': True}), (b_, {'size': 12})], size=15, color=WHITE if i == 3 else INK)
+        if i < 3:
+            arrow(s, x + 2.83, 2.42, 0.22, 0.3)
+    table(s, 0.6, 3.5, 12.1, [['類別', '特徵', '說明'],
+                              ['時域', 'RMS、WL、SSC、ZC、MAV、偏度', 'SSC、ZC 門檻為 0；偏度為有偏估計'],
+                              ['頻域', 'VCF、MDF、MNF、PKF', 'Welch PSD：Hamming 400 點、補零到 512 點 FFT']],
+          [1.6, 4.6, 5.9], size=14, row_h=0.6)
+    text(s, 0.6, 5.4, 12.1, 0.5, f'C 版和上游 Python 逐一比對：相對誤差中位數約 {fc:.0e}（float32 的捨入誤差）', size=14, color=GREY)
+    conclude(s, '特徵和原論文完全相同，差異只來自之後的模型與校正方式')
+
+    s = story(d, '正規化與定點數：每次配戴重算 z-score', '不同次配戴的訊號大小不同；MCU 上要省記憶體又要和 PC 結果一模一樣', notes='src/c/rt_lda.h、features.h（fe_normalize_q16）、ldacal.h；report 35.11、35.13。')
+    blocks = [('每次配戴的提示輪', ['6 個手勢 × 約 2 秒', '每個手勢取 10 個視窗', '存在暫存區（最多 120 個視窗，37.5 KB）']),
+              ('z-score', ['用這次提示視窗算 μ、σ', 'x′ = (x − μ) / σ', '換次配戴就重算']),
+              ('Q5.10 定點數', ['int16：值 = round(x′ × 1024)', '範圍 ±32，超過就飽和', '四捨六入五成雙；PC 與 MCU 結果相同'])]
+    for i, (h_, lines) in enumerate(blocks):
+        x = 0.6 + i * 4.1
+        box(s, x, 1.95, 3.85, 2.75, fill=TEAL_L if i == 2 else LIGHT)
+        text(s, x + 0.25, 2.1, 3.4, 2.5, [(h_, {'bold': True, 'size': 17})] + [(ln, {'bullet': True}) for ln in lines], size=14, space=6)
+        if i < 2:
+            arrow(s, x + 3.88, 3.15, 0.2, 0.32)
+    text(s, 0.6, 4.95, 12.1, 0.5, '注意：PC 上的離線分析（DB6、自我測試）用的是第 1 天的 z-score；板上是每次配戴重算', size=13, color=GREY)
+    conclude(s, 'int16 讓模型輸入只佔一半記憶體，而且 PC 參考和板上逐位元可比')
+
+    lc = N['ldachk']
+    s = story(d, '收縮 LDA：只存累加和，不存資料', '每次配戴只有 60 個視窗、80 維：共變異數不收縮就是奇異的；資料又要跨次累積', notes='src/c/ldacal.h（OAS：Chen 等，2010；同 sklearn.covariance.oas）；report 35.10；results/ldacal_c_check.csv、arm_ldacal_size.csv。')
+    box(s, 0.6, 1.95, 7.3, 3.9, fill=LIGHT)
+    text(s, 0.85, 2.05, 6.9, 3.7, [('狀態（固定大小）', {'bold': True, 'size': 16}),
+                                   ('每類的數量 n_c、總和 s_c = Σx', {'bullet': True}),
+                                   ('G = Σ x xᵀ（對稱，只存下三角 3,240 個 float）', {'bullet': True}),
+                                   ('求解', {'bold': True, 'size': 16}),
+                                   ('m_c = s_c / n_c；S = (G − Σ n_c m_c m_cᵀ) / N', {'bullet': True}),
+                                   ('OAS 收縮：C = (1 − ρ)S + ρ·tr(S)/p·I', {'bullet': True}),
+                                   ('Cholesky 分解；w_c = C⁻¹m_c，b_c = −½ m_cᵀw_c', {'bullet': True}),
+                                   ('分類：argmax_c (x·w_c + b_c)；遺忘：每學一次 G、s、n × 0.97', {'bullet': True})], size=14, space=4)
+    stats = [(f'{N["ldacal"]["ram"] / 1024:.1f} KB', 'LDA 模組 RAM'), (f'{N["bench"]["fit_ms"]:.1f} ms', '一次求解（板上）'),
+             (f'{lc[1]:,}／{lc[0]:,}', '視窗預測和 Python 參考相同')]
+    for i, (big, lab) in enumerate(stats):
+        y = 1.95 + i * 1.32
+        box(s, 8.2, y, 4.5, 1.18, fill=TEAL_L)
+        text(s, 8.4, y + 0.08, 4.1, 0.6, big, size=24, bold=True, color=TEAL)
+        text(s, 8.4, y + 0.68, 4.1, 0.45, lab, size=13, color=GREY)
+    conclude(s, '收縮讓少量資料也能解；累加和讓標籤跨次累積但記憶體固定；整個更新是閉式解')
+
+    s = story(d, '任務軟標籤：把「預期的手勢」變成機率標籤', '機器人端只說「這一步預期哪個手勢、哪些手勢也合理」；MCU 怎麼更新模型？', notes='src/c/rt_lda.h（RTL_EPS 0.15、RTL_P0 0.05、RTL_P_INVALID 0.01、RTL_BETA 0.3、RTL_DECAY 0.97、RTL_CMD_MAX 16）、ldacal.h（ld_soft_q、ld_add_soft）；report 35.18、35.22–35.24。')
+    table(s, 0.6, 1.95, 5.6, [['先驗（依機器人狀態）', '機率'], ['預期的手勢', '1 − ε = 0.85'], ['其他當下合理的手勢', '共分 ε = 0.15'],
+                              ['放鬆', '0.05'], ['當下不合理的手勢', '0.01']], [3.6, 2.0], size=14, row_h=0.6)
+    box(s, 6.5, 1.95, 6.2, 3.9, fill=LIGHT)
+    text(s, 6.75, 2.05, 5.8, 3.7, [('更新步驟', {'bold': True, 'size': 16}),
+                                   ('取出造成這個指令的視窗（最多 16 個）', {'bullet': True}),
+                                   ('q ∝ 先驗 × exp(β·(s̄ − max s̄))，β = 0.3', {'bullet': True}),
+                                   ('遺忘：累加和 × 0.97', {'bullet': True}),
+                                   ('G += Σ x xᵀ；s_c += q_c Σ x；n_c += q_c × 視窗數', {'bullet': True}),
+                                   ('重新求解（同一個閉式解）', {'bullet': True}),
+                                   (f'板上一次 {N["soft_cmd_ms"]:.2f} ms', {'bullet': True, 'bold': True, 'color': TEAL})], size=14, space=5)
+    conclude(s, '標籤錯了也只是機率偏一點；晚到、對應到舊指令的標籤用視窗編號擋掉')
+
+    s = story(d, '出力判斷與指令決策', '休息時不能亂動：什麼時候才送出一個機器人指令？', notes='src/c/rt_lda.h（RTL_SET_GATE）、decision.h；report 35.18、35.21、35.28；預設 k = 3，出力判斷錄資料時先不開。')
+    box(s, 0.6, 1.95, 5.9, 3.9, fill=LIGHT)
+    text(s, 0.85, 2.05, 5.5, 3.7, [('出力判斷', {'bold': True, 'size': 16}),
+                                   ('出力 = 8 個通道原始 MAV 的總和', {'bullet': True}),
+                                   ('門檻 = √（放鬆的中位數 × 最小手勢的中位數）', {'bullet': True}),
+                                   ('用提示輪的視窗算；低於門檻 → 一律當放鬆', {'bullet': True}),
+                                   ('對照：Scheme 等（2013）用 μ不動＋3σ不動', {'bullet': True, 'color': GREY})], size=14, space=6)
+    box(s, 6.8, 1.95, 5.9, 3.9, fill=TEAL_L)
+    text(s, 7.05, 2.05, 5.5, 3.7, [('指令決策', {'bold': True, 'size': 16}),
+                                   ('連續 3 個視窗分類相同 → 確立這個手勢', {'bullet': True}),
+                                   ('和上一個不同才送指令；一直握著只送一次', {'bullet': True}),
+                                   ('握拳＝位置 A、側捏＝回原位、三指捏＝夾', {'bullet': True}),
+                                   ('食指指出＝位置 B、張開＝放、放鬆＝不動', {'bullet': True})], size=14, space=6)
+    conclude(s, '一個指令要連續 3 個視窗（每 100 ms 一個）一致才送出；休息誤觸發主要靠出力判斷擋')
+
+    s = story(d, '通訊協定：PC、MCU、機器人之間', '同一套封包格式，PC 工具、板子和 PC 參考版都用它', notes='src/c/protocol.h、rt_lda.h；src/pc/protocol.py。')
+    table(s, 0.6, 1.95, 12.1, [['欄位', '同步碼', '類型', '序號', '長度', '內容', '檢查碼'],
+                               ['大小', '0xA5 0x5A', '1 B', '2 B', '2 B', '0–512 B', 'CRC-16/CCITT']], [1.6, 1.8, 1.4, 1.4, 1.4, 2.0, 2.5], size=14, row_h=0.6)
+    table(s, 0.6, 3.35, 12.1, [['方向', '封包', '內容'],
+                               ['PC → MCU', 'SAMPLES', '20 個樣本 × 8 通道 int16（10 ms）；32.9 KB/s，佔 921600 baud 的 36%'],
+                               ['PC → MCU', 'CONTROL', '提示開始／結束、FIT、任務標籤、出力判斷設定、清除累積'],
+                               ['MCU → PC', 'COMMAND／PRED／STATUS', '機器人指令、每個視窗的分類（記錄與延遲）、事件與診斷']],
+          [1.8, 3.0, 7.3], size=13, row_h=0.55)
+    conclude(s, '封包有序號與 CRC：掉封包可以偵測；板上重放時用同一串位元組在 PC 重跑比對')
+
+    fs = N['fwrtos']
+    s = story(d, '韌體架構與記憶體', '最後的韌體：FreeRTOS、全部靜態配置，用了 STM32H753 多少記憶體？', notes='src/c/app_rt_rtos.c、FreeRTOSConfig.h；results/arm_rt_lda_rtos2_firmware_size.txt（1 KB = 1024 B）。')
+    layers = [('USART3 中斷（最高）', '收樣本 → 環形緩衝', LIGHT, INK), ('rx task（高優先）', '特徵、分類、指令', TEAL, WHITE),
+              ('learn task（低優先）', 'LDA 求解、任務標籤', TEAL_L, INK), ('idle', 'WFI 睡眠', LIGHT, INK)]
+    for i, (h_, b_, fill, col) in enumerate(layers):
+        bx = box(s, 0.6, 1.95 + i * 0.97, 4.6, 0.82, fill=fill)
+        label_in(bx, [(h_, {'bold': True}), (b_, {'size': 12})], size=14, color=col)
+    table(s, 5.6, 1.95, 7.1, [['項目', '大小'], ['提示輪暫存區（120 視窗 × 80 × float）', '37.5 KB'],
+                              ['LDA 模組（累加和、Cholesky 工作區）', f'{N["ldacal"]["ram"] / 1024:.1f} KB'],
+                              ['兩個 task 的 stack', '各 2 KB（實測用約 0.5 KB）'],
+                              ['整個韌體 RAM（data＋bss）', f'{(fs[1] + fs[2]) / 1024:.1f} KB／512 KB'],
+                              ['整個韌體程式（text）', f'{fs[0] / 1024:.1f} KB／2 MB']], [4.6, 2.5], size=13, row_h=0.6)
+    conclude(s, 'RAM 用不到四分之一：還有空間放更多暫存或第二個模型')
+
+    rtt, rtg, btk, rt = N['rt_task'], N['rt_gate'], N['btask'], N['rtos']
+    s = story(d, '驗證方法：每一步都和參考逐一比對', '怎麼確定 C 版、板子上的結果是對的？', notes='report 6.4、35.10、35.22–35.25、35.28、35.33、35.36–35.39；對應的 results/*_check.csv 與 board_replay_*_summary.csv。')
+    rows = [['驗證什麼', '怎麼比', '結果'],
+            ['特徵（C vs 上游 Python）', '全部錄音逐一比對', f'相對誤差中位數約 {fc:.0e}'],
+            ['LDA 求解（C vs Python）', '開發資料每個視窗', f'{lc[1]:,}／{lc[0]:,} 相同'],
+            ['即時迴圈＋任務標籤（PC 上的 C）', '每個視窗、每次更新', f'{rtt["agree"]:,}／{rtt["windows"]:,} 相同'],
+            ['出力判斷 C 版', '三種設定', f'{rtg["agree"]:,}／{rtg["windows"]:,} 相同'],
+            ['板上即時重放（裸機）', '同一串位元組在 PC 重跑', f'{btk["same"]:,}／{btk["windows"]:,}；{btk["upd"]} 次更新'],
+            ['板上 FreeRTOS（含 CPU 滿載）', '和裸機版、PC 比', f'{rt["same"]:,}／{rt["windows"]:,}；任務標籤值逐筆相同'],
+            ['MLP C 版（對照組）', '和 float64 參考比', '預測 hash 相同']]
+    table(s, 0.6, 1.95, 12.1, rows, [4.4, 3.6, 4.1], size=13, row_h=0.5)
+    conclude(s, '每個 C 模組都有 Python 參考；分析判準都在跑之前寫定')
 
     s = d.slide('下一步：自我測試——任務標籤在同一次配戴中有沒有用', notes=(
         'report 35.35；lab_kit/SELFTEST.md、src/selftest_analysis.py（判準在錄之前已 commit）。用自己的筆電：Trigno SDK（TCU）已安裝；板子已燒 LDA 韌體。'
