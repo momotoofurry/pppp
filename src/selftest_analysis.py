@@ -17,8 +17,7 @@ this, one donning in one posture tends to sit at the ceiling (the synthetic dry 
 Signal path offline: emg.csv (unix_ms, frame, ch0_V..ch7_V at the TCU's rate) -> rate from a line fit of unix_ms on
 the frame number -> resampled to 2000 Hz (scipy resample_poly; the bridge uses a windowed sinc, so the samples are
 not bit-equal to what the board saw) -> src/c/features.c streamed over the whole session (window w = samples
-200 w .. 200 w + 399) -> z-score with the statistics of DAY 1's cued pass (fixed afterwards, as on the device)
--> Q5.10 -> shrinkage LDA from running sums (OAS), forgetting 0.97 per learned trial, 6 classes
+200 w .. 200 w + 399) -> z-score (two modes, below) -> Q5.10 -> shrinkage LDA from running sums (OAS), forgetting 0.97 per learned trial, 6 classes
 (Power Lateral Tripod Pointer Open Rest, the label order of TaskScreen and decision.c).
 Windows used:
   cued pass   'cal g' rows of ops.csv (the last one per gesture before the first TaskScreen segment): windows
@@ -32,8 +31,14 @@ Windows used:
               TaskScreen / decision.c: pose_A Power, home Lateral, grip Tripod, pose_B Pointer, release Open);
               with probability e replaced by a random other command's gesture (sensitivity, 20 seeds).
 Only completed segment runs are used (seg_end; the last completed run of each segment index).
+z-score, two modes (added 2026-11-14, before any recording):
+  session    the statistics of THIS day's cued pass (mu, sd of its 60 windows): what the firmware does (rt_lda.c
+             recomputes them at every FIT; the running sums keep the rows of earlier days in their own day's
+             z-score)                                                         <- PRIMARY for R12
+  day1       the statistics of day 1's cued pass, fixed afterwards (what the offline analyses so far did: db6_sim,
+             task_sim*); reported as a sensitivity analysis
 Conditions (events processed in recorded time order; every day starts from the state the previous day ended in):
-  fixed      day 1's cued-pass model, never updated
+  fixed      day 1's cued-pass model, never updated (inputs in the mode's z-score)
   cue        + every day's cued pass (running sums, kept across days)          <- what runs live
   cue_soft   + soft task labels (task_sim2: prior expected 1 - eps, the other 4 commands eps / 4, Rest p0;
              q = prior x exp(beta x mean score))
@@ -41,7 +46,8 @@ Conditions (events processed in recorded time order; every day starts from the s
   cue_soft_t1  soft labels from T1 only, frozen after T1 (P2 then measures labels 5-10 min old)
 Scores: accuracy over the probe windows of P0, P1, P2 with the model state at that time.
 Decision rule, fixed before the first recording (n = 1 self-test: a go / no-go for keeping task labels as a main
-axis of the thesis, not a population claim):
+axis of the thesis, not a population claim). Evaluated in the 'session' z-score mode (the device); the same
+numbers in the 'day1' mode are reported next to it and do not change the verdict:
   D = mean over P1 and P2 of (cue_soft - cue) at e 0, per day; D_bar = mean over days.
   R12  GO          if D_bar >= +2 points and D > 0 on at least ceil(2/3 x days) days
        NO-GO       if D_bar <= 0
@@ -244,12 +250,13 @@ def task_label(mdl, mode, rows, pred, exp):
         mdl.learn_soft(rows, qq / qq.sum())
 
 
-def replay(days, cond, e, seed, mu, sd):
+def replay(days, cond, e, seed, stats):
     """-> rows: per day and probe, the per-cue correct counts (for the bootstrap) and accuracy"""
     rng = np.random.default_rng(seed)
     mode = {'cue_soft': 'soft', 'cue_pn': 'pn', 'cue_pos': 'pos', 'cue_soft_t1': 'soft'}.get(cond)
     mdl, out, cmds = None, [], dict(cmd=0, ok=0, miss=0)
     for di, D in enumerate(days):
+        mu, sd = stats[di]
         Z = (D['F'] - mu) / sd
         frozen = False
         for t, kind, pay in D['events']:
@@ -316,28 +323,48 @@ def main():
         p(f"{D['name']}: TCU rate {D['rate']:.1f} Hz, {len(D['F'])} windows, cued pass windows {D['cal_windows']}, "
           f"probes {D['probes']}, task trials {D['trials']}")
         assert D['probes'] == 3, 'expected 3 completed labelled segments (P0 P1 P2)'
-    cp = next(pay for _, kind, pay in days[0]['events'] if kind == 'cuepass')
-    cal0 = np.concatenate([days[0]['F'][r] for r, _ in cp])
-    mu, sd = cal0.mean(0), cal0.std(0)
-    bad = ~np.isfinite(sd) | (sd == 0)
-    mu[bad], sd[bad] = 0.0, np.inf
-    rows, cmd_rows = [], []
-    for cond in CONDS:
-        for e in (ERRS if cond in ('cue_soft', 'cue_pn', 'cue_pos') else (0.0,)):
-            for seed in (range(SEEDS) if e > 0 else (0,)):
-                o, c = replay(days, cond, e, seed, mu, sd)
-                rows += o
-                cmd_rows.append(dict(cond=cond, e=e, seed=seed, **c))
+    def cue_stats(D):
+        cp = next(pay for _, kind, pay in D['events'] if kind == 'cuepass')
+        X = np.concatenate([D['F'][r] for r, _ in cp])
+        mu, sd = X.mean(0), X.std(0)
+        bad = ~np.isfinite(sd) | (sd == 0)
+        mu[bad], sd[bad] = 0.0, np.inf
+        return mu, sd
+
+    per_day = [cue_stats(D) for D in days]
+    STATS = {'session': per_day, 'day1': [per_day[0]] * len(days)}
+    all_rows, all_cmd = [], []
+    for zmode, stats in STATS.items():
+        for cond in CONDS:
+            for e in (ERRS if cond in ('cue_soft', 'cue_pn', 'cue_pos') else (0.0,)):
+                for seed in (range(SEEDS) if e > 0 else (0,)):
+                    o, c = replay(days, cond, e, seed, stats)
+                    all_rows += [dict(r, zmode=zmode) for r in o]
+                    all_cmd.append(dict(zmode=zmode, cond=cond, e=e, seed=seed, **c))
+    pd.DataFrame(all_rows).drop(columns=['correct', 'n']).to_csv(os.path.join(args.out, 'selftest_probes.csv'), index=False)
+    pd.DataFrame(all_cmd).to_csv(os.path.join(args.out, 'selftest_commands.csv'), index=False)
+    verdicts = {}
+    for zmode in STATS:
+        verdicts[zmode] = report(p, zmode, [r for r in all_rows if r['zmode'] == zmode],
+                                 [c for c in all_cmd if c['zmode'] == zmode], len(days))
+    p('')
+    p(f"R12 verdict (primary, z-score per donning as on the device): {verdicts['session']}")
+    p(f"   sensitivity (day-1 z-score): {verdicts['day1']}")
+    with open(os.path.join(args.out, 'selftest_summary.txt'), 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+
+
+def report(p, zmode, rows, cmd_rows, ndays):
     df = pd.DataFrame(rows)
-    df.drop(columns=['correct', 'n']).to_csv(os.path.join(args.out, 'selftest_probes.csv'), index=False)
-    pd.DataFrame(cmd_rows).to_csv(os.path.join(args.out, 'selftest_commands.csv'), index=False)
+    p('')
+    p(f'================ z-score mode: {zmode} ' + ('(PRIMARY: as on the device)' if zmode == 'session' else '(sensitivity)'))
     acc = df.groupby(['cond', 'e', 'day', 'probe']).acc.mean().unstack('probe')
     p('\nprobe accuracy % (6 classes); P0 right after the cued pass, P1 after task segment 1, P2 after segment 2')
     p(acc.round(2).to_string())
     p('\nR12: D = mean over P1, P2 of (cue_soft - cue), e 0')
     rng = np.random.default_rng(0)
     Ds = []
-    for di in range(1, len(days) + 1):
+    for di in range(1, ndays + 1):
         a = [r for r in rows if r['cond'] == 'cue_soft' and r['e'] == 0 and r['day'] == di and r['probe'] in ('probe1', 'probe2')]
         b = [r for r in rows if r['cond'] == 'cue' and r['day'] == di and r['probe'] in ('probe1', 'probe2')]
         d = float(np.mean([x['acc'] - y['acc'] for x, y in zip(a, b)]))
@@ -363,14 +390,13 @@ def main():
     p(f"  cue_soft - cue_pn  at e 0.3, P1-P2: {m('cue_soft', 0.3, ['probe1', 'probe2']) - m('cue_pn', 0.3, ['probe1', 'probe2']):+.2f}")
     p(f"  cue_soft - cue_pos at e 0.3, P1-P2: {m('cue_soft', 0.3, ['probe1', 'probe2']) - m('cue_pos', 0.3, ['probe1', 'probe2']):+.2f}")
     p(f"  cue_soft_t1 - cue at P2 (labels 5-10 min old): {m('cue_soft_t1', 0.0, ['probe2']) - m('cue', 0.0, ['probe2']):+.2f}")
-    if len(days) > 1:
+    if ndays > 1:
         p(f"  cue - fixed, days 2+, all probes: {m('cue', 0.0, ['probe0', 'probe1', 'probe2'], 2) - m('fixed', 0.0, ['probe0', 'probe1', 'probe2'], 2):+.2f}")
     cm = pd.DataFrame(cmd_rows).groupby(['cond', 'e'])[['cmd', 'ok', 'miss']].mean()
     cm['cmd_acc %'] = (cm.ok / cm.cmd * 100).round(1)
     p('\noffline task-trial decisions (mean over seeds, all days)')
     p(cm.round(1).to_string())
-    with open(os.path.join(args.out, 'selftest_summary.txt'), 'w') as f:
-        f.write('\n'.join(lines) + '\n')
+    return verdict
 
 
 if __name__ == '__main__':

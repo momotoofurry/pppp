@@ -451,7 +451,7 @@ def build(out):
         text(s, x + 0.25, 2.1, 3.4, 2.5, [(h_, {'bold': True, 'size': 17})] + [(ln, {'bullet': True}) for ln in lines], size=14, space=6)
         if i < 2:
             arrow(s, x + 3.88, 3.15, 0.2, 0.32)
-    text(s, 0.6, 4.95, 12.1, 0.5, '注意：PC 上的離線分析（DB6、自我測試）用的是第 1 天的 z-score；板上是每次配戴重算', size=13, color=GREY)
+    text(s, 0.6, 4.95, 12.1, 0.5, '注意：先前的離線分析（DB6、模擬）用第 1 天的 z-score；自我測試的分析已改成和板子一樣（每次配戴重算為主）', size=13, color=GREY)
     conclude(s, 'int16 讓模型輸入只佔一半記憶體，而且 PC 參考和板上逐位元可比')
 
     lc = N['ldachk']
