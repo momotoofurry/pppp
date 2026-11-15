@@ -527,8 +527,8 @@ static class Program
             if (notes == 0) W("no 'note' lines: were the temperatures typed in (note temp room .. skin ..)?");
         }
 
-        var tasks = Directory.GetFiles(dir, name + "_*_task.csv");
-        if (tasks.Length == 0) W("no " + name + "_*_task.csv from TaskScreen");
+        var tasks = Directory.GetFiles(dir, name + "*_task.csv");
+        if (tasks.Length == 0) W("no " + name + "*_task.csv from TaskScreen");
         foreach (var t in tasks) {
             long rows = 0;
             using (var r = new StreamReader(t)) { while (r.ReadLine() != null) rows++; }
