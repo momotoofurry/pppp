@@ -14,7 +14,10 @@
 //       TCU only (no STM32): START, record, then the measured sample rate (frames / time) and per channel the
 //       largest |value| and the RMS; warns when a channel comes near the +-8.19 mV the MCU encoding can carry.
 //   TrignoBridge run    --port COM5 [--tcu 127.0.0.1] [--rate 2000] [--emg-csv emg.csv] [--mcu-csv mcu.csv]
-//                       [--ops-csv ops.csv] [--udp 50555] [--gate 1] [--script commands.txt]
+//                       [--ops-csv ops.csv] [--udp 50555] [--gate 1] [--script commands.txt] [--slots 1-8]
+//       --slots: which 8 TCU sensor slots become channels 1-8, in that order (default 1-8). Ranges a-b and lists
+//       joined with ':' (no commas: cmd.exe splits on them), e.g. --slots 4-11 or --slots 1-4:9-12. emg.csv, the
+//       board and every later step see only the 8 mapped channels; the mapping is written to ops.csv as a note.
 //                       (--port file:<path>: write the serial bytes to a file; --udp 0: no forwarding;
 //                        --udp 50555,50556: forward to TaskScreen and to src/pc/kinova_bridge.py)
 //       TCU -> (resampled to 2000 Hz when --rate is not 2000) -> int16 0.25 uV -> packets -> COM port at 921600;
@@ -301,6 +304,25 @@ static class Program
 
     static string Get(Dictionary<string, string> d, string k, string def) { return d.ContainsKey(k) ? d[k] : def; }
 
+    // --slots 4-11 or 1-4:9-12 -> 0-based TCU channel index of channels 1-8; null (and a message) when invalid
+    static int[] ParseSlots(string spec)
+    {
+        var r = new List<int>();
+        foreach (var part in spec.Split(new[] { ':' }, StringSplitOptions.RemoveEmptyEntries)) {
+            var ab = part.Split('-');
+            int lo, hi;
+            if (ab.Length > 2 || !int.TryParse(ab[0], out lo) || !int.TryParse(ab[ab.Length - 1], out hi) || hi < lo) {
+                Console.WriteLine("--slots: cannot read '" + part + "' (use e.g. 4-11 or 1-4:9-12)"); return null;
+            }
+            for (int k = lo; k <= hi; k++) r.Add(k);
+        }
+        if (r.Count != Proto.CH || r.Exists(k => k < 1 || k > Tcu.CHANNELS) || new HashSet<int>(r).Count != r.Count) {
+            Console.WriteLine("--slots needs " + Proto.CH + " different slots between 1 and " + Tcu.CHANNELS + ", got: " + string.Join(",", r));
+            return null;
+        }
+        return r.ConvertAll(k => k - 1).ToArray();
+    }
+
     // --port must name a serial port (COMx) or file:<path>; anything else (e.g. an empty %1 in a .bat) stops here
     static string PortArg(Dictionary<string, string> d)
     {
@@ -378,7 +400,7 @@ static class Program
         say("banner: " + ReplyOf(cs));
         var q = new List<string> { "VERSION?", "RATE?", "ENDIANNESS?", "BACKWARDS COMPATIBILITY?", "UPSAMPLING?",
                                    "UPSAMPLE?", "FRAME INTERVAL?", "MAX SAMPLES EMG?", "MAX SAMPLES AUX?", "TRIGGER?" };
-        for (int s = 1; s <= 8; s++) { q.Add("SENSOR " + s + " PAIRED?"); q.Add("SENSOR " + s + " TYPE?"); q.Add("SENSOR " + s + " MODE?"); }
+        for (int s = 1; s <= Tcu.CHANNELS; s++) { q.Add("SENSOR " + s + " PAIRED?"); q.Add("SENSOR " + s + " TYPE?"); q.Add("SENSOR " + s + " MODE?"); }
         foreach (var x in q) say(string.Format(IC, "  {0,-26} -> {1}", x, Ask(cs, x)));
         say("START -> " + Ask(cs, "START"));
         var counts = new long[ports.Length];
@@ -885,6 +907,9 @@ static class Program
     static int Run(Dictionary<string, string> a)
     {
         double rate = double.Parse(Get(a, "rate", "2000"), IC);
+        string slotSpec = Get(a, "slots", "1-8");
+        int[] slot = ParseSlots(slotSpec);
+        if (slot == null) return 1;
         string portName = PortArg(a);
         if (portName == null) return 1;
         var tcu = new Tcu(Get(a, "tcu", "127.0.0.1"));
@@ -894,6 +919,8 @@ static class Program
         mcuCsv.WriteLine("unix_ms,kind,window,t_us,gesture,command,accepted,ratio,pushed,event,value");
         opsCsv = new StreamWriter(Get(a, "ops-csv", "ops.csv"));
         opsCsv.WriteLine("unix_ms,command,accepted");
+        Console.WriteLine("TCU slots " + string.Join(",", Array.ConvertAll(slot, k => (k + 1).ToString())) + " -> channels 1-" + Proto.CH);
+        lock (opsCsv) { opsCsv.WriteLine(UnixMs().ToString("F1", IC) + ",note slots " + slotSpec + " -> ch 1-" + Proto.CH + ",1"); opsCsv.Flush(); }
         OpenUdp(Get(a, "udp", "50555"));
         lda = Get(a, "firmware", "freeze") == "lda";
         gateOn = !lda && Get(a, "gate", "1") != "0";
@@ -953,7 +980,7 @@ static class Program
                     var sb = new StringBuilder();
                     sb.Append(ms.ToString("F1", IC)).Append(',').Append(framesIn);
                     var x = new double[Proto.CH];
-                    for (int c = 0; c < Proto.CH; c++) { x[c] = f[c]; sb.Append(',').Append(f[c].ToString("G9", IC)); }
+                    for (int c = 0; c < Proto.CH; c++) { x[c] = f[slot[c]]; sb.Append(',').Append(f[slot[c]].ToString("G9", IC)); }
                     emg.WriteLine(sb.ToString());
                     framesIn++;
                     var outs = rs == null ? new List<double[]> { x } : rs.Push(x);
