@@ -1,0 +1,55 @@
+[Parallel(n_jobs=19)]: Using backend LokyBackend with 19 concurrent workers.
+[Parallel(n_jobs=19)]: Done 34 out of 80 | elapsed:  1.3min
+[Parallel(n_jobs=19)]: Done 60 out of 80 | elapsed:  1.9min remaining:   38.7s
+[Parallel(n_jobs=19)]: Done 77 out of 80 | elapsed:  2.2min remaining:    5.1s
+[Parallel(n_jobs=19)]: Done 80 out of 80 | elapsed:  2.2min finished
+e                   0.0    0.1    0.2    0.3
+shift cond                                  
+0.0   cue1        90.80    NaN    NaN    NaN
+      cue1_avg    92.78  91.89  91.09  90.42
+      cue1_pn     92.62  90.32  88.08  83.50
+      cue1_pos    92.91  92.96  92.99  92.76
+      cue1_prior  90.90  89.23  86.07  82.60
+      cue1_soft   93.17  93.28  93.11  93.01
+0.5   cue1        88.04    NaN    NaN    NaN
+      cue1_avg    90.57  89.74  88.96  88.15
+      cue1_pn     90.50  88.08  85.27  81.60
+      cue1_pos    90.20  90.19  89.86  89.94
+      cue1_prior  88.20  86.65  83.79  80.90
+      cue1_soft   90.85  90.88  90.65  90.24
+R14 / R15, shift 0.0
+  shift 0.0 e=0.0: cue1_soft - cue1_avg = +0.39 (+0.05, +0.73), better 17 worse 3
+  shift 0.0 e=0.0: cue1_soft - cue1_prior = +2.27 (+1.40, +3.14), better 19 worse 1
+  shift 0.0 e=0.0: cue1_avg - cue1_pn = +0.16 (-0.19, +0.52), better 13 worse 7
+  shift 0.0 e=0.0: cue1_avg - cue1 = +1.99 (+0.87, +3.11), better 18 worse 2
+  shift 0.0 e=0.1: cue1_soft - cue1_avg = +1.39 (+0.88, +1.90), better 19 worse 1
+  shift 0.0 e=0.1: cue1_soft - cue1_prior = +4.05 (+3.05, +5.04), better 20 worse 0
+  shift 0.0 e=0.1: cue1_avg - cue1_pn = +1.57 (+1.13, +2.01), better 20 worse 0
+  shift 0.0 e=0.1: cue1_avg - cue1 = +1.09 (-0.01, +2.20), better 11 worse 6
+  shift 0.0 e=0.2: cue1_soft - cue1_avg = +2.02 (+1.38, +2.66), better 20 worse 0
+  shift 0.0 e=0.2: cue1_soft - cue1_prior = +7.04 (+5.72, +8.37), better 20 worse 0
+  shift 0.0 e=0.2: cue1_avg - cue1_pn = +3.01 (+2.34, +3.68), better 20 worse 0
+  shift 0.0 e=0.2: cue1_avg - cue1 = +0.30 (-0.78, +1.37), better 8 worse 12
+  shift 0.0 e=0.3: cue1_soft - cue1_avg = +2.59 (+1.84, +3.33), better 19 worse 1
+  shift 0.0 e=0.3: cue1_soft - cue1_prior = +10.41 (+8.88, +11.94), better 20 worse 0
+  shift 0.0 e=0.3: cue1_avg - cue1_pn = +6.93 (+6.04, +7.81), better 20 worse 0
+  shift 0.0 e=0.3: cue1_avg - cue1 = -0.37 (-1.39, +0.64), better 6 worse 14
+R14 / R15, shift 0.5
+  shift 0.5 e=0.0: cue1_soft - cue1_avg = +0.29 (-0.12, +0.69), better 15 worse 5
+    R14 e=0.0: PASS
+  shift 0.5 e=0.0: cue1_soft - cue1_prior = +2.65 (+1.75, +3.56), better 19 worse 1
+  shift 0.5 e=0.0: cue1_avg - cue1_pn = +0.07 (-0.24, +0.37), better 12 worse 8
+  shift 0.5 e=0.0: cue1_avg - cue1 = +2.53 (+1.26, +3.79), better 18 worse 2
+  shift 0.5 e=0.1: cue1_soft - cue1_avg = +1.14 (+0.66, +1.62), better 18 worse 2
+  shift 0.5 e=0.1: cue1_soft - cue1_prior = +4.23 (+3.26, +5.20), better 20 worse 0
+  shift 0.5 e=0.1: cue1_avg - cue1_pn = +1.66 (+1.22, +2.10), better 19 worse 1
+  shift 0.5 e=0.1: cue1_avg - cue1 = +1.70 (+0.39, +3.01), better 14 worse 6
+  shift 0.5 e=0.2: cue1_soft - cue1_avg = +1.69 (+1.17, +2.21), better 19 worse 1
+  shift 0.5 e=0.2: cue1_soft - cue1_prior = +6.86 (+5.62, +8.10), better 20 worse 0
+  shift 0.5 e=0.2: cue1_avg - cue1_pn = +3.69 (+2.94, +4.44), better 20 worse 0
+  shift 0.5 e=0.2: cue1_avg - cue1 = +0.92 (-0.52, +2.36), better 11 worse 9
+  shift 0.5 e=0.3: cue1_soft - cue1_avg = +2.09 (+1.55, +2.63), better 19 worse 1
+    R14 e=0.3: PASS
+  shift 0.5 e=0.3: cue1_soft - cue1_prior = +9.35 (+8.26, +10.44), better 20 worse 0
+  shift 0.5 e=0.3: cue1_avg - cue1_pn = +6.55 (+5.55, +7.55), better 20 worse 0
+  shift 0.5 e=0.3: cue1_avg - cue1 = +0.11 (-1.03, +1.25), better 10 worse 10
