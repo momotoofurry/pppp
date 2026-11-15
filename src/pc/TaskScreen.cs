@@ -5,7 +5,11 @@
 //   TaskScreen --subject S01 --day 2 --cond A [--out .] [--segments labelled,practice,task,labelled,noncontrol]
 //              [--commands grip,release,pose_A,pose_B,home] [--n 40] [--timeout 5] [--rest 2.5]
 //              [--reps 5] [--cue 2] [--gap 3] [--practice 120] [--items 1,2,3,5] [--item 60]
-//              [--retry 0|1] [--udp 50555] [--fake] [--auto] [--windowed]
+//              [--retry 0|1] [--udp 50555] [--fake] [--auto] [--windowed] [--postures selftest]
+// --postures selftest (SELFTEST.md, SOP section 4): a line at the top tells the arm posture of the next cue / trial;
+// it turns gold with '換姿勢 →' at the rest where the posture changes, and the change is logged as event 'posture'
+// (target = N / A / B / C). 1st labelled segment: neutral; 2nd: A then B after half the cues; 3rd: C then A; task
+// segments: A, B, C, A in quarters of --n. Cue orders and timings are not changed.
 //
 // The board's commands come from TrignoBridge.exe (run, same PC) as UDP datagrams "<unix_ms>,<mcu.csv line>" on
 // 127.0.0.1:<udp>. Segments, in the order of --segments; the experimenter starts each one with the space bar:
@@ -48,6 +52,7 @@ class Step
     public double Ms;                // duration; 0 = until the space bar (wait)
     public string Text, Target;      // Target: gesture (cue) or command (trial)
     public int Trial = -1;
+    public string Posture;           // --postures: N / A / B / C, null = none
 }
 
 class TaskForm : Form
@@ -71,6 +76,12 @@ class TaskForm : Form
     readonly string subject, day, cond;
     readonly string[] segs, commands;
     readonly bool fake, auto, retry;
+    readonly string postures;        // --postures: "" = off, "selftest"
+    readonly Label pose = new Label();
+    string shownPosture;             // posture of the last step shown
+    static readonly Dictionary<string, string> POSTURE_ZH = new Dictionary<string, string> {
+        { "N", "中立：前臂平放桌上" }, { "A", "A 往前伸：像拿桌子另一邊的東西" },
+        { "B", "B 抬到肩高：手臂往前平舉" }, { "C", "C 往外側伸：手往身體外側伸" } };
     readonly double timeoutMs, restMs, cueMs, gapMs, practiceMs, itemMs;
     readonly int nTrials, reps;
     readonly int[] items;
@@ -123,6 +134,8 @@ class TaskForm : Form
         items = new int[it.Length];
         for (int i = 0; i < it.Length; i++) items[i] = int.Parse(it[i]);
         fake = a.ContainsKey("fake"); auto = a.ContainsKey("auto"); retry = Get("retry", "0") == "1";
+        postures = Get("postures", "");
+        if (postures != "" && postures != "selftest") throw new ArgumentException("--postures: only 'selftest'");
         epochMs = (DateTime.UtcNow - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds - clock.Elapsed.TotalMilliseconds;
 
         string dir = Get("out", ".");
@@ -135,6 +148,7 @@ class TaskForm : Form
             string.Format("subject {0} day {1} segments {2} commands {3} n {4} timeout_s {5} fake {6} retry {7}",
                           subject, day, string.Join(" ", segs), string.Join(" ", commands), nTrials, timeoutMs / 1000, fake ? 1 : 0,
                           retry ? 1 : 0)
+            + (postures != "" ? " postures " + postures : "")
             + (udp != null ? " udp " + port : " udp off"));
 
         Text = "TaskScreen";
@@ -146,7 +160,10 @@ class TaskForm : Form
         big.Font = new Font("Microsoft JhengHei UI", 56, FontStyle.Bold);
         small.Dock = DockStyle.Bottom; small.Height = 40; small.ForeColor = Color.Gray;
         small.Font = new Font("Microsoft JhengHei UI", 14);
-        Controls.Add(big); Controls.Add(small);
+        pose.Dock = DockStyle.Top; pose.Height = postures != "" ? 70 : 0; pose.Visible = postures != "";
+        pose.TextAlign = ContentAlignment.MiddleCenter; pose.ForeColor = Color.Silver;
+        pose.Font = new Font("Microsoft JhengHei UI", 26, FontStyle.Bold);
+        Controls.Add(big); Controls.Add(small); Controls.Add(pose);
         KeyDown += OnKey;
         FormClosed += delegate { Shutdown(); };
 
@@ -217,6 +234,35 @@ class TaskForm : Form
 
     List<Step> Build(string seg)
     {
+        var built = Build0(seg);
+        if (postures == "selftest") AssignPostures(seg, built);
+        return built;
+    }
+
+    // SELFTEST.md / SOP section 4: which arm posture each cue or trial is done in (rests take the next one's)
+    void AssignPostures(string seg, List<Step> st)
+    {
+        int k = 0;                                                // how many segments of this kind came before
+        for (int i = 0; i < segIdx; i++) if (segs[i] == seg) k++;
+        var main = st.FindAll(x => x.Kind == "cue" || x.Kind == "trial");
+        for (int i = 0; i < main.Count; i++) {
+            string q = "N";
+            if (seg == "labelled") {
+                bool first = i < main.Count / 2;
+                q = k == 1 ? (first ? "A" : "B") : k == 2 ? (first ? "C" : "A") : "N";
+            } else if (seg == "task") q = new[] { "A", "B", "C", "A" }[Math.Min(3, i * 4 / Math.Max(1, main.Count))];
+            main[i].Posture = q;
+        }
+        string next = null;
+        for (int i = st.Count - 1; i >= 0; i--) {                 // a rest shows the posture of what follows it
+            if (st[i].Posture != null) next = st[i].Posture; else if (next != null) st[i].Posture = next;
+        }
+        string prev = null;
+        foreach (var x in st) { if (x.Posture == null) x.Posture = prev; prev = x.Posture; }
+    }
+
+    List<Step> Build0(string seg)
+    {
         var r = new Random((int)Fnv(string.Join("|", subject, day, cond, seg, segIdx.ToString(IC))));
         var s = new List<Step>();
         if (seg == "labelled") {
@@ -259,6 +305,12 @@ class TaskForm : Form
         }
         big.ForeColor = Color.Gray;
         big.Text = "下一段：" + SEG_ZH[segs[segIdx]] + "\n（實驗者按空白鍵開始）";
+        if (postures != "") {
+            var nx = Build(segs[segIdx]);                         // same seed as when it runs: order and postures match
+            string q = nx.Count > 0 ? nx[0].Posture : null;
+            pose.ForeColor = q != null && q != shownPosture ? Color.Gold : Color.Silver;
+            pose.Text = q == null ? "" : (q != shownPosture && shownPosture != null ? "換姿勢 → " : "這段開始：") + POSTURE_ZH[q];
+        }
         small.Text = string.Format("{0} 第 {1} 天   段落 {2}/{3}   {4}", subject, day, segIdx + 1, segs.Length, Summary());
     }
 
@@ -309,6 +361,13 @@ class TaskForm : Form
             big.Text = s.Kind == "practice" ? s.Text + "\n" + lastCommand : s.Text;
         }
         small.Text = string.Format(IC, "{0}   {1} {2}/{3}", subject, SEG_ZH[segName], stepIdx + 1, steps.Count);
+        if (s.Posture != null) {
+            bool change = s.Posture != shownPosture;
+            pose.ForeColor = change ? Color.Gold : Color.Silver;
+            pose.Text = (change && shownPosture != null ? "換姿勢 → " : "姿勢：") + POSTURE_ZH[s.Posture];
+            if (change) Log(now, segName, "posture", stepIdx, s.Trial, s.Posture, "", "", "", "", "", "", POSTURE_ZH[s.Posture]);
+            shownPosture = s.Posture;
+        }
         Log(now, segName, s.Kind + "_on", stepIdx, s.Trial, s.Target ?? "", "", "", "", "", "", "", s.Kind == "item" ? s.Text : "");
         if (s.Kind == "wait" && auto) NextStep();
         if (s.Kind == "tlx") { tlxValue = 50; ShowTlx(); if (auto) TlxKeep(now); }
