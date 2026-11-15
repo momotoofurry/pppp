@@ -90,13 +90,16 @@ def T(s_, bold=False):
     return ('txt', s_, bold)
 
 
-def paper_method(d, title, cite, setting, steps, notes):
-    """the paper's method: setting on the left, its pipeline as a vertical flow on the right"""
+def paper_method(d, title, cite, setting, steps, notes, limits=None):
+    """the paper's method: setting on the left (optionally the limits I saw below it), its pipeline as a vertical flow
+    on the right"""
     s = d.slide(title, notes=notes, tag='論文')
     text(s, 0.6, 1.3, 12.1, 0.4, cite, size=13, color=GREY)
     box(s, 0.6, 1.85, 5.9, 4.85, fill=LIGHT)
-    text(s, 0.85, 2.0, 5.5, 4.6, [('實驗設定', {'size': 17, 'bold': True})] + [(ln, {'bullet': True}) for ln in setting],
-         size=15, space=8)
+    paras = [('實驗設定', {'size': 17, 'bold': True})] + [(ln, {'bullet': True}) for ln in setting]
+    if limits:                                    # the user's own layout (2026-11-15): limits under the setting
+        paras += [('', {})] + [('我讀完後看到的限制', {'bold': True})] + [(ln, {'bullet': True, 'size': 16}) for ln in limits]
+    text(s, 0.85, 2.0, 5.5, 4.02 if limits else 4.6, paras, size=15, space=8)
     n = len(steps)
     hh = min(0.95, (4.85 - 0.2 * (n - 1)) / n)
     for i, (h_, b_) in enumerate(steps):
@@ -171,6 +174,7 @@ def data():
     N['db6within'] = float(db['within'])
     en = open(os.path.join(P.R, 'energy_dryrun_board.txt'), encoding='utf-8').read()
     N['win_us'] = float(re.search(r'window\s+n=\s*\d+\s+mean\s+([\d.]+) us', en).group(1))
+    N['t7'] = csv('task_sim7_summary.csv').set_index(['shift', 'e', 'cond']).probe_after
     return N
 
 
@@ -238,18 +242,15 @@ def build(out):
                  [('預訓練隨機森林', '用其他人的資料先訓練好'), ('one-shot 校正', '使用者做一次短校正：剪枝＋加新樹'),
                   ('使用中收集視窗', '不需要使用者給標籤'), ('t-SNE＋K-Means 偽標籤', '把視窗分群、對到類別'),
                   ('自動重訓新的樹', '免標籤地跟上變化')],
-                 notes='方法照上游程式碼與論文文字整理（report 1.2）。')
+                 notes='方法照上游程式碼與論文文字整理（report 1.2）。限制是我讀完後的整理，不是作者原話。',
+                 limits=['只在同一份資料（arm_position）上驗證', 'LDA 只當對照，沒有做收縮估計', '放進穿戴裝置時的記憶體與運算沒有討論'])
     sel = [('自我校正（全部 block）', 'self-cal, all blocks (mean)'), ('LDA @P5', 'LDA @P5 (mean)'), ('RF @P5', 'RF @P5 (mean)'),
            ('one-shot 比 RF 多 @P5', 'one-shot gain over RF @P5'), ('自我校正比 one-shot 多 @P5', 'self-cal gain over one-shot @P5')]
-    paper_results(d, 'Jiang 等（2024）報告的結果', '論文 Table 1 與正文（arm_position，20 人）',
-                  [['指標（%）', '論文數字']] + [[n, f'{rp.loc[m_, "paper"]:.1f}'] for n, m_ in sel],
-                  [5.4, 2.2], ['只在同一份資料（arm_position）上驗證', 'LDA 只當對照，沒有做收縮估計', '放進穿戴裝置時的記憶體與運算沒有討論'],
-                  notes='數字取自論文（results/paper_comparison.csv 的 paper 欄）。限制欄是我讀完後的整理，不是作者原話。')
+    # 2026-11-15: the user deleted the separate "Jiang reported results" slide and the conclusion bar here
     s = story(d, '我的重現：和論文逐項比較', '原論文的結果，用它公開的程式碼重跑得出來嗎？', notes='report 第 1 節；results/paper_comparison.csv（20 人 × 11 block × 3 seed）。')
     table(s, 0.6, 1.95, 12.1, [['指標（%）', '論文', '我重跑', '差']] +
           [[n, f'{rp.loc[m_, "paper"]:.2f}', f'{rp.loc[m_, "ours (seed-avg)"]:.2f}', f'{rp.loc[m_, "diff (ours-paper)"]:+.2f}'] for n, m_ in sel],
           [5.5, 2.2, 2.2, 2.2], size=15, row_h=0.6)
-    conclude(s, '重現成功：所有對得上的指標差距都 < 1 點 → 原方法可信，開始放進 MCU')
 
     cp = N['comp']
     s = story(d, '放進微控制器：照原樣放不下，要刪減', 'STM32H7 只有 512 KB 的 AXI RAM；原方法照原樣放得進去嗎？', notes='report 第 2–4、6、7、12 節；results/ram_scenarios.csv、sweep_pareto.csv。')
@@ -452,6 +453,41 @@ def build(out):
     ch.value_axis.major_gridlines.format.line.color.rgb = rgb('E3E8EA')
     conclude(s, '硬標籤一錯就掉；軟標籤到 30% 仍穩。但 P-CIIL 一樣穩 →「勝過所有 CIIL」不成立，照實報告')
 
+    t7 = N['t7']
+    s = story(d, '結果②（續）：軟標籤要不要乘上分類器分數？', 'Campbell 的博士論文（2026，第 4 章）已用「平分」的軟標籤；我的差別是乘上分類器分數。這一步有用嗎？',
+              notes='report 35.41；results/task_sim7_summary.csv（½ 格偏移、一輪提示、20 人 × 2 seed）。判準 R14（e = 0.3 時比平分多 ≥ 1 點且 CI > 0；e = 0 時 ≥ −0.5）在執行前 commit，通過：'
+                    '+2.09（+1.55, +2.63），19 人較好；e = 0 時 +0.29。平分版沒有 label spreading（需要成長的記憶庫，作者自己指出不適合嵌入式）。')
+    cd = CategoryChartData()
+    cd.categories = [f'標籤錯 {int(e_ * 100)}%' for e_ in es]
+    series7 = [('只做一輪提示', None, MUTE), ('只有先驗（不乘分數）', 'cue1_prior', CORAL), ('平分（Campbell 第 4 章）', 'cue1_avg', GREY),
+               ('先驗 × 分數（我的）', 'cue1_soft', TEAL)]
+    for name, c_, _ in series7:
+        cd.add_series(name, [round(t7.loc[(0.5, 0.0, 'cue1')] if c_ is None else t7.loc[(0.5, e_, c_)], 1) for e_ in es])
+    gf = s.shapes.add_chart(XL_CHART_TYPE.LINE_MARKERS, Inches(0.6), Inches(1.9), Inches(7.4), Inches(3.95), cd)
+    ch = gf.chart
+    chart_style(ch, legend=True, vmax=94, vmin=78, label_size=11, axis_size=12)
+    ch.plots[0].has_data_labels = False
+    for srs, (_, _, col) in zip(ch.plots[0].series, series7):
+        srs.format.line.color.rgb = rgb(col)
+        srs.format.line.width = P.Pt(3.5 if col in (TEAL, CORAL) else 2.25)
+        srs.smooth = False
+        srs.marker.format.fill.solid()
+        srs.marker.format.fill.fore_color.rgb = rgb(col)
+    ch.value_axis.visible = True
+    ch.value_axis.has_major_gridlines = True
+    ch.value_axis.major_gridlines.format.line.color.rgb = rgb('E3E8EA')
+    elig = sub(t('E'), w('合理'))
+    eqs(s, 8.2, 1.9, 4.5, 3.95, [
+        T('我的：先驗 × 分數', True),
+        E(cat(sub(t('q'), t('c')), t('∝'), sub(t('π'), t('c')), sup(t('e'), cat(t('β'), par(cat(sub(bar(t('s')), t('c')), t('−'), w('max'), w(' '), bar(t('s')))))))),
+        T('平分（情境為負時）', True),
+        E(cat(sub(t('q'), t('c')), t('='), frac(t('1'), par(elig, '|', '|')), t(','), w('  '), t('c'), t('∈'), elig)),
+        T('只有先驗（β = 0）', True),
+        E(cat(sub(t('q'), t('c')), t('='), sub(t('π'), t('c')))),
+        T(f'標籤錯 30%：我的 − 平分 = +{t7.loc[(0.5, 0.3, "cue1_soft")] - t7.loc[(0.5, 0.3, "cue1_avg")]:.1f} 點', True),
+    ], size=15, fill=TEAL_L)
+    conclude(s, '耐錯主要來自「乘上分類器分數」：比平分多約 2 點、比只有先驗多約 9 點（模擬）→ 可以主張這一步')
+
     vd = N['vid']
     s = story(d, '結果③：和 Vidovic（2016）照原文公式比較', '用 Vidovic 原文的公式和參數（τ = λ = 0.8），在同一個模擬、同一批人上比較', notes='report 35.30；results/task_sim6_vidovic.csv、task_sim4_summary.csv（½ 格偏移，block 1–10，20 人）。判準 R6 通過。')
     bars(s, ['固定第 1 天 LDA', 'Vidovic LDAMA（只調平均）', 'Vidovic LDACMA', '我的：一輪提示', '我的：一輪提示＋軟標籤'],
@@ -501,10 +537,11 @@ def build(out):
             ['整套能在 MCU 上即時執行', '站得住', '板上和 PC 逐一相同（第 6 段）'],
             ['任務標籤能提升準確率', '未證實', '模擬有效；DB6 換次後不明顯'],
             ['軟標籤勝過所有 CIIL 策略', '不成立', '模擬中 P-CIIL 一樣耐錯'],
+            ['「先驗 × 分數」比平分式軟標籤耐錯', '站得住（模擬）', '錯 30% 時多 2.1 點（Campbell 2026 第 4 章）'],
             ['比 Vidovic 高 16 點', '不成立', '只在同次評分；換次後消失'],
             ['出力判斷是新方法', '不是新的', 'Scheme 等（2013）已有同類做法']]
-    fills = {(i, 1): TEAL_L if r_[1] == '站得住' else (PINK if r_[1].startswith('不') else YELLOW) for i, r_ in enumerate(rows[1:], start=1)}
-    table(s, 0.6, 1.4, 12.1, rows, [5.0, 2.4, 4.7], size=14, row_h=0.56, fills=fills)
+    fills = {(i, 1): TEAL_L if r_[1].startswith('站得住') else (PINK if r_[1].startswith('不') else YELLOW) for i, r_ in enumerate(rows[1:], start=1)}
+    table(s, 0.6, 1.4, 12.1, rows, [5.0, 2.4, 4.7], size=14, row_h=0.5, fills=fills)
     text(s, 0.6, 6.55, 12.1, 0.4, '→ 任務標籤從「主要貢獻」降為「要用真人實驗檢驗的假設」', size=15, bold=True, color=TEAL)
 
     # ================================================================ 6 implementation
