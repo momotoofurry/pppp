@@ -25,7 +25,8 @@
 //       TaskScreen.exe; every typed command -> ops.csv. All three CSVs carry Unix time in ms (unix_ms).
 //       Commands typed while running:
 //         reset | cal <0-5> | calend | calibrate | align | decision <tau_permille> <k> | report <0|1> | status | quit
-//       cal <g> = reset + CAL_START; CAL_END follows by itself after 2 s of samples (10 windows per gesture).
+//       cal <g> = reset + CAL_START; CAL_END follows by itself after 4 s of samples with --firmware lda (30 windows per gesture; 2 s / 10 until
+//       2026-11-16, and still 2 s for the frozen firmware).
 //       adapt 0|1 = study condition: 0 fixed day-1 model (no adaptation, no alignment), 1 full system (default);
 //       start every condition with 'load' so that both begin from the same day-1 model (PROTOCOL.md).
 //       load = restore the day-1 model from the board's Flash (after the board was off, e.g. on day 2; the
@@ -719,10 +720,14 @@ static class Program
                                                 100 * ok >= VERIFY_PASS_PCT * n ? "PASS" : "FAIL: redo the calibration (cal 0-5, calibrate)"));
         }
     }
-    // cal <g> = reset + CAL_START, then CAL_END by itself after CAL_FRAMES samples have gone out (2 s: windows 9..18
-    // after the reset = 10 windows per gesture, as the data set; rt.c caps the total at 60, not per gesture)
+    // cal <g> = reset + CAL_START, then CAL_END by itself after CAL_FRAMES samples have gone out (4 s: windows 9..38
+    // after the reset = 30 windows per gesture; the LDA firmware build rtl_task_cal4 keeps RTL_LABEL_MAX = 360 = two passes,
+    // room to redo gestures; 2 s / 10 until 2026-11-16)
     // align = reset + ALIGN_START, then ALIGN_END by itself after ALIGN_FRAMES (8 s: 79 windows - 9 warmup = 70)
-    const long CAL_FRAMES = 4000, ALIGN_FRAMES = 16000;
+    // the frozen RF firmware (rt.c) caps the cued pass at 60 windows, so it keeps 2 s / 10 windows per gesture
+    static long CAL_FRAMES { get { return lda ? 8000 : 4000; } }
+    static string CAL_S { get { return lda ? "4" : "2"; } }
+    const long ALIGN_FRAMES = 16000;
     static long framesSent, autoStart = -1, autoFrames;
     static byte autoEnd;                                          // CAL_END or ALIGN_END while one is pending
     static string autoMsg;
@@ -767,9 +772,9 @@ static class Program
         else if (c == "cal" && p.Length == 2) {
             int g = int.Parse(p[1]);
             if (g < 0 || g > 5) { Console.WriteLine("gesture 0-5: 0 Power, 1 Lateral, 2 Tripod, 3 Pointer, 4 Open, 5 Rest"); return false; }
-            StartAuto(Proto.CAL_START, g, Proto.CAL_END, CAL_FRAMES, "calend (auto, 2 s): you can relax");
-            Console.WriteLine(string.Format(IC, "[{0:F1} s] cal {1} ({2}): do the gesture now and hold it; calend comes by itself after 2 s",
-                                            clock.Elapsed.TotalSeconds, g, Proto.GESTURES[g]));
+            StartAuto(Proto.CAL_START, g, Proto.CAL_END, CAL_FRAMES, "calend (auto, " + CAL_S + " s): you can relax");
+            Console.WriteLine(string.Format(IC, "[{0:F1} s] cal {1} ({2}): do the gesture now and hold it; calend comes by itself after {3} s",
+                                            clock.Elapsed.TotalSeconds, g, Proto.GESTURES[g], CAL_S));
             return true;
         }
         else if (c == "calend") { lock (txLock) { Send(Proto.Control(Proto.CAL_END)); autoStart = -1; } }
@@ -779,7 +784,7 @@ static class Program
             lock (vLock) { vOk[g] = 0; vN[g] = 0; verifyG = g; verifyLeft = VERIFY_WINDOWS; }
             Send(Proto.Control(Proto.STREAM_RESET));
             Console.WriteLine(string.Format(IC, "[{0:F1} s] verify {1} ({2}): do the gesture now and hold it (about 2 s)",
-                                            clock.Elapsed.TotalSeconds, g, Proto.GESTURES[g]));
+                                            clock.Elapsed.TotalSeconds, g, Proto.GESTURES[g], CAL_S));
             return true;
         }
         else if (c == "align") {

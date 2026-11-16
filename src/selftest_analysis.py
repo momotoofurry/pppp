@@ -2,7 +2,7 @@
 interleaved? PC only, offline replay of the recorded raw EMG. Written and committed BEFORE the first recording.
 
 Recording (SELFTEST.md): per day, one donning. TrignoBridge.exe run --firmware lda (raw EMG -> <name>_emg.csv,
-typed commands -> <name>_ops.csv); the cued pass is typed in the bridge: cal 0 ... cal 5 (2 s each), calibrate;
+typed commands -> <name>_ops.csv); the cued pass is typed in the bridge: cal 0 ... cal 5 (4 s each; 2 s until 2026-11-16), calibrate;
 then TaskScreen --segments labelled,task,labelled,task,labelled --reps 2 --n 40 (-> <name>_task.csv):
   P0  labelled segment 1: every gesture twice, random order  (right after the cued pass)
   T1  task segment 1: 40 cued commands (pose_A grip pose_B release home, balanced, random order)
@@ -21,7 +21,11 @@ not bit-equal to what the board saw) -> src/c/features.c streamed over the whole
 (Power Lateral Tripod Pointer Open Rest, the label order of TaskScreen and decision.c).
 Windows used:
   cued pass   'cal g' rows of ops.csv (the last one per gesture before the first TaskScreen segment): windows
-              wholly inside [t, t + 2 s], the last 10 (as the 2 s recordings of arm_position, windows 9-18)
+              wholly inside [t, t + CAL_S], the last (inside - 9): what the board keeps after its 9 warm-up windows.
+              Changed 2026-11-16, before any real recording: CAL_S 2 s -> 4 s (30 windows per gesture instead of 10;
+              the LDA firmware build rtl_task_cal4 keeps RTL_LABEL_MAX = 360). --cal-s 2 re-runs the analysis with
+              only the first 2 s of each cued gesture (10 windows, the old rule): the 2 s vs 4 s comparison, reported
+              next to the primary result and not changing the verdict.
   probes      cue_on .. cue_off of the labelled segments: windows wholly inside [cue_on + 0.5 s, cue_off], the
               central 10 (0.5 s for the reaction)
   task trials trial_on .. trial_off + 0.5 s of the task segments (TaskScreen ends a trial at the board's first
@@ -80,7 +84,8 @@ COMMAND = {'pose_A': 'Power', 'home': 'Lateral', 'grip': 'Tripod', 'pose_B': 'Po
 CMD_G = sorted(G[g] for g in COMMAND.values())
 K, REST = 6, 5
 FS, WIN, STEP, NW = 2000.0, 400, 200, 10
-CAL_S, REACT_S, HOLD_S, K_DC, DECAY = 2.0, 0.5, 0.5, 3, 0.97
+CAL_S, REACT_S, HOLD_S, K_DC, DECAY = 4.0, 0.5, 0.5, 3, 0.97
+WARMUP = 9                                                    # windows the board skips after the reset of every cal
 EPS, P0, BETA = T2.EPS, T2.P0, T2.BETA
 ERRS, SEEDS = (0.0, 0.1, 0.3), 20
 CONDS = ('fixed', 'cue', 'cue_soft', 'cue_pn', 'cue_pos', 'cue_soft_t1')
@@ -165,7 +170,7 @@ def mid(idx):
     return idx[o:o + NW]
 
 
-def load_day(folder, name):
+def load_day(folder, name, cal_s=CAL_S):
     X, t0, rate = load_emg(os.path.join(folder, f'{name}_emg.csv'))
     F = features(X)
     nw = len(F)
@@ -180,7 +185,8 @@ def load_day(folder, name):
             cal[int(c[1])] = float(r.unix_ms)
     assert sorted(cal) == list(range(K)), f'{name}: cued pass incomplete, cal rows for {sorted(cal)}'
     ev = []                                                     # (time, kind, payload)
-    cue_rows = [inside(t0, nw, cal[g], cal[g] + CAL_S * 1000)[-NW:] for g in range(K)]
+    cal_nw = int(round((cal_s * FS - WIN) / STEP)) + 1 - WARMUP           # 4 s: 30, 2 s: 10
+    cue_rows = [inside(t0, nw, cal[g], cal[g] + cal_s * 1000)[-cal_nw:] for g in range(K)]
     ev.append((max(cal.values()), 'cuepass', [(rows, g) for g, rows in enumerate(cue_rows)]))
     # the last completed run of every segment index
     runs, cur = {}, None
@@ -310,6 +316,7 @@ def main():
     ap.add_argument('--dir', required=True)
     ap.add_argument('--days', nargs='+', required=True)
     ap.add_argument('--out', default=os.path.join(P.ROOT, 'results', 'selftest'))
+    ap.add_argument('--cal-s', type=float, default=CAL_S, help='seconds of each cued gesture used (4; 2 = the old rule)')
     args = ap.parse_args()
     os.makedirs(args.out, exist_ok=True)
     lines = []
@@ -318,7 +325,8 @@ def main():
         lines.append(s)
         print(s, flush=True)
 
-    days = [load_day(args.dir, n) for n in args.days]
+    days = [load_day(args.dir, n, args.cal_s) for n in args.days]
+    p(f"cued pass: first {args.cal_s:g} s of each gesture")
     for D in days:
         p(f"{D['name']}: TCU rate {D['rate']:.1f} Hz, {len(D['F'])} windows, cued pass windows {D['cal_windows']}, "
           f"probes {D['probes']}, task trials {D['trials']}")

@@ -7,7 +7,7 @@ decision rule) runs once before the first real recording.
 Per participant p (1-3) and day d (1-2): the EMG of each scheduled gesture is a random stretch of a random trial of
 that grasp from participant{p}_day{d}_block1 (rows 0-7 = one electrode ring; grasp codes 1-6 -> Power Lateral Tripod
 Pointer Open Rest), rest periods from the rest grasp. Schedule as SELFTEST.md: 3 s rest; cued pass cal 0..5 (gesture
-2.5 s, rest 2 s), calibrate; TaskScreen labelled (2 x 6 cues, gap 3 s, cue 2 s, gesture from 0.4 s after cue_on to
+4.5 s, rest 2 s), calibrate; TaskScreen labelled (2 x 6 cues, gap 3 s, cue 2 s, gesture from 0.4 s after cue_on to
 0.2 s after cue_off), task (40 trials, the target's gesture from 0.5 s to 2.5 s, trial_off at 2.2 s, rest 2.5 s),
 labelled, task, labelled. The user's reaction to the board's feedback is not modelled.
 Usage (in the container, Kyranou data at /data): python src/selftest_fake.py [--out build/selftest_fake]
@@ -83,7 +83,7 @@ def session(data, p, d, rng):
     ops.append((s.ms(), 'reset', 1))
     for g in range(6):
         ops.append((s.ms(), f'cal {g}', 1))
-        s.add(g, 2.5)
+        s.add(g, 4.5)
         s.add(5, 2.0)
     ops.append((s.ms(), 'calibrate', 1))
     s.add(5, 3.0)
