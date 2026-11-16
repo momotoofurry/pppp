@@ -26,7 +26,7 @@ class ExperimentPanel : Form
     readonly List<Control> needBridge = new List<Control>(), needIdle = new List<Control>();
     readonly Button[] calBtn = new Button[6];
     Button calibrateBtn;
-    TextBox room, skin, strap, photo, exercise, freeNote, fatigue, skinEnd, dest;
+    TextBox room, skin, strap, photo, exercise, freeNote, dest;
 
     Process bridge, tool;
     StreamWriter bridgeIn;
@@ -115,8 +115,6 @@ class ExperimentPanel : Form
 
         // ---- SOP 5.5: end
         g = Group(left, "⑦ 結束（5.5）");
-        fatigue = Box(40, "", "疲勞"); skinEnd = Box(120, "ok", "結束皮膚");
-        Row(g, Lbl("疲勞 0-10"), fatigue, Lbl("皮膚"), skinEnd);
         var end = Btn("結束錄製並檢查檔案", delegate { EndSession(); }); end.Font = UIB; end.Width = 260;
         var ver = Btn("只檢查檔案（verify）", delegate { Verify(); });
         Row(g, end); Row(g, ver);
@@ -298,7 +296,7 @@ class ExperimentPanel : Form
     {
         string l = cmdBox.Text.Trim();
         if (l == "") return;
-        if (l == "quit" && MessageBox.Show("直接 quit 會結束錄製（不會先記疲勞）。確定？", Text, MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+        if (l == "quit" && MessageBox.Show("quit 會結束錄製。確定？", Text, MessageBoxButtons.YesNo) != DialogResult.Yes) return;
         Send(l); cmdBox.Clear();
     }
 
@@ -337,9 +335,8 @@ class ExperimentPanel : Form
 
     void EndSession()
     {
-        if (fatigue.Text.Trim() == "") { MessageBox.Show("先填疲勞 0-10。", Text); fatigue.Focus(); return; }
-        if (MessageBox.Show("提示畫面都做完了嗎？按「是」會記錄疲勞、結束錄製，然後檢查檔案。", Text, MessageBoxButtons.YesNo) != DialogResult.Yes) return;
-        Send("note end, fatigue 0-10: " + fatigue.Text.Trim() + ", skin " + skinEnd.Text.Trim());
+        if (MessageBox.Show("提示畫面都做完了嗎？按「是」會結束錄製，然後檢查檔案。", Text, MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+        Send("note end");
         verifyAfterQuit = true;
         Send("quit");
     }
