@@ -131,7 +131,7 @@ def session(data, p, d, rng):
     frame = np.arange(len(Y))
     batch = frame // 27
     ms = T0_UNIX + ((batch + 1) * 27) / rate * 1000 + 2.0       # a read returns 27 frames, logged ~2 ms later
-    emg = pd.DataFrame(Y.astype(np.float32), columns=[f'ch{c}_V' for c in range(8)])
+    emg = pd.DataFrame(Y.astype(np.float32), columns=[f'ch{c}_V' for c in range(1, 9)])
     emg.insert(0, 'frame', frame)
     emg.insert(0, 'unix_ms', [f'{v:.1f}' for v in ms])           # as TrignoBridge: F1, not the float format
     return emg, pd.DataFrame(ops, columns=['unix_ms', 'command', 'accepted']), pd.DataFrame(task)[COLS], rate

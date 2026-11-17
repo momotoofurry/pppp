@@ -136,7 +136,8 @@ class RunLDA:
 # ------------------------------------------------------------------ reading one day
 def load_emg(path):
     df = pd.read_csv(path)
-    X = df[[f'ch{c}_V' for c in range(8)]].to_numpy(np.float64)
+    cols = [f'ch{c}_V' for c in range(1, 9)]                     # TrignoBridge writes ch1_V..ch8_V (fixed 2026-11-17)
+    X = df[cols].to_numpy(np.float64)
     fr = df.frame.to_numpy(np.float64)
     ms = df.unix_ms.to_numpy(np.float64)
     slope, icpt = np.polyfit(fr, ms - ms[0], 1)                 # ms per frame
