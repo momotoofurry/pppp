@@ -16,7 +16,8 @@
 //   TrignoBridge run    --port COM5 [--tcu 127.0.0.1] [--rate 2000] [--emg-csv emg.csv] [--mcu-csv mcu.csv]
 //                       [--ops-csv ops.csv] [--udp 50555] [--gate 1] [--script commands.txt] [--slots 1-8]
 //       --slots: which 8 TCU sensor slots become channels 1-8, in that order (default 1-8). Ranges a-b and lists
-//       joined with ':' (no commas: cmd.exe splits on them), e.g. --slots 4-11 or --slots 1-4:9-12. emg.csv, the
+//       joined with ':' (no commas: cmd.exe splits on them), e.g. --slots 4-11 or --slots 1-4:9-12; a slot may repeat
+//       (4 sensors: --slots 5:11:15:16:5:11:15:16). emg.csv, the
 //       board and every later step see only the 8 mapped channels; the mapping is written to ops.csv as a note.
 //                       (--port file:<path>: write the serial bytes to a file; --udp 0: no forwarding;
 //                        --udp 50555,50556: forward to TaskScreen and to src/pc/kinova_bridge.py)
@@ -317,10 +318,16 @@ static class Program
             }
             for (int k = lo; k <= hi; k++) r.Add(k);
         }
-        if (r.Count != Proto.CH || r.Exists(k => k < 1 || k > Tcu.CHANNELS) || new HashSet<int>(r).Count != r.Count) {
-            Console.WriteLine("--slots needs " + Proto.CH + " different slots between 1 and " + Tcu.CHANNELS + ", got: " + string.Join(",", r));
+        if (r.Count != Proto.CH || r.Exists(k => k < 1 || k > Tcu.CHANNELS)) {
+            Console.WriteLine("--slots needs " + Proto.CH + " slots between 1 and " + Tcu.CHANNELS + ", got: " + string.Join(",", r));
             return null;
         }
+        // a slot may repeat (2026-11-17: only 4 working sensors, e.g. 5:11:15:16:5:11:15:16): the copy feeds the
+        // board the same signal, adds no information, and keeps the 8-channel firmware (an empty slot is all zeros,
+        // and its skewness / mean frequency would be 0/0 = NaN)
+        int distinct = new HashSet<int>(r).Count;
+        if (distinct != r.Count)
+            Console.WriteLine("note: --slots repeats slots: " + distinct + " different sensors feed " + Proto.CH + " channels");
         return r.ConvertAll(k => k - 1).ToArray();
     }
 
