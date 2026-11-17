@@ -26,7 +26,7 @@ from proposal import (CORAL, GREY, INK, LIGHT, MUTE, NAVY, TEAL, TEAL_L, WHITE, 
 WHEN = '2026 年 12 月'
 FOOT = f'碩士論文進度報告｜{WHEN}｜方向待指導老師確認'
 PINK, YELLOW = 'FBE3DD', 'FFF2CC'
-SECTIONS = ['1 背景與問題', '2 RQ1：原方法能不能用', '3 方法', '4 模擬結果', '5 真實資料', '6 系統實作', '7 結論與下一步']
+SECTIONS = ['1 背景與問題', '2 為什麼轉向', '3 方法', '4 公開資料驗證', '5 MCU 實作', '6 自我測試', '7 結論與下一步', '附錄']
 
 
 class Deck(P.Deck):
@@ -184,30 +184,42 @@ def build(out):
     k, t2, t4, rp = N['kyr'], N['t2'], N['t4'], N['repro']
     sm, nx = N['db6']['same'], N['db6']['next']
 
-    # ================================================================ title + outline
-    s = d.slide(dark=True, notes='研討會式報告：背景與問題 → 原方法檢驗 → 方法 → 結果 → 真實資料 → 系統實作 → 結論。')
+    cp = N['comp']
+    sh = N['shift']
+    ex = N['ext']
+    la = N['la']
+    t7 = N['t7']
+    vd = N['vid']
+    fr = N['front']
+    fc = N['featchk']
+    lc = N['ldachk']
+    fs = N['fwrtos']
+    ram = fs[1] + fs[2]
+    rt = N['rtos']
+    nn, mb = N['nn'], N['mlpb']
+    rtt, rtg, btk = N['rt_task'], N['rt_gate'], N['btask']
+    s = d.slide(dark=True, notes='進度報告（2026-11-17 大改）：問題 → 為什麼轉向 → 方法 → 公開資料驗證 → MCU 實作 → 自我測試 → 結論。')
     text(s, 0.9, 1.5, 11.5, 0.5, '碩士論文進度報告', size=18, color='8FD3D0')
-    text(s, 0.9, 2.1, 11.6, 2.0, ['在微控制器上、用最少的使用者負擔做每次配戴的肌電校正',
-                                    ('從「免標籤自我校正」收斂到「一輪提示＋機器人任務提供的標籤」', {'size': 22, 'bold': False, 'color': 'CFE3E6'})],
+    text(s, 0.9, 2.1, 11.6, 2.0, ['在微控制器上，用最少的校正讓肌電控制每天都準',
+                                    ('每次配戴的短提示＋跨天累積＋機器人任務提供的軟標籤，用 9 個方向手勢控制輔助機械臂', {'size': 22, 'bold': False, 'color': 'CFE3E6'})],
          size=28, bold=True, color=WHITE, space=10)
     text(s, 0.9, 4.75, 11, 1.2, ['機器人研究所｜生物力學與醫學應用實驗室', '報告人：【待填】　指導教授：【待填】',
                                   (f'{WHEN}　方向尚待指導老師確認', {'color': '8FD3D0'})], size=16, color='CFE3E6', space=4)
 
-    s = d.slide('報告大綱', notes='每一段都接著上一段留下的問題。')
-    outline = [('背景與問題', '重新戴上肌電介面後準確率下降；現有做法與缺口'),
-               ('RQ1：原方法能不能用', '重現 → 放進 MCU → 預先登錄的獨立檢驗 → 轉折'),
-               ('方法', '收縮 LDA、任務軟標籤、出力判斷（含公式）'),
-               ('模擬結果', '和 CIIL、Vidovic、Scheme 照原文比較'),
-               ('真實資料', 'NinaPro DB6：哪些成立、哪些被推翻'),
-               ('系統實作', 'MCU 上的計算、記憶體、即時性、和神經網路比較'),
-               ('結論與下一步', '三個研究問題的答案；自我測試')]
+    s = d.slide('報告大綱', notes='2026-11-17 大改：主線約 25 頁，原題目的重現、論文細節、模擬與 MCU 計算移到附錄。')
+    outline = [('背景與問題', '重新戴上就不準；現有做法與缺口；研究問題'),
+               ('為什麼轉向', '免標籤自我校正沒有確認增益；少量有標籤資料才有效'),
+               ('方法', '收縮 LDA 只存累加和、任務軟標籤、出力判斷、9 類指令'),
+               ('公開資料驗證', 'DB2、Ozdemir 2022、GrabMyo：手勢數、擺法、軟標籤、跨天'),
+               ('MCU 實作', '記憶體、即時性、逐一驗證'),
+               ('自我測試', '4 顆貼主要肌肉；流程測試；9 手勢的實驗與判準'),
+               ('結論與下一步', '研究問題的答案、時程、需要老師決定的事')]
     for i, (h_, b_) in enumerate(outline):
         y = 1.45 + i * 0.75
         circle_num(s, 0.7, y + 0.06, i + 1, fill=TEAL, d=0.5)
         text(s, 1.45, y, 3.8, 0.6, h_, size=18, bold=True, anchor=MSO_ANCHOR.MIDDLE)
         text(s, 5.3, y, 7.4, 0.6, b_, size=15, color=GREY, anchor=MSO_ANCHOR.MIDDLE)
 
-    # ================================================================ 1 background
     d.divider(0, '每天重新戴上肌電介面，準確率就掉；校正又是使用者的負擔')
     s = story(d, '問題：重新戴上之後，昨天的模型今天就不準', '公開資料 NinaPro DB6（10 人、5 天、8 類手勢）：同樣的人、同樣的手勢，換一次配戴差多少？',
               notes='report 35.31；results/db6_sim.csv。「當次完整重新校正」＝只用該次的第 1–6 次重複訓練（上限參考，使用者要做很多提示動作）。', tag=None)
@@ -222,52 +234,21 @@ def build(out):
             ['情境式增量學習', 'Campbell 等（2024）', '正常使用，任務情境當標籤', '只在虛擬游標；假設情境完美'],
             ['信心度拒絕／出力門檻', 'Scheme 等（2013）', '—', '擋誤觸發的前端，可與上面合用']]
     table(s, 0.6, 1.45, 12.1, rows, [2.6, 2.8, 3.2, 3.5], size=14, row_h=0.75)
-    text(s, 0.6, 5.45, 12.1, 0.5, '我的出發點：把第一列（原題目）放進 MCU；結果發現必須轉向第二、三列', size=15, color=GREY)
+    text(s, 0.6, 5.45, 12.1, 0.5, '我的方向：結合第二、三、四列——每次一輪短提示、跨天累積、任務提供標籤、出力判斷擋誤觸發', size=15, color=GREY)
 
-    s = d.slide('研究問題與這份報告的地圖', notes='RQ1、RQ3 已有答案；RQ2 是主要問題，下一步的自我測試要回答。')
-    rqs = [('RQ1', '免標籤自我校正有沒有用？', '→ 第 2 段'), ('RQ2', '標籤能不能大部分由機器人任務提供？', '→ 第 3–5 段'),
-           ('RQ3', '整套能不能在 MCU 上即時執行？', '→ 第 6 段')]
+    s = d.slide('研究問題', notes='2026-11-17 改寫：RQ1 原本是「免標籤自我校正有沒有用」（答案：沒有確認增益，見第 2 段與附錄）。')
+    rqs = [('RQ1', '每次重新戴上後，一輪短提示＋跨天累積能把準確率拉回多少？', '→ 第 4 段'),
+           ('RQ2', '機器人任務能不能提供標籤，讓模型在使用中繼續變準？', '→ 第 4、6 段'),
+           ('RQ3', '整套能不能在 MCU 上即時執行？', '→ 第 5 段')]
     for i, (q, a1, a2) in enumerate(rqs):
         y = 1.5 + i * 1.3
         box(s, 0.6, y, 12.1, 1.1, fill=TEAL_L if i != 1 else PINK)
         circle_num(s, 0.85, y + 0.28, i + 1, fill=TEAL if i != 1 else CORAL, d=0.55)
-        text(s, 1.65, y + 0.1, 8.5, 0.9, f'{q}：{a1}', size=19, bold=True, anchor=MSO_ANCHOR.MIDDLE)
-        text(s, 10.2, y + 0.1, 2.4, 0.9, a2, size=16, color=GREY, anchor=MSO_ANCHOR.MIDDLE)
-    text(s, 0.6, 5.55, 12.1, 0.9, '研究的方向不是一開始就定好的：每一段的結果決定了下一段要做什麼。', size=16, color=GREY)
+        text(s, 1.65, y + 0.1, 8.9, 0.9, f'{q}：{a1}', size=18, bold=True, anchor=MSO_ANCHOR.MIDDLE)
+        text(s, 10.6, y + 0.1, 2.0, 0.9, a2, size=16, color=GREY, anchor=MSO_ANCHOR.MIDDLE)
+    text(s, 0.6, 5.55, 12.1, 0.9, '應用：用 9 個方向手勢（上下左右前後、夾爪開／夾、停）控制輔助機械臂（Kinova Gen3）', size=16, color=GREY)
 
-    # ================================================================ 2 RQ1
-    d.divider(1, '原題目：把 Jiang 等的免標籤自我校正隨機森林放進微控制器')
-    paper_method(d, 'Jiang 等（2024）：免標籤自我校正隨機森林', 'Jiang, Ma, Nazarpour. Posture-invariant myoelectric control with self-calibrating random forests. Frontiers in Neurorobotics, 2024',
-                 ['資料：arm_position，20 人', '5 個手臂位置（P2、P4、P5、P6、P8）、11 個 block', '6 類手勢（含放鬆）、8 通道', '比較：LDA、RF、one-shot、自我校正'],
-                 [('預訓練隨機森林', '用其他人的資料先訓練好'), ('one-shot 校正', '使用者做一次短校正：剪枝＋加新樹'),
-                  ('使用中收集視窗', '不需要使用者給標籤'), ('t-SNE＋K-Means 偽標籤', '把視窗分群、對到類別'),
-                  ('自動重訓新的樹', '免標籤地跟上變化')],
-                 notes='方法照上游程式碼與論文文字整理（report 1.2）。限制是我讀完後的整理，不是作者原話。',
-                 limits=['只在同一份資料（arm_position）上驗證', 'LDA 只當對照，沒有做收縮估計', '放進穿戴裝置時的記憶體與運算沒有討論'])
-    sel = [('自我校正（全部 block）', 'self-cal, all blocks (mean)'), ('LDA @P5', 'LDA @P5 (mean)'), ('RF @P5', 'RF @P5 (mean)'),
-           ('one-shot 比 RF 多 @P5', 'one-shot gain over RF @P5'), ('自我校正比 one-shot 多 @P5', 'self-cal gain over one-shot @P5')]
-    # 2026-11-15: the user deleted the separate "Jiang reported results" slide and the conclusion bar here
-    s = story(d, '我的重現：和論文逐項比較', '原論文的結果，用它公開的程式碼重跑得出來嗎？', notes='report 第 1 節；results/paper_comparison.csv（20 人 × 11 block × 3 seed）。')
-    table(s, 0.6, 1.95, 12.1, [['指標（%）', '論文', '我重跑', '差']] +
-          [[n, f'{rp.loc[m_, "paper"]:.2f}', f'{rp.loc[m_, "ours (seed-avg)"]:.2f}', f'{rp.loc[m_, "diff (ours-paper)"]:+.2f}'] for n, m_ in sel],
-          [5.5, 2.2, 2.2, 2.2], size=15, row_h=0.6)
-
-    cp = N['comp']
-    s = story(d, '放進微控制器：照原樣放不下，要刪減', 'STM32H7 只有 512 KB 的 AXI RAM；原方法照原樣放得進去嗎？', notes='report 第 2–4、6、7、12 節；results/ram_scenarios.csv、sweep_pareto.csv。')
-    bars(s, ['照論文原樣（float32 buffer、400 棵樹、t-SNE）', '不做 t-SNE（int16 buffer、100 棵樹）'],
-         [('自我校正需要的 RAM（KB）', [N['ram_paper'], N['ram_noTSNE']])], None, y=1.9, h=3.0, vmax=1400, legend=False, fmt='0', points=[CORAL, TEAL])
-    text(s, 0.6, 4.95, 12.1, 0.9, [f'模型壓縮：100 棵、深度 10、int16 只要 {cp["kb"]:.1f} KB（完整模型 {N["comp_full_kb"]:.0f} KB），準確率只差 {cp["d"]:+.2f} 點',
-                                   '整套用 C、靜態記憶體重寫，在 NUCLEO-H753ZI 上即時執行'], size=15, space=4)
-    conclude(s, '韌體 v2：拿掉 t-SNE、模型壓縮，凍結成 pilot 版本')
-
-    sh = N['shift']
-    s = story(d, '電極轉動時：免標籤救不回來', '電極環轉了一格（約 45°），免標籤的自我校正能補救嗎？', notes='report 8.1；results/shift_sweep_raw_summary*.csv（模擬：轉原始 EMG 再算特徵）。UHC＝Campbell 等（2024）的高信心偽標籤基準。')
-    bars(s, ['沒有轉動', '轉一格：固定模型', '轉一格：免標籤自我校正', '轉一格：高信心偽標籤（UHC）', '轉一格：加開機對齊'],
-         [('準確率 %', [sh['none'], sh['fixed'], sh['tsne'], sh['uhc'], sh['align']])], None, y=1.9, h=3.9, legend=False,
-         points=[MUTE, GREY, CORAL, CORAL, TEAL])
-    conclude(s, '加上「開機對齊」（估計轉了幾格再對回來）；模擬中可以救回 → 要在真實資料上確認')
-
-    ex = N['ext']
+    d.divider(1, '原題目是免標籤自我校正；獨立資料上沒有確認增益，有效的是少量有標籤資料')
     s = story(d, '預先登錄的獨立資料檢驗：免標籤沒有確認增益', '在別人錄的跨日資料（Kyranou 等，2025；8 人、Delsys Trigno）上，完整系統比固定模型好嗎？',
               notes='report 第 24 節；分析計畫在看資料前 commit（EXTERNAL_PLAN.md），只跑一次；results/external_check_summary.csv。8 人可偵測 dz ≥ 1.16。')
     bars(s, ['固定模型', '完整系統（免標籤自我校正＋開機對齊）'], [('跨日準確率 %', [ex['F'], ex['A']])], None, w_=7.0, y=1.9, h=3.9,
@@ -286,27 +267,25 @@ def build(out):
          points=[MUTE, CORAL, '7FB7B9', '7FB7B9', TEAL])
     conclude(s, '研究問題改成：每次配戴用「少量標籤」校正 → 用什麼模型？標籤從哪來？')
 
-    # ================================================================ 3 methods
-    d.divider(2, '有了少量標籤：用收縮 LDA 校正；讓機器人任務提供更多標籤；出力判斷擋誤觸發')
-    paper_method(d, 'Vidovic 等（2016）：用小校正集收縮 LDA', 'Vidovic et al. Improving the robustness of myoelectric pattern recognition for upper limb prostheses by covariate shift adaptation. IEEE TNSRE, 2016',
-                 ['離線：7 位健常人＋4 位截肢者，跨 5 天', '線上：8 位健常人＋1 位截肢者，3 天', '8 個電極；每天重新穿戴', '校正資料：不到 1 分鐘'],
-                 [('第 1 天訓練 LDA', '類別平均、共變異'), ('每天錄小校正集', '每個動作一次（< 1 分鐘）'),
-                  ('把參數往校正集收縮', '公式見下一頁'), ('用調整後的 LDA 分類', '原文最佳 τ = 0.8、λ = 0.8')],
-                 notes='依原文式 6–7、II-C、III-B 節（report 35.30）。')
-    s = d.slide('Vidovic 等（2016）：收縮公式與報告的結果', notes='公式依原文式 6–7；結果取自原文摘要與 III-B 節。', tag='論文')
-    mu, Sg = t('μ'), t('Σ')
-    eqs(s, 0.6, 1.4, 6.4, 3.7, [
-        T('第 1 天的 LDA 參數，往這次配戴的小校正集收縮：', True),
-        E(cat(sub(bar(mu), t('c')), t('='), par(cat(t('1'), t('−'), t('τ'))), subsup(mu, t('c'), w('訓練')), t('+'), t('τ'), subsup(mu, t('c'), w('校正')))),
-        E(cat(bar(Sg), t('='), par(cat(t('1'), t('−'), t('λ'))), sup(Sg, w('訓練')), t('+'), t('λ'), sup(Sg, w('校正')))),
-        T('判別函數（等先驗）：'),
-        E(cat(sub(t('g'), t('c')), par(t('x')), t('='), subsup(bar(mu), t('c'), t('T')), sup(bar(Sg), t('−1')), t('x'), t('−'), frac(t('1'), t('2')),
-              subsup(bar(mu), t('c'), t('T')), sup(bar(Sg), t('−1')), sub(bar(mu), t('c')))),
-    ], size=19)
-    table(s, 7.3, 1.4, 5.4, [['原文結果', ''], ['離線，有適應（5 天）', '維持 92% 以上'], ['離線，沒有適應', '降到 75%'],
-                             ['線上，有適應 vs 沒有', '提升 25%'], ['只調平均（τ, λ = 0）', '較差']], [3.1, 2.3], size=14, row_h=0.62, header_fill=CORAL)
-    text(s, 0.6, 5.35, 12.1, 0.9, ['τ、λ 越大越相信這次的校正集；τ = λ = 1 就是只用校正集重訓',
-                                   '我讀完後看到的限制：每天仍要主動校正；每次都從第 1 天出發，不跨次累積；在 PC 上'], size=14, color=GREY, space=4)
+    d.divider(2, '收縮 LDA 只存累加和（可跨天累積）；任務軟標籤；出力判斷；9 類指令')
+    s = story(d, '系統架構：PC 只轉送，MCU 做全部運算', '一個指令從肌電到機械臂、再把任務標籤送回 MCU 的路徑', notes='report 7.3、35.13、35.24–35.27；src/c/protocol.h、rt_lda.h、src/pc/TrignoBridge.cs、kinova_bridge.py。')
+    chain = [('Delsys Trigno', '4 顆貼主要肌肉、2 kHz'),('PC 橋接', 'TrignoBridge（C#）'), ('STM32H753', '480 MHz、Cortex-M7'), ('PC／ROS 2', 'kinova_bridge'), ('Kinova Gen3', '＋Robotiq 夾爪')]
+    for i, (h_, b_) in enumerate(chain):
+        x = 0.6 + i * 2.5
+        bx = box(s, x, 2.0, 2.15, 1.05, fill=TEAL if i == 2 else LIGHT)
+        label_in(bx, [(h_, {'bold': True}), (b_, {'size': 12})], size=15, color=WHITE if i == 2 else INK)
+        if i < 4:
+            arrow(s, x + 2.18, 2.37, 0.3, 0.32)
+    back = box(s, 3.1, 3.35, 9.65, 0.6, fill=PINK, shape=P.MSO_SHAPE.LEFT_ARROW)
+    label_in(back, '任務標籤：預期的手勢＋當下合理的手勢＋指令的視窗編號（3–7 bytes）', size=14)
+    cols = [('PC 橋接', ['只轉送原始樣本，不做運算', 'int16，1 LSB = 0.25 µV', '每 10 ms 一個封包（20 個樣本）']),
+            ('MCU', ['濾波、特徵、z-score', 'LDA 分類、指令決策', '提示輪校正與任務標籤學習']),
+            ('機器人端', ['依指令移動手臂', '知道任務流程與目前狀態', '回傳「預期的手勢」當標籤'])]
+    for i, (h_, lines) in enumerate(cols):
+        x = 0.6 + i * 4.1
+        box(s, x, 4.2, 3.85, 1.65, fill=LIGHT)
+        text(s, x + 0.2, 4.28, 3.5, 1.55, [(h_, {'bold': True, 'size': 15})] + [(ln, {'bullet': True}) for ln in lines], size=13, space=3)
+    conclude(s, '演算法全部在 MCU 上；Trigno 基地台只有 USB 輸出，所以 PC 只當轉接')
 
     s = d.slide('我的方法①：收縮 LDA，只存累加和', notes='src/c/ldacal.h（OAS：Chen 等，2010；同 sklearn.covariance.oas）；report 35.9–35.10。', tag='我的做法')
     n_, s_, G, c = t('n'), t('s'), t('G'), t('c')
@@ -333,24 +312,6 @@ def build(out):
         E(cat(t('54'), t('<'), t('p'), t('='), t('80'))),
         T('→ S 是奇異矩陣，不能直接求反矩陣；加 ρμI 之後一定可逆'),
     ], size=17, fill=TEAL_L)
-
-    la = N['la']
-    s = story(d, '收縮 LDA 的效果：比我自己提出的森林方法更好', '用同樣的開機標籤，各種方法的準確率（開發資料 20 人，無偏移）', notes='report 35.9–35.11；results/lda_anchor_summary.csv。')
-    bars(s, ['one-shot RF（固定）', '免標籤自我校正', '葉節點計數（我的方法）', '上游的 LDA（沒收縮）', 'LDA＋收縮', 'LDA＋收縮＋標籤累積'],
-         [('準確率 %', [la.loc[(0.0, c_)] for c_ in ('F', 'A', 'LAonly_a8_za', 'LDAfix', 'LDAfixS', 'LDAcum')])], None,
-         y=1.9, h=3.9, legend=False, vmin=50, points=[MUTE, CORAL, '7FB7B9', GREY, '7FB7B9', TEAL])
-    conclude(s, '上游 LDA 輸給森林是因為沒做收縮；收縮＋累積最好 → 主線換成 LDA，葉節點計數退為對照組')
-
-    paper_method(d, 'Campbell 等（2024）：情境式增量學習（CIIL）', 'Campbell, Eddy, Bateman, Côté-Allard, Scheme. Context-informed incremental learning improves both the performance and resilience of myoelectric control. J NeuroEng Rehabil, 2024',
-                 ['任務：虛擬游標 2 自由度 Fitts 測試', 'Myo 臂環 8 通道；LDA；5 類', '32 人（情境 2 的 21 人：臂環轉 45°）', '對照：UHC（高信心偽標籤）'],
-                 [('使用者控制游標', '朝目標移動'), ('用任務情境推標籤', '朝目標＝正情境；遠離目標＝負情境'),
-                  ('正情境：沿用預測當標籤', 'P-CIIL'), ('負情境：改成正確方向', 'N-CIIL；兩者合用＝P+N-CIIL'), ('增量更新 LDA', '邊用邊學')],
-                 notes='依全文 Methods 整理（文獻搜尋_2026-11-13.md 1.0 節）。')
-    paper_results(d, 'Campbell 等（2024）報告的結果（電極轉動後）', '全文 Results 圖 4–5、Discussion（情境 2，21 人）',
-                  [['指標', 'P+N-CIIL', '其他'], ['throughput（bit/s）', '0.61', '轉動前 0.50'], ['path efficiency', '66.0%', 'P-CIIL 40.1%、UHC 11.7%'],
-                   ['active error', '21.0%', '沒有適應 61.5%'], ['恢復到能做線上測試', '21／21', 'UHC 5、P-CIIL 14']],
-                  [2.6, 1.8, 3.2], ['虛擬環境提供「完美情境」：要找出情境正確率的下限', '要到更真實的實體環境驗證', '要擴展到 2 自由度以上'],
-                  notes='數字與限制取自全文（作者 Discussion → Future work）。', row_h=0.62, head='作者自己說的未來工作')
 
     s = d.slide('我的方法②：任務軟標籤', notes='src/c/rt_lda.h（RTL_EPS 0.15、RTL_P0 0.05、RTL_P_INVALID 0.01、RTL_BETA 0.3、RTL_DECAY 0.97）、ldacal.h（ld_soft_q、ld_add_soft）；report 35.18、35.22–35.24。右邊的數字是示意計算。', tag='我的做法')
     pi = t('π')
@@ -401,6 +362,278 @@ def build(out):
         T('張開／握拳 → 夾爪開／夾；放鬆 → 停'),
     ], size=17, fill=TEAL_L)
 
+    d.divider(3, '用三個公開資料集檢驗：幾個手勢、怎麼擺、軟標籤、跨天')
+    s = d.slide('公開資料驗證：用了哪些資料、各回答什麼', notes='report 35.46–35.52。全部用板子的特徵程式（features.c）與板子的模型（z-score、Q5.10、OAS LDA 累加和）。', tag='我的做法')
+    rows = [['資料', '人數／天數', '感測器擺法', '手勢', '用來回答'],
+            ['NinaPro DB2', '10 人／1 次', '12 個（2 個對肌肉＋環）', '9 類都有', '手勢數、提示輪數、軟標籤'],
+            ['Ozdemir 2022', '40 人／1 次', '4 顆對準肌肉', '7 類（無食指、比讚）', '和自我測試最像的擺法'],
+            ['GrabMyo', '43 人／3 天（1、8、29）', '前臂兩圈各 8 個', '9 類（左右用旋前／旋後代替）', '跨天：累積與軟標籤'],
+            ['NinaPro DB6（之前）', '10 人／5 天', '環', '8 類抓握', '重新配戴後掉多少']]
+    table(s, 0.6, 1.45, 12.1, rows, [2.4, 2.4, 2.7, 2.6, 2.0], size=13, row_h=0.62)
+    text(s, 0.6, 4.75, 12.1, 0.9, ['準確率都是 balanced accuracy（每類先算再平均）', '7 類 = 手腕上下左右＋張開＋握拳＋放鬆；5 類 = 手腕上下左右＋放鬆'],
+         size=14, color=GREY, space=4)
+
+    s = story(d, '公開資料①：手勢數與提示輪數', 'NinaPro DB2，4 顆（屈指淺肌、伸指肌＋2 個環上電極，28 種取中位數），10 人',
+              notes='report 35.46–35.47；results/db2_wrist/db2_wrist_sim_short_passes{1,2,3}.txt、db2_wrist_sim_standard.txt。')
+    bars(s, ['9 類', '7 類', '5 類'], [('一輪提示', [50.1, 57.4, 63.5]), ('兩輪', [55.6, 63.1, 68.4]), ('三輪', [60.4, 66.5, 71.5]),
+                                      ('訓練資料多（參考）', [71.2, 75.1, 78.2])],
+         [MUTE, '7FB7B9', TEAL, NAVY], y=1.9, h=3.9)
+    conclude(s, '手勢越少越準；每多一輪提示 +3–6 點；但只有 2 顆對準肌肉時，一輪提示離 85% 很遠')
+
+    s = d.slide('公開資料②：貼主要肌肉時，4 顆夠不夠？', notes=(
+        'report 35.46–35.48、35.50、35.52；results/db2_wrist/*.txt、results/ozdemir2022/ozdemir_sim.txt。'
+        'DB2 的 4 顆 = FDS＋EDC 專用電極＋2 個環上電極（28 種組合的中位數）；Ozdemir 2022 = 4 顆由醫師定位在 ECR、FCR、ECU、FCU。'
+        '兩者都是單次配戴；Ozdemir 照提示時間表標籤。'), tag='我的做法')
+    rows = [['資料（4 顆）', '擺法', '7 類 一輪', '7 類 兩輪', '5 類 一輪', '軟標籤增益'],
+            ['NinaPro DB2（10 人）', '2 顆對肌肉＋2 顆在環上', '58.5', '—', '64.1', '+3.5'],
+            ['Ozdemir 2022（40 人）', '4 顆都對準肌肉', '85.3', '90.7', '90.9', '+2.7']]
+    table(s, 0.6, 1.4, 12.1, rows, [2.9, 2.9, 1.4, 1.4, 1.4, 2.1], size=14, row_h=0.6)
+    text(s, 0.6, 3.4, 12.1, 0.4, 'balanced accuracy（%）；7 類 = 手腕上下左右＋張開＋握拳＋放鬆，5 類 = 手腕上下左右＋放鬆；軟標籤增益 = 7 類一輪提示後加軟標籤（點）', size=12, color=GREY)
+    box(s, 0.6, 3.95, 12.1, 2.0, fill=TEAL_L)
+    text(s, 0.85, 4.05, 11.6, 1.8, [('看得到的', {'bold': True, 'size': 16}),
+                                     ('4 顆都對準肌肉時，7 類兩輪提示平均 90.7%，40 人中 32 人 ≥ 85%', {'bullet': True}),
+                                     ('兩輪比一輪好（85.3 → 90.7）；軟標籤再加 1–3 點，任務期望錯 30% 時幾乎不變', {'bullet': True}),
+                                     ('9 類（加食指、比讚）只有 DB2 有：4 顆一輪 50.3%，加軟標籤 54.6%', {'bullet': True})], size=14, space=4)
+    conclude(s, '4 顆對準肌肉在公開資料上 7 類約 90%（兩資料集的人與流程不同，不能直接比）；自我測試看自己能不能過 85%')
+
+    s = d.slide('公開資料③：短校正之後，任務軟標籤能補多少？', notes='report 35.50、35.52；results/db2_wrist/db2_soft_sim.txt、results/ozdemir2022/ozdemir_sim.txt。單次配戴，任務重複接在提示輪之後。', tag='我的做法')
+    rows = [['資料（4 顆）', '組合', '只做提示', '＋軟標籤', '軟標籤（30% 標錯）', '真實標籤（上限）', '進步人數'],
+            ['DB2', '9 類', '50.3', '54.6', '52.8', '55.4', '10/10'],
+            ['DB2', '7 類', '57.9', '61.4', '60.2', '62.4', '9/10'],
+            ['Ozdemir 2022', '7 類，一輪', '85.3', '88.1', '87.5', '88.8', '29/40'],
+            ['Ozdemir 2022', '7 類，兩輪', '90.7', '91.8', '91.6', '92.2', '28/40']]
+    table(s, 0.6, 1.45, 12.1, rows, [2.0, 1.7, 1.5, 1.5, 2.1, 1.9, 1.4], size=14, row_h=0.58)
+    conclude(s, '軟標籤拿到真實標籤增益的大部分，任務標錯 30% 仍有效；提示輪越好，能補的空間越小', y=5.2)
+
+    s = story(d, '公開資料④：跨天（GrabMyo 43 人，第 8、29 天平均）', '每天重新戴上：不更新、每天短校正、跨天累積、再加軟標籤，差多少？',
+              notes='report 35.51；results/grabmyo/combined.txt。左右用前臂旋後／旋前代替（GrabMyo 沒有橈偏、尺偏）；4 顆 = 等距的環上電極（不是對準肌肉）。探索性結果，沒有預先登錄判準。')
+    bars(s, ['第 1 天模型\n不更新', '每天只做\n短校正', '每天短校正\n＋軟標籤', '跨天累積', '累積＋軟標籤\n（完整系統）'],
+         [('8 顆 9 類', [64.7, 75.9, 81.2, 81.0, 83.4]), ('4 顆 7 類', [67.7, 79.6, 82.6, 82.7, 83.7])],
+         [TEAL, '7FB7B9'], y=1.9, h=3.9, vmin=50, vmax=100)
+    conclude(s, '不更新會掉約 11 點；完整系統比每天重新短校正好 4–8 點（8 顆 9 類 42/43 人進步）')
+
+    s = d.slide('整理：哪些站得住、哪些還沒', notes='每一項的出處見 report 35.x。「公開資料上站得住」= 別人的資料、我的模型；自己的資料待自我測試。')
+    rows = [['主張', '狀態', '證據'],
+            ['每次重新戴上都要校正', '站得住', 'DB6、GrabMyo：不更新掉約 11 點'],
+            ['一輪短提示＋跨天累積有效', '站得住', 'GrabMyo 43 人 +3–5 點（DB6 下一次配戴不顯著）'],
+            ['任務軟標籤能再提升', '公開資料上站得住', 'DB2 10/10、Ozdemir、GrabMyo；自己的資料待測'],
+            ['4 顆貼主要肌肉夠用', '有希望', 'Ozdemir 7 類兩輪 90.7%（40 人中 32 人 ≥ 85%）'],
+            ['9 類（含食指、比讚）', '困難', 'DB2 4 顆約 55%；GrabMyo 4 顆約 76%'],
+            ['整套在 MCU 上即時執行', '站得住', '板上逐一比對；FreeRTOS 下不拖慢']]
+    fills = {(i, 1): TEAL_L if r_[1] == '站得住' else (PINK if r_[1] == '困難' else YELLOW) for i, r_ in enumerate(rows[1:], start=1)}
+    table(s, 0.6, 1.4, 12.1, rows, [4.2, 2.6, 5.3], size=14, row_h=0.55, fills=fills)
+
+    d.divider(4, '整套方法在 STM32H753 上即時執行，每一步都和參考逐一比對')
+    s = d.slide('韌體架構與記憶體配置', notes='src/c/app_rt_rtos.c、FreeRTOSConfig.h；results/arm_rt_lda_rtos2_firmware_size.txt（1 KB = 1024 B）。', tag='我的做法')
+    layers = [('USART3 中斷（最高）', '收樣本 → 環形緩衝', LIGHT, INK), ('rx task（高優先）', '特徵、分類、指令', TEAL, WHITE),
+              ('learn task（低優先）', 'LDA 求解、任務標籤', TEAL_L, INK), ('idle', 'WFI 睡眠', LIGHT, INK)]
+    for i, (h_, b_, fill, col) in enumerate(layers):
+        bx = box(s, 0.6, 1.4 + i * 0.97, 4.4, 0.82, fill=fill)
+        label_in(bx, [(h_, {'bold': True}), (b_, {'size': 12})], size=14, color=col)
+    eqs(s, 5.3, 1.35, 7.4, 4.0, [
+        T('提示輪暫存區（9 手勢版：最多 3 輪 × 9 手勢 × 30 視窗）', True),
+        E(cat(t('810'), w(' 視窗'), t('×'), t('80'), t('×'), t('4'), w(' B'), t('='), t('259,200'), w(' B'), t('='), t('253.1'), w(' KB'))),
+        T('9 手勢自我測試版（裸機）：RAM 327,812 B = 320.1 KB = 62.5%', True),
+        T('整個韌體（FreeRTOS 版，6 手勢、120 視窗）', True),
+        E(cat(w('RAM'), t('='), t(f'{fs[1]:,}'), t('+'), t(f'{fs[2]:,}'), t('='), t(f'{ram:,}'), w(' B'), t('='), t(f'{ram / 1024:.1f}'), w(' KB'))),
+        E(cat(frac(t(f'{ram / 1024:.1f}'), t('512')), t('='), t(f'{ram / 1024 / 512 * 100:.1f}'), t('%'), w('  （程式 '), t(f'{fs[0] / 1024:.1f}'), w(' KB）'))),
+    ], size=17)
+    text(s, 5.3, 5.5, 7.4, 0.5, '兩個 task 的 stack 各 2 KB，實測只用約 0.5 KB；全部靜態配置，沒有 heap', size=14, color=GREY)
+
+    s = story(d, '即時性：學習再忙也不拖慢控制（FreeRTOS）', '低優先的學習 task 把 CPU 佔滿時，分類延遲會變嗎？（板上 11.5 分鐘即時重放）',
+              notes='report 35.36–35.37；results/board_replay_lda_rtos2_*.csv、_rtos_stress_*.csv、_task_*.csv、energy_dryrun_board.txt。延遲在 PC 端量，含 USB。')
+    bars(s, ['P50', 'P95', 'P99'], [(n2, rt['lat'][kk]) for n2, kk in (('裸機', 'bare'), ('FreeRTOS', 'rtos'), (f'FreeRTOS＋學習佔滿 CPU', 'stress'))],
+         [MUTE, '7FB7B9', TEAL], w_=7.6, y=1.9, h=3.9, vmax=9, fmt='0.00')
+    eqs(s, 8.4, 1.95, 4.3, 3.85, [
+        T('CPU 使用率（平常）', True),
+        E(cat(frac(cat(t(f'{N["win_us"] / 1000:.2f}'), w(' ms')), cat(t('100'), w(' ms'))), t('='), t(f'{N["win_us"] / 1000:.1f}'), t('%'))),
+        T('每 100 ms 一個視窗的特徵＋分類'),
+        T(f'實測 idle {rt["idle"]:.1f}%；壓力測試 idle {rt["idle_stress"]:.0f}%', True),
+    ], size=16, fill=TEAL_L)
+    conclude(s, f'即時處理放高優先、學習放低優先：學習佔 {rt["learn_stress"]:.0f}% CPU 時分類延遲（ms）不變')
+
+    s = story(d, '驗證方法：每一步都和參考逐一比對', '怎麼確定 C 版、板子上的結果是對的？', notes='report 6.4、35.10、35.22–35.25、35.28、35.33、35.36–35.39。')
+    rows = [['驗證什麼', '怎麼比', '結果'],
+            ['特徵（C vs 上游 Python）', '全部錄音逐一比對', f'相對誤差中位數約 {fc:.0e}'],
+            ['LDA 求解（C vs Python）', '開發資料每個視窗', f'{lc[1]:,}／{lc[0]:,} 相同'],
+            ['即時迴圈＋任務標籤（PC 上的 C）', '每個視窗、每次更新', f'{rtt["agree"]:,}／{rtt["windows"]:,} 相同'],
+            ['出力判斷 C 版', '三種設定', f'{rtg["agree"]:,}／{rtg["windows"]:,} 相同'],
+            ['板上即時重放（裸機）', '同一串位元組在 PC 重跑', f'{btk["same"]:,}／{btk["windows"]:,}；{btk["upd"]} 次更新'],
+            ['板上 FreeRTOS（含 CPU 滿載）', '和裸機版、PC 比', f'{rt["same"]:,}／{rt["windows"]:,}；任務標籤值逐筆相同'],
+            ['MLP C 版（對照組）', '和 float64 參考比', '預測 hash 相同']]
+    table(s, 0.6, 1.95, 12.1, rows, [4.4, 3.6, 4.1], size=13, row_h=0.5)
+    conclude(s, 'RQ3 的答案：整套方法能在 MCU 上即時執行，每一步都和參考逐一相同（耗電待量）')
+
+    d.divider(5, '用自己的手臂先試：4 顆貼主要肌肉、9 個方向手勢')
+    s = d.slide('感測器擺法：4 顆貼在主要肌肉上', notes=(
+        'report 35.43；lab_kit/SOP_自我測試.md 3B。實驗室的 4 顆 Trigno IM 配對後完全不送資料（EMG 和加速度都是 0），借不到別的，'
+        '只剩 4 顆 Avanti；4 個通道各送兩次當 8 通道（slots 16:15:11:5:16:15:11:5），韌體不用改。'), tag='我的做法')
+    rows = [['通道', '肌肉', '位置', '用力時摸最鼓的地方'],
+            ['1', '伸指肌（EDC）', '背側，靠肘 1/3–1/2', '手指用力伸直張開'],
+            ['2', '屈指淺肌（FDS）', '掌側中段，稍偏小指側', '用力握拳'],
+            ['3', '拇指側（FCR／FPL 一帶）', '掌側拇指側，中段稍往手腕', '拇指壓食指側面'],
+            ['4', '尺側屈腕肌（FCU）', '掌側小指側，靠肘 1/3', '手腕往小指方向彎']]
+    table(s, 0.6, 1.4, 12.1, rows, [0.9, 3.3, 4.1, 3.8], size=14, row_h=0.55)
+    box(s, 0.6, 4.4, 12.1, 2.2, fill=TEAL_L)
+    text(s, 0.85, 4.5, 11.6, 2.0, [('為什麼是 4 顆、貼主要肌肉', {'bold': True, 'size': 16}),
+                                    ('原本計畫 8 顆繞一圈；實驗室的 IM 感測器不能串流，只剩 4 顆 Avanti', {'bullet': True}),
+                                    ('貼在負責手腕上下左右與握放的 4 塊肌肉上；4 個通道各送兩次，8 通道的韌體不用改', {'bullet': True}),
+                                    ('每天照描好的外框貼回同一位置（跨天累積要靠位置一致）', {'bullet': True})], size=14, space=5)
+
+    s = d.slide('自我測試第一次：流程測試（6 個抓握手勢，2026-11-17）', notes='report 35.43–35.44；D:\\selftest_data\\T00\\analysis_2026-11-17。使用者決定這次只當流程測試，不當證據。', tag='我的做法')
+    rows = [['項目', '結果'],
+            ['資料', '11.6 分鐘、2000 Hz、沒有掉資料、沒有飽和'],
+            ['雜訊', '放鬆 2.7–5.2 µV；60 Hz 佔 2–4.5%（拔掉充電器後）'],
+            ['剛校正完（6 類）', '52.5%（亂猜 16.7%）'],
+            ['任務軟標籤', 'P1、P2 平均 +10.4 點；95% 區間 −2.9 ~ +23.3；只用 2 s 提示時 +0.4']]
+    table(s, 0.6, 1.4, 12.1, rows, [3.0, 9.1], size=14, row_h=0.55)
+    box(s, 0.6, 4.3, 12.1, 1.6, fill=TEAL_L)
+    text(s, 0.85, 4.38, 11.6, 1.5, [('學到的', {'bold': True, 'size': 16}),
+                                    ('實驗室的 IM 感測器不能串流 → 改 4 顆 Avanti 貼主要肌肉', {'bullet': True}),
+                                    ('4 顆分 6 種抓握太難 → 改 9 個方向手勢、提示輪做兩輪', {'bullet': True}),
+                                    ('流程與工具可行；分析程式的欄位錯誤已修正', {'bullet': True})], size=14, space=4)
+    conclude(s, '流程跑得通；這次只當流程測試，不當證據')
+
+    s = d.slide('下一步：自我測試（9 個方向手勢、4 顆貼主要肌肉）', notes=(
+        'report 35.44–35.49；lab_kit/SOP_自我測試.md 3B、4A；src/selftest9_analysis.py（兩條判準在錄之前已 commit）。'
+        '2026-11-17 的 6 手勢錄製只當流程測試。自我測試的資料只用來決定方向；要發表需 IRB。'))
+    steps = [('提示輪', '9 × 4 秒 × 2 輪'), ('P0', '提示手勢 9×3'), ('T1', '機械臂指令 40 次'), ('P1', '提示手勢 9×3'), ('T2', '機械臂指令 40 次'), ('P2', '提示手勢 9×3')]
+    for i, (h_, b_) in enumerate(steps):
+        x = 0.6 + i * 2.07
+        bx = box(s, x, 1.4, 1.8, 1.0, fill=TEAL if h_ in ('T1', 'T2') else LIGHT)
+        label_in(bx, [(h_, {'bold': True}), b_], size=13, color=WHITE if h_ in ('T1', 'T2') else INK)
+        if i < 5:
+            arrow(s, x + 1.83, 1.74, 0.2, 0.32)
+    text(s, 0.6, 2.5, 12.1, 0.4, '8 個指令 = 上下左右前後＋夾爪開／夾；任務段換操作姿勢；判準 1：7／5 類選 ≥ 85% 中最多類的一組', size=13, color=GREY)
+    Ad = lambda m_, pp: subsup(t('A'), t(pp), w(m_))  # noqa: E731
+    eqs(s, 0.6, 3.0, 7.6, 3.75, [
+        T('判準 2（錄之前已寫定；9 類；第 d 天）', True),
+        E(cat(sub(t('D'), t('d')), t('='), frac(t('1'), t('2')), sum_(t('P ∈ {P1, P2}'), '', par(cat(Ad('軟標籤', 'P'), t('−'), Ad('只做提示', 'P')))))),
+        E(cat(w('GO：  '), bar(t('D')), t('≥'), t('2'), w('  且  '), t('#'), par(cat(sub(t('D'), t('d')), t('>'), t('0'))), t('≥'), par(cat(frac(t('2'), t('3')), t('n')), '⌈', '⌉'))),
+        E(cat(w('NO‑GO：  '), bar(t('D')), t('≤'), t('0'))),
+    ], size=17)
+    box(s, 8.5, 3.0, 4.2, 3.75, fill=TEAL_L)
+    text(s, 8.75, 3.15, 3.8, 3.5, [('如果結果是', {'bold': True, 'size': 15}),
+                                   ([('GO', {'bold': True, 'color': TEAL}), '：任務標籤留在主軸 → 多人先導實驗'], {'bullet': True}),
+                                   ([('NO-GO', {'bold': True, 'color': CORAL}), '：寫成負面結果，主軸改為短提示＋MCU'], {'bullet': True}),
+                                   ('其他：交給多人先導實驗', {'bullet': True}),
+                                   ('結果【待填：錄完後更新】', {'color': GREY})], size=14, space=6)
+
+    d.divider(6, '研究問題的答案、時程、需要老師決定的事')
+    s = d.slide('結論：研究問題的答案', notes='公開資料 = 別人的資料、我的模型；自己的資料要等 9 手勢自我測試（判準已在錄之前 commit）。')
+    rqs = [('RQ1', '短提示＋跨天累積能拉回多少？', '公開資料上：跨天累積比每天重新短校正 +3–5 點；4 顆對準肌肉、7 類兩輪約 91%', TEAL_L),
+           ('RQ2', '任務能不能提供標籤？', '公開資料上可以：+1–5 點、耐 30% 標錯；自己的資料待 9 手勢自我測試', PINK),
+           ('RQ3', '能不能在 MCU 上即時執行？', '可以：逐一驗證、FreeRTOS 下不拖慢、比 MLP 便宜；耗電待量', TEAL_L)]
+    for i, (q, a1, a2, fill) in enumerate(rqs):
+        y = 1.45 + i * 1.45
+        box(s, 0.6, y, 12.1, 1.25, fill=fill)
+        circle_num(s, 0.85, y + 0.35, i + 1, fill=TEAL if fill == TEAL_L else CORAL, d=0.55)
+        text(s, 1.65, y + 0.12, 10.8, 0.5, f'{q}：{a1}', size=17, bold=True)
+        text(s, 1.65, y + 0.62, 10.8, 0.5, a2, size=15, color=GREY)
+    text(s, 0.6, 5.95, 12.1, 0.8, '方向：每次配戴兩輪短提示＋跨天累積＋任務軟標籤；4 顆貼主要肌肉；9 個方向手勢控制輔助機械臂；全部在 MCU 上',
+         size=15, bold=True, color=TEAL)
+
+    s = d.slide('接下來的時程（草案）', notes='時程待與指導老師討論；EMBC 2027 截止日以官網為準（第三方列表為 2027-01-24）。')
+    plan = [('自我測試（9 手勢、4 顆）；12 月中進度報告', 0, 2), ('EMBC 2027 投稿（公開資料：獨立檢驗）', 1, 3), ('IRB；能量量測；真 Kinova 整條接起來', 1, 3),
+            ('先導實驗（健常人、跨日）', 3, 5), ('正式實驗／病患個案（視 IRB）', 5, 7), ('分析與撰寫', 6, 8)]
+    months = ['11月', '12月', '1月', '2月', '3月', '4月', '5月', '6月']
+    x0, cw = 5.6, 0.89
+    for j, m_ in enumerate(months):
+        text(s, x0 + j * cw, 1.45, cw, 0.35, m_, size=12, color=GREY, align=PP_ALIGN.CENTER)
+    for i, (t_, a0, a1) in enumerate(plan):
+        y = 1.95 + i * 0.7
+        text(s, 0.6, y, 4.9, 0.6, t_, size=15, anchor=MSO_ANCHOR.MIDDLE)
+        box(s, x0, y + 0.08, cw * len(months), 0.45, fill=LIGHT, radius=0.5)
+        box(s, x0 + a0 * cw, y + 0.08, (a1 - a0) * cw, 0.45, fill=CORAL if i == 0 else TEAL, radius=0.5)
+
+    s = d.slide('需要老師決定或討論的事', dark=True, notes='建議：主軸改為短提示＋跨天累積＋任務軟標籤；感測器先確認；IRB 早點準備；EMBC 用公開資料。')
+    for i, t_ in enumerate(['論文主軸改為「短提示＋跨天累積＋任務軟標籤」，用 9 個方向手勢控制機械臂？', '感測器：實驗室的 IM 感測器不能串流，要修或借 Avanti 嗎？正式實驗用 4 顆還是 8 顆？',
+                            '自我測試、多人先導實驗的 IRB 何時送？', 'EMBC 2027 用公開資料（DB2、Ozdemir、GrabMyo）投稿可以嗎？作者順序？']):
+        y = 1.6 + i * 1.2
+        circle_num(s, 0.9, y + 0.1, i + 1, fill=CORAL, d=0.6)
+        text(s, 1.8, y, 10.6, 0.8, t_, size=20, color=WHITE, anchor=MSO_ANCHOR.MIDDLE)
+
+    s = d.slide('參考文獻', notes='標＊者還沒打開原文逐字確認。')
+    refs = ['Jiang, Ma, Nazarpour (2024). Posture-invariant myoelectric control with self-calibrating random forests. Frontiers in Neurorobotics.',
+            'Jiang et al. (2025). Plug-and-play myoelectric control via a self-calibrating random forest common model. Journal of Neural Engineering.',
+            'Kyranou, Szymaniak, Nazarpour (2025). 8-participant two-day Trigno dataset. Scientific Data.',
+            'Vidovic et al. (2016). Improving the robustness of myoelectric pattern recognition for upper limb prostheses by covariate shift adaptation. IEEE TNSRE 24(9).',
+            'Campbell, Eddy, Bateman, Côté-Allard, Scheme (2024). Context-informed incremental learning improves both the performance and resilience of myoelectric control. J NeuroEng Rehabil 21:70.',
+            'Scheme, Hudgins, Englehart (2013). Confidence-based rejection for improved pattern recognition myoelectric control. IEEE TBME 60(6).',
+            'Chen, Wiesel, Eldar, Hero (2010). Shrinkage algorithms for MMSE covariance estimation. IEEE Transactions on Signal Processing.（OAS）',
+            '＊Palermo et al. (2017). Repeatability of grasp recognition for robotic hand prosthesis control based on sEMG data. ICORR 2017.（NinaPro DB6）',
+            '＊Atzori et al. (2014). Electromyography data for non-invasive naturally-controlled robotic hand prostheses. Scientific Data.（NinaPro DB2）',
+            'Ozdemir, Kisa, Guren, Akan (2022). Dataset for multi-channel sEMG signals of hand gestures. Data in Brief 41, 107921.',
+            'Pradhan, He, Jiang (2022). Multi-day dataset of forearm and wrist EMG for hand gesture recognition and biometrics (GRABMyo). Scientific Data 9, 733.']
+    text(s, 0.6, 1.4, 12.1, 5.0, refs, size=12, color=INK, space=5)
+    text(s, 0.6, 6.55, 12.1, 0.35, '＊ 尚未打開原文逐字核對', size=11, color=GREY)
+
+    d.divider(7, '主線之外的細節：原題目的重現、論文的方法與結果、模擬、MCU 計算')
+    paper_method(d, 'Jiang 等（2024）：免標籤自我校正隨機森林', 'Jiang, Ma, Nazarpour. Posture-invariant myoelectric control with self-calibrating random forests. Frontiers in Neurorobotics, 2024',
+                 ['資料：arm_position，20 人', '5 個手臂位置（P2、P4、P5、P6、P8）、11 個 block', '6 類手勢（含放鬆）、8 通道', '比較：LDA、RF、one-shot、自我校正'],
+                 [('預訓練隨機森林', '用其他人的資料先訓練好'), ('one-shot 校正', '使用者做一次短校正：剪枝＋加新樹'),
+                  ('使用中收集視窗', '不需要使用者給標籤'), ('t-SNE＋K-Means 偽標籤', '把視窗分群、對到類別'),
+                  ('自動重訓新的樹', '免標籤地跟上變化')],
+                 notes='方法照上游程式碼與論文文字整理（report 1.2）。限制是我讀完後的整理，不是作者原話。',
+                 limits=['只在同一份資料（arm_position）上驗證', 'LDA 只當對照，沒有做收縮估計', '放進穿戴裝置時的記憶體與運算沒有討論'])
+    sel = [('自我校正（全部 block）', 'self-cal, all blocks (mean)'), ('LDA @P5', 'LDA @P5 (mean)'), ('RF @P5', 'RF @P5 (mean)'),
+           ('one-shot 比 RF 多 @P5', 'one-shot gain over RF @P5'), ('自我校正比 one-shot 多 @P5', 'self-cal gain over one-shot @P5')]
+    # 2026-11-15: the user deleted the separate "Jiang reported results" slide and the conclusion bar here
+    s = story(d, '我的重現：和論文逐項比較', '原論文的結果，用它公開的程式碼重跑得出來嗎？', notes='report 第 1 節；results/paper_comparison.csv（20 人 × 11 block × 3 seed）。')
+    table(s, 0.6, 1.95, 12.1, [['指標（%）', '論文', '我重跑', '差']] +
+          [[n, f'{rp.loc[m_, "paper"]:.2f}', f'{rp.loc[m_, "ours (seed-avg)"]:.2f}', f'{rp.loc[m_, "diff (ours-paper)"]:+.2f}'] for n, m_ in sel],
+          [5.5, 2.2, 2.2, 2.2], size=15, row_h=0.6)
+
+    s = story(d, '放進微控制器：照原樣放不下，要刪減', 'STM32H7 只有 512 KB 的 AXI RAM；原方法照原樣放得進去嗎？', notes='report 第 2–4、6、7、12 節；results/ram_scenarios.csv、sweep_pareto.csv。')
+    bars(s, ['照論文原樣（float32 buffer、400 棵樹、t-SNE）', '不做 t-SNE（int16 buffer、100 棵樹）'],
+         [('自我校正需要的 RAM（KB）', [N['ram_paper'], N['ram_noTSNE']])], None, y=1.9, h=3.0, vmax=1400, legend=False, fmt='0', points=[CORAL, TEAL])
+    text(s, 0.6, 4.95, 12.1, 0.9, [f'模型壓縮：100 棵、深度 10、int16 只要 {cp["kb"]:.1f} KB（完整模型 {N["comp_full_kb"]:.0f} KB），準確率只差 {cp["d"]:+.2f} 點',
+                                   '整套用 C、靜態記憶體重寫，在 NUCLEO-H753ZI 上即時執行'], size=15, space=4)
+    conclude(s, '韌體 v2：拿掉 t-SNE、模型壓縮，凍結成 pilot 版本')
+
+    s = story(d, '電極轉動時：免標籤救不回來', '電極環轉了一格（約 45°），免標籤的自我校正能補救嗎？', notes='report 8.1；results/shift_sweep_raw_summary*.csv（模擬：轉原始 EMG 再算特徵）。UHC＝Campbell 等（2024）的高信心偽標籤基準。')
+    bars(s, ['沒有轉動', '轉一格：固定模型', '轉一格：免標籤自我校正', '轉一格：高信心偽標籤（UHC）', '轉一格：加開機對齊'],
+         [('準確率 %', [sh['none'], sh['fixed'], sh['tsne'], sh['uhc'], sh['align']])], None, y=1.9, h=3.9, legend=False,
+         points=[MUTE, GREY, CORAL, CORAL, TEAL])
+    conclude(s, '加上「開機對齊」（估計轉了幾格再對回來）；模擬中可以救回 → 要在真實資料上確認')
+
+    paper_method(d, 'Vidovic 等（2016）：用小校正集收縮 LDA', 'Vidovic et al. Improving the robustness of myoelectric pattern recognition for upper limb prostheses by covariate shift adaptation. IEEE TNSRE, 2016',
+                 ['離線：7 位健常人＋4 位截肢者，跨 5 天', '線上：8 位健常人＋1 位截肢者，3 天', '8 個電極；每天重新穿戴', '校正資料：不到 1 分鐘'],
+                 [('第 1 天訓練 LDA', '類別平均、共變異'), ('每天錄小校正集', '每個動作一次（< 1 分鐘）'),
+                  ('把參數往校正集收縮', '公式見下一頁'), ('用調整後的 LDA 分類', '原文最佳 τ = 0.8、λ = 0.8')],
+                 notes='依原文式 6–7、II-C、III-B 節（report 35.30）。')
+    s = d.slide('Vidovic 等（2016）：收縮公式與報告的結果', notes='公式依原文式 6–7；結果取自原文摘要與 III-B 節。', tag='論文')
+    mu, Sg = t('μ'), t('Σ')
+    eqs(s, 0.6, 1.4, 6.4, 3.7, [
+        T('第 1 天的 LDA 參數，往這次配戴的小校正集收縮：', True),
+        E(cat(sub(bar(mu), t('c')), t('='), par(cat(t('1'), t('−'), t('τ'))), subsup(mu, t('c'), w('訓練')), t('+'), t('τ'), subsup(mu, t('c'), w('校正')))),
+        E(cat(bar(Sg), t('='), par(cat(t('1'), t('−'), t('λ'))), sup(Sg, w('訓練')), t('+'), t('λ'), sup(Sg, w('校正')))),
+        T('判別函數（等先驗）：'),
+        E(cat(sub(t('g'), t('c')), par(t('x')), t('='), subsup(bar(mu), t('c'), t('T')), sup(bar(Sg), t('−1')), t('x'), t('−'), frac(t('1'), t('2')),
+              subsup(bar(mu), t('c'), t('T')), sup(bar(Sg), t('−1')), sub(bar(mu), t('c')))),
+    ], size=19)
+    table(s, 7.3, 1.4, 5.4, [['原文結果', ''], ['離線，有適應（5 天）', '維持 92% 以上'], ['離線，沒有適應', '降到 75%'],
+                             ['線上，有適應 vs 沒有', '提升 25%'], ['只調平均（τ, λ = 0）', '較差']], [3.1, 2.3], size=14, row_h=0.62, header_fill=CORAL)
+    text(s, 0.6, 5.35, 12.1, 0.9, ['τ、λ 越大越相信這次的校正集；τ = λ = 1 就是只用校正集重訓',
+                                   '我讀完後看到的限制：每天仍要主動校正；每次都從第 1 天出發，不跨次累積；在 PC 上'], size=14, color=GREY, space=4)
+
+    s = story(d, '收縮 LDA 的效果：比我自己提出的森林方法更好', '用同樣的開機標籤，各種方法的準確率（開發資料 20 人，無偏移）', notes='report 35.9–35.11；results/lda_anchor_summary.csv。')
+    bars(s, ['one-shot RF（固定）', '免標籤自我校正', '葉節點計數（我的方法）', '上游的 LDA（沒收縮）', 'LDA＋收縮', 'LDA＋收縮＋標籤累積'],
+         [('準確率 %', [la.loc[(0.0, c_)] for c_ in ('F', 'A', 'LAonly_a8_za', 'LDAfix', 'LDAfixS', 'LDAcum')])], None,
+         y=1.9, h=3.9, legend=False, vmin=50, points=[MUTE, CORAL, '7FB7B9', GREY, '7FB7B9', TEAL])
+    conclude(s, '上游 LDA 輸給森林是因為沒做收縮；收縮＋累積最好 → 主線換成 LDA，葉節點計數退為對照組')
+
+    paper_method(d, 'Campbell 等（2024）：情境式增量學習（CIIL）', 'Campbell, Eddy, Bateman, Côté-Allard, Scheme. Context-informed incremental learning improves both the performance and resilience of myoelectric control. J NeuroEng Rehabil, 2024',
+                 ['任務：虛擬游標 2 自由度 Fitts 測試', 'Myo 臂環 8 通道；LDA；5 類', '32 人（情境 2 的 21 人：臂環轉 45°）', '對照：UHC（高信心偽標籤）'],
+                 [('使用者控制游標', '朝目標移動'), ('用任務情境推標籤', '朝目標＝正情境；遠離目標＝負情境'),
+                  ('正情境：沿用預測當標籤', 'P-CIIL'), ('負情境：改成正確方向', 'N-CIIL；兩者合用＝P+N-CIIL'), ('增量更新 LDA', '邊用邊學')],
+                 notes='依全文 Methods 整理（文獻搜尋_2026-11-13.md 1.0 節）。')
+    paper_results(d, 'Campbell 等（2024）報告的結果（電極轉動後）', '全文 Results 圖 4–5、Discussion（情境 2，21 人）',
+                  [['指標', 'P+N-CIIL', '其他'], ['throughput（bit/s）', '0.61', '轉動前 0.50'], ['path efficiency', '66.0%', 'P-CIIL 40.1%、UHC 11.7%'],
+                   ['active error', '21.0%', '沒有適應 61.5%'], ['恢復到能做線上測試', '21／21', 'UHC 5、P-CIIL 14']],
+                  [2.6, 1.8, 3.2], ['虛擬環境提供「完美情境」：要找出情境正確率的下限', '要到更真實的實體環境驗證', '要擴展到 2 自由度以上'],
+                  notes='數字與限制取自全文（作者 Discussion → Future work）。', row_h=0.62, head='作者自己說的未來工作')
+
     s = d.slide('評估方法：每個比較都事先寫好判準', notes='report 35.20–35.32、35.38；每個實驗的判準寫在程式檔頭並在執行前 commit。', tag='我的做法')
     di, db, sd_ = sub(t('d'), t('i')), bar(t('d')), sub(t('s'), t('d'))
     tq = sub(t('t'), t('0.975, n−1'))
@@ -422,8 +655,6 @@ def build(out):
                                   ('判準寫在程式檔頭，執行前 commit', {'bullet': True}),
                                   ('沒通過的照實報告（R1、R11 未通過）', {'bullet': True})], size=14, space=6)
 
-    # ================================================================ 4 simulation results
-    d.divider(3, '在模擬的閉迴路抓放任務中：任務標籤能取代多少提示？標籤出錯時誰比較耐？')
     s = story(d, '結果①：一輪提示＋任務標籤 ≈ 兩輪提示', '閉迴路抓放模擬（20 人，使用者 25% 臨時改主意，電極偏移半格）', notes='report 35.15–35.19；results/task_sim2_summary.csv。')
     bars(s, ['固定模型', '一輪提示', '一輪＋硬標籤', '一輪＋軟標籤＋出力判斷', '兩輪提示', '正確答案（上限）'],
          [('準確率 %', [t2.loc[(0.5, 0.25, c_)].probe_after for c_ in ('fixed', 'cue1', 'cue1_gate', 'cue1_soft_act', 'cue2', 'oracle')])],
@@ -454,7 +685,6 @@ def build(out):
     ch.value_axis.major_gridlines.format.line.color.rgb = rgb('E3E8EA')
     conclude(s, '硬標籤一錯就掉；軟標籤到 30% 仍穩。但 P-CIIL 一樣穩 →「勝過所有 CIIL」不成立，照實報告')
 
-    t7 = N['t7']
     s = story(d, '結果②（續）：軟標籤要不要乘上分類器分數？', 'Campbell 的博士論文（2026，第 4 章）已用「平分」的軟標籤；我的差別是乘上分類器分數。這一步有用嗎？',
               notes='report 35.41；results/task_sim7_summary.csv（½ 格偏移、一輪提示、20 人 × 2 seed）。判準 R14（e = 0.3 時比平分多 ≥ 1 點且 CI > 0；e = 0 時 ≥ −0.5）在執行前 commit，通過：'
                     '+2.09（+1.55, +2.63），19 人較好；e = 0 時 +0.29。平分版沒有 label spreading（需要成長的記憶庫，作者自己指出不適合嵌入式）。')
@@ -489,14 +719,12 @@ def build(out):
     ], size=15, fill=TEAL_L)
     conclude(s, '耐錯主要來自「乘上分類器分數」：比平分多約 2 點、比只有先驗多約 9 點（模擬）→ 可以主張這一步')
 
-    vd = N['vid']
     s = story(d, '結果③：和 Vidovic（2016）照原文公式比較', '用 Vidovic 原文的公式和參數（τ = λ = 0.8），在同一個模擬、同一批人上比較', notes='report 35.30；results/task_sim6_vidovic.csv、task_sim4_summary.csv（½ 格偏移，block 1–10，20 人）。判準 R6 通過。')
     bars(s, ['固定第 1 天 LDA', 'Vidovic LDAMA（只調平均）', 'Vidovic LDACMA', '我的：一輪提示', '我的：一輪提示＋軟標籤'],
          [('模擬 %', [vd['fixed'], vd['LDAMA'], vd['LDACMA'], t4.loc[(0.5, 0.0, 'cue1')].probe_after, t4.loc[(0.5, 0.0, 'cue1_soft')].probe_after])],
          None, y=1.9, h=3.9, legend=False, vmin=40, points=[MUTE, GREY, GREY, '7FB7B9', TEAL])
     conclude(s, '模擬中我的方法較好，但部分來自「標籤跨次累積」，而且是模擬的偏移 → 要在真實資料上確認')
 
-    fr = N['front']
     s = d.slide('Scheme 等（2013）：信心度拒絕與出力門檻', notes='依原文摘要、式 11–15、III-A 節（report 35.30）。', tag='論文')
     text(s, 0.6, 1.3, 12.1, 0.4, 'Scheme, Hudgins, Englehart. Confidence-based rejection for improved pattern recognition myoelectric control. IEEE TBME, 2013', size=13, color=GREY)
     eqs(s, 0.6, 1.85, 6.6, 4.85, [
@@ -521,8 +749,6 @@ def build(out):
          points=[MUTE, CORAL, GREY, TEAL])
     conclude(s, '我的門檻誤觸發最少；但「出力門檻」Scheme 已做過 → 引用先例，只主張門檻的設法')
 
-    # ================================================================ 5 real data
-    d.divider(4, '前面都是模擬的偏移；在真實的重新配戴資料上還成立嗎？')
     s = story(d, '結果⑤：真實的重新配戴（NinaPro DB6）', '10 人、5 天、8 類；每次配戴一輪提示。另外改用「下一個 session」評分，去掉時間相鄰',
               notes='report 35.31–35.32；results/db6_sim*.csv、db6_adj*.csv。DB6 同一抓握 12 次連續錄，同次評分偏樂觀。判準 R8–R10 通過、R11 未通過。')
     bars(s, ['同一個 session 評分', '下一個 session 評分（去掉時間相鄰）'],
@@ -545,28 +771,6 @@ def build(out):
     table(s, 0.6, 1.4, 12.1, rows, [5.0, 2.4, 4.7], size=14, row_h=0.5, fills=fills)
     text(s, 0.6, 6.55, 12.1, 0.4, '→ 任務標籤從「主要貢獻」降為「要用真人實驗檢驗的假設」', size=15, bold=True, color=TEAL)
 
-    # ================================================================ 6 implementation
-    d.divider(5, 'RQ3：整套方法怎麼放進 STM32H753，以及怎麼驗證每一步')
-    s = story(d, '系統架構：PC 只轉送，MCU 做全部運算', '一個指令從肌電到機械臂、再把任務標籤送回 MCU 的路徑', notes='report 7.3、35.13、35.24–35.27；src/c/protocol.h、rt_lda.h、src/pc/TrignoBridge.cs、kinova_bridge.py。')
-    chain = [('Delsys Trigno', '4 顆貼主要肌肉、2 kHz'),('PC 橋接', 'TrignoBridge（C#）'), ('STM32H753', '480 MHz、Cortex-M7'), ('PC／ROS 2', 'kinova_bridge'), ('Kinova Gen3', '＋Robotiq 夾爪')]
-    for i, (h_, b_) in enumerate(chain):
-        x = 0.6 + i * 2.5
-        bx = box(s, x, 2.0, 2.15, 1.05, fill=TEAL if i == 2 else LIGHT)
-        label_in(bx, [(h_, {'bold': True}), (b_, {'size': 12})], size=15, color=WHITE if i == 2 else INK)
-        if i < 4:
-            arrow(s, x + 2.18, 2.37, 0.3, 0.32)
-    back = box(s, 3.1, 3.35, 9.65, 0.6, fill=PINK, shape=P.MSO_SHAPE.LEFT_ARROW)
-    label_in(back, '任務標籤：預期的手勢＋當下合理的手勢＋指令的視窗編號（3–7 bytes）', size=14)
-    cols = [('PC 橋接', ['只轉送原始樣本，不做運算', 'int16，1 LSB = 0.25 µV', '每 10 ms 一個封包（20 個樣本）']),
-            ('MCU', ['濾波、特徵、z-score', 'LDA 分類、指令決策', '提示輪校正與任務標籤學習']),
-            ('機器人端', ['依指令移動手臂', '知道任務流程與目前狀態', '回傳「預期的手勢」當標籤'])]
-    for i, (h_, lines) in enumerate(cols):
-        x = 0.6 + i * 4.1
-        box(s, x, 4.2, 3.85, 1.65, fill=LIGHT)
-        text(s, x + 0.2, 4.28, 3.5, 1.55, [(h_, {'bold': True, 'size': 15})] + [(ln, {'bullet': True}) for ln in lines], size=13, space=3)
-    conclude(s, '演算法全部在 MCU 上；Trigno 基地台只有 USB 輸出，所以 PC 只當轉接')
-
-    fc = N['featchk']
     s = d.slide('特徵擷取：每 100 ms 從 8 個通道算出 80 維', notes='src/c/features.c、features.h；report 6.4；results/features_c_check.csv。帶通 10–500 Hz 4 階 Butterworth；視窗 400 點（200 ms）、每 200 點（100 ms）；PSD：Hamming 400 點補零到 512 點 FFT。', tag='我的做法')
     x_i = sub(t('x'), t('i'))
     ind = lambda body: cat(t('𝟙'), par(body, '[', ']'))  # noqa: E731
@@ -609,7 +813,6 @@ def build(out):
         T('注意：先前的離線分析（DB6、模擬）用第 1 天的 z-score；自我測試的分析已改成和板子一樣'),
     ], size=17, fill=TEAL_L)
 
-    lc = N['ldachk']
     p_ = 80
     tri = p_ * (p_ + 1) // 2
     s = d.slide('MCU 上的 LDA：記憶體與運算量', notes='src/c/ldacal.c；report 35.10、35.23；results/arm_ldacal_size.csv、lda_bench_board_480mhz_cache.txt、ldacal_c_check.csv。', tag='我的做法')
@@ -645,38 +848,6 @@ def build(out):
                                   ('MCU → PC：COMMAND、PRED、STATUS', {'bullet': True}),
                                   ('序號＋CRC：掉封包可偵測；板上重放時用同一串位元組在 PC 重跑比對', {'bullet': True})], size=14, space=6)
 
-    fs = N['fwrtos']
-    ram = fs[1] + fs[2]
-    s = d.slide('韌體架構與記憶體配置', notes='src/c/app_rt_rtos.c、FreeRTOSConfig.h；results/arm_rt_lda_rtos2_firmware_size.txt（1 KB = 1024 B）。', tag='我的做法')
-    layers = [('USART3 中斷（最高）', '收樣本 → 環形緩衝', LIGHT, INK), ('rx task（高優先）', '特徵、分類、指令', TEAL, WHITE),
-              ('learn task（低優先）', 'LDA 求解、任務標籤', TEAL_L, INK), ('idle', 'WFI 睡眠', LIGHT, INK)]
-    for i, (h_, b_, fill, col) in enumerate(layers):
-        bx = box(s, 0.6, 1.4 + i * 0.97, 4.4, 0.82, fill=fill)
-        label_in(bx, [(h_, {'bold': True}), (b_, {'size': 12})], size=14, color=col)
-    eqs(s, 5.3, 1.35, 7.4, 4.0, [
-        T('提示輪暫存區（9 手勢版：最多 3 輪 × 9 手勢 × 30 視窗）', True),
-        E(cat(t('810'), w(' 視窗'), t('×'), t('80'), t('×'), t('4'), w(' B'), t('='), t('259,200'), w(' B'), t('='), t('253.1'), w(' KB'))),
-        T('9 手勢自我測試版（裸機）：RAM 327,812 B = 320.1 KB = 62.5%', True),
-        T('整個韌體（FreeRTOS 版，6 手勢、120 視窗）', True),
-        E(cat(w('RAM'), t('='), t(f'{fs[1]:,}'), t('+'), t(f'{fs[2]:,}'), t('='), t(f'{ram:,}'), w(' B'), t('='), t(f'{ram / 1024:.1f}'), w(' KB'))),
-        E(cat(frac(t(f'{ram / 1024:.1f}'), t('512')), t('='), t(f'{ram / 1024 / 512 * 100:.1f}'), t('%'), w('  （程式 '), t(f'{fs[0] / 1024:.1f}'), w(' KB）'))),
-    ], size=17)
-    text(s, 5.3, 5.5, 7.4, 0.5, '兩個 task 的 stack 各 2 KB，實測只用約 0.5 KB；全部靜態配置，沒有 heap', size=14, color=GREY)
-
-    rt = N['rtos']
-    s = story(d, '即時性：學習再忙也不拖慢控制（FreeRTOS）', '低優先的學習 task 把 CPU 佔滿時，分類延遲會變嗎？（板上 11.5 分鐘即時重放）',
-              notes='report 35.36–35.37；results/board_replay_lda_rtos2_*.csv、_rtos_stress_*.csv、_task_*.csv、energy_dryrun_board.txt。延遲在 PC 端量，含 USB。')
-    bars(s, ['P50', 'P95', 'P99'], [(n2, rt['lat'][kk]) for n2, kk in (('裸機', 'bare'), ('FreeRTOS', 'rtos'), (f'FreeRTOS＋學習佔滿 CPU', 'stress'))],
-         [MUTE, '7FB7B9', TEAL], w_=7.6, y=1.9, h=3.9, vmax=9, fmt='0.00')
-    eqs(s, 8.4, 1.95, 4.3, 3.85, [
-        T('CPU 使用率（平常）', True),
-        E(cat(frac(cat(t(f'{N["win_us"] / 1000:.2f}'), w(' ms')), cat(t('100'), w(' ms'))), t('='), t(f'{N["win_us"] / 1000:.1f}'), t('%'))),
-        T('每 100 ms 一個視窗的特徵＋分類'),
-        T(f'實測 idle {rt["idle"]:.1f}%；壓力測試 idle {rt["idle_stress"]:.0f}%', True),
-    ], size=16, fill=TEAL_L)
-    conclude(s, f'即時處理放高優先、學習放低優先：學習佔 {rt["learn_stress"]:.0f}% CPU 時分類延遲（ms）不變')
-
-    nn, mb = N['nn'], N['mlpb']
     s = story(d, '為什麼用 LDA，不用神經網路：準確率', '同樣只有一輪提示的校正預算（DB6 10 人 8 類），小型神經網路（MLP）會不會更準？',
               notes='report 35.38；results/nn_compare.csv（MLP 80-64-32-8，設定事先寫定、未調參，3 個 seed）。判準 R13 通過。')
     bars(s, ['同一個 session', '下一個 session'],
@@ -702,122 +873,6 @@ def build(out):
     table(s, 7.5, 1.35, 5.2, rows, [2.2, 1.4, 1.6], size=14, row_h=0.65, fills={(i, 1): TEAL_L for i in range(1, 5)})
     text(s, 7.5, 4.85, 5.2, 1.6, [f'更新慢 {mb["mlp_upd"] / mb["lda_upd"]:.0f} 倍、分類慢 {mb["mlp_pred"] / mb["lda_pred"]:.0f} 倍、RAM 多 {mb["mlp_ram"] / mb["lda_ram"]:.1f} 倍',
                                   '選 LDA 有準確率和板上實測兩種證據'], size=14, color=GREY, space=5)
-
-    rtt, rtg, btk = N['rt_task'], N['rt_gate'], N['btask']
-    s = story(d, '驗證方法：每一步都和參考逐一比對', '怎麼確定 C 版、板子上的結果是對的？', notes='report 6.4、35.10、35.22–35.25、35.28、35.33、35.36–35.39。')
-    rows = [['驗證什麼', '怎麼比', '結果'],
-            ['特徵（C vs 上游 Python）', '全部錄音逐一比對', f'相對誤差中位數約 {fc:.0e}'],
-            ['LDA 求解（C vs Python）', '開發資料每個視窗', f'{lc[1]:,}／{lc[0]:,} 相同'],
-            ['即時迴圈＋任務標籤（PC 上的 C）', '每個視窗、每次更新', f'{rtt["agree"]:,}／{rtt["windows"]:,} 相同'],
-            ['出力判斷 C 版', '三種設定', f'{rtg["agree"]:,}／{rtg["windows"]:,} 相同'],
-            ['板上即時重放（裸機）', '同一串位元組在 PC 重跑', f'{btk["same"]:,}／{btk["windows"]:,}；{btk["upd"]} 次更新'],
-            ['板上 FreeRTOS（含 CPU 滿載）', '和裸機版、PC 比', f'{rt["same"]:,}／{rt["windows"]:,}；任務標籤值逐筆相同'],
-            ['MLP C 版（對照組）', '和 float64 參考比', '預測 hash 相同']]
-    table(s, 0.6, 1.95, 12.1, rows, [4.4, 3.6, 4.1], size=13, row_h=0.5)
-    conclude(s, 'RQ3 的答案：整套方法能在 MCU 上即時執行，每一步都和參考逐一相同（耗電待量）')
-
-    # ================================================================ 7 conclusions
-    d.divider(6, '三個研究問題的答案，以及接下來要回答 RQ2 的實驗')
-    s = d.slide('結論：三個研究問題', notes='若自我測試為 NO-GO，主軸改為「每次配戴的短提示＋跨次累積，可在 MCU 上執行」，任務標籤寫成負面結果。')
-    rqs = [('RQ1', '免標籤自我校正有沒有用？', '沒有確認增益（獨立資料、預先登錄）；真正有效的是少量有標籤資料', TEAL_L),
-           ('RQ2', '標籤能不能大部分由機器人任務提供？', '模擬中可以；真實資料上換次後不明顯 → 尚未回答，用自我測試檢驗', PINK),
-           ('RQ3', '整套能不能在 MCU 上即時執行？', '可以：逐一驗證、FreeRTOS 下不拖慢、比 MLP 便宜；耗電待量', TEAL_L)]
-    for i, (q, a1, a2, fill) in enumerate(rqs):
-        y = 1.45 + i * 1.45
-        box(s, 0.6, y, 12.1, 1.25, fill=fill)
-        circle_num(s, 0.85, y + 0.35, i + 1, fill=TEAL if fill == TEAL_L else CORAL, d=0.55)
-        text(s, 1.65, y + 0.12, 10.8, 0.5, f'{q}：{a1}', size=17, bold=True)
-        text(s, 1.65, y + 0.62, 10.8, 0.5, a2, size=15, color=GREY)
-    text(s, 0.6, 5.95, 12.1, 0.8, '收斂後的方向：每次重新戴上後，用一輪短提示＋跨次累積把模型校正回來，並檢驗機器人任務能否提供更多標籤，整套在 MCU 上即時執行',
-         size=15, bold=True, color=TEAL)
-
-    s = d.slide('感測器擺法：4 顆貼在主要肌肉上', notes=(
-        'report 35.43；lab_kit/SOP_自我測試.md 3B。實驗室的 4 顆 Trigno IM 配對後完全不送資料（EMG 和加速度都是 0），借不到別的，'
-        '只剩 4 顆 Avanti；4 個通道各送兩次當 8 通道（slots 16:15:11:5:16:15:11:5），韌體不用改。'), tag='我的做法')
-    rows = [['通道', '肌肉', '位置', '用力時摸最鼓的地方'],
-            ['1', '伸指肌（EDC）', '背側，靠肘 1/3–1/2', '手指用力伸直張開'],
-            ['2', '屈指淺肌（FDS）', '掌側中段，稍偏小指側', '用力握拳'],
-            ['3', '拇指側（FCR／FPL 一帶）', '掌側拇指側，中段稍往手腕', '拇指壓食指側面'],
-            ['4', '尺側屈腕肌（FCU）', '掌側小指側，靠肘 1/3', '手腕往小指方向彎']]
-    table(s, 0.6, 1.4, 12.1, rows, [0.9, 3.3, 4.1, 3.8], size=14, row_h=0.55)
-    box(s, 0.6, 4.4, 12.1, 2.2, fill=TEAL_L)
-    text(s, 0.85, 4.5, 11.6, 2.0, [('為什麼是 4 顆、貼主要肌肉', {'bold': True, 'size': 16}),
-                                    ('原本計畫 8 顆繞一圈；實驗室的 IM 感測器不能串流，只剩 4 顆 Avanti', {'bullet': True}),
-                                    ('貼在負責手腕上下左右與握放的 4 塊肌肉上；4 個通道各送兩次，8 通道的韌體不用改', {'bullet': True}),
-                                    ('每天照描好的外框貼回同一位置（跨天累積要靠位置一致）', {'bullet': True})], size=14, space=5)
-
-    s = d.slide('公開資料：貼主要肌肉時，4 顆夠不夠？', notes=(
-        'report 35.46–35.48、35.50、35.52；results/db2_wrist/*.txt、results/ozdemir2022/ozdemir_sim.txt。'
-        'DB2 的 4 顆 = FDS＋EDC 專用電極＋2 個環上電極（28 種組合的中位數）；Ozdemir 2022 = 4 顆由醫師定位在 ECR、FCR、ECU、FCU。'
-        '兩者都是單次配戴；Ozdemir 照提示時間表標籤。'), tag='我的做法')
-    rows = [['資料（4 顆）', '擺法', '7 類 一輪', '7 類 兩輪', '5 類 一輪', '軟標籤增益'],
-            ['NinaPro DB2（10 人）', '2 顆對肌肉＋2 顆在環上', '58.5', '—', '64.1', '+3.5'],
-            ['Ozdemir 2022（40 人）', '4 顆都對準肌肉', '85.3', '90.7', '90.9', '+2.7']]
-    table(s, 0.6, 1.4, 12.1, rows, [2.9, 2.9, 1.4, 1.4, 1.4, 2.1], size=14, row_h=0.6)
-    text(s, 0.6, 3.4, 12.1, 0.4, 'balanced accuracy（%）；7 類 = 手腕上下左右＋張開＋握拳＋放鬆，5 類 = 手腕上下左右＋放鬆；軟標籤增益 = 7 類一輪提示後加軟標籤（點）', size=12, color=GREY)
-    box(s, 0.6, 3.95, 12.1, 2.0, fill=TEAL_L)
-    text(s, 0.85, 4.05, 11.6, 1.8, [('看得到的', {'bold': True, 'size': 16}),
-                                     ('4 顆都對準肌肉時，7 類兩輪提示平均 90.7%，40 人中 32 人 ≥ 85%', {'bullet': True}),
-                                     ('兩輪比一輪好（85.3 → 90.7）；軟標籤再加 1–3 點，任務期望錯 30% 時幾乎不變', {'bullet': True}),
-                                     ('9 類（加食指、比讚）只有 DB2 有：4 顆一輪 50.3%，加軟標籤 54.6%', {'bullet': True})], size=14, space=4)
-    conclude(s, '4 顆對準肌肉在公開資料上 7 類約 90%（兩資料集的人與流程不同，不能直接比）；自我測試看自己能不能過 85%')
-
-    s = d.slide('下一步：自我測試（9 個方向手勢、4 顆貼主要肌肉）', notes=(
-        'report 35.44–35.49；lab_kit/SOP_自我測試.md 3B、4A；src/selftest9_analysis.py（兩條判準在錄之前已 commit）。'
-        '2026-11-17 的 6 手勢錄製只當流程測試。自我測試的資料只用來決定方向；要發表需 IRB。'))
-    steps = [('提示輪', '9 × 4 秒 × 2 輪'), ('P0', '提示手勢 9×3'), ('T1', '機械臂指令 40 次'), ('P1', '提示手勢 9×3'), ('T2', '機械臂指令 40 次'), ('P2', '提示手勢 9×3')]
-    for i, (h_, b_) in enumerate(steps):
-        x = 0.6 + i * 2.07
-        bx = box(s, x, 1.4, 1.8, 1.0, fill=TEAL if h_ in ('T1', 'T2') else LIGHT)
-        label_in(bx, [(h_, {'bold': True}), b_], size=13, color=WHITE if h_ in ('T1', 'T2') else INK)
-        if i < 5:
-            arrow(s, x + 1.83, 1.74, 0.2, 0.32)
-    text(s, 0.6, 2.5, 12.1, 0.4, '8 個指令 = 上下左右前後＋夾爪開／夾；任務段換操作姿勢；判準 1：7／5 類選 ≥ 85% 中最多類的一組', size=13, color=GREY)
-    Ad = lambda m_, pp: subsup(t('A'), t(pp), w(m_))  # noqa: E731
-    eqs(s, 0.6, 3.0, 7.6, 3.75, [
-        T('判準 2（錄之前已寫定；9 類；第 d 天）', True),
-        E(cat(sub(t('D'), t('d')), t('='), frac(t('1'), t('2')), sum_(t('P ∈ {P1, P2}'), '', par(cat(Ad('軟標籤', 'P'), t('−'), Ad('只做提示', 'P')))))),
-        E(cat(w('GO：  '), bar(t('D')), t('≥'), t('2'), w('  且  '), t('#'), par(cat(sub(t('D'), t('d')), t('>'), t('0'))), t('≥'), par(cat(frac(t('2'), t('3')), t('n')), '⌈', '⌉'))),
-        E(cat(w('NO‑GO：  '), bar(t('D')), t('≤'), t('0'))),
-    ], size=17)
-    box(s, 8.5, 3.0, 4.2, 3.75, fill=TEAL_L)
-    text(s, 8.75, 3.15, 3.8, 3.5, [('如果結果是', {'bold': True, 'size': 15}),
-                                   ([('GO', {'bold': True, 'color': TEAL}), '：任務標籤留在主軸 → 多人先導實驗'], {'bullet': True}),
-                                   ([('NO-GO', {'bold': True, 'color': CORAL}), '：寫成負面結果，主軸改為短提示＋MCU'], {'bullet': True}),
-                                   ('其他：交給多人先導實驗', {'bullet': True}),
-                                   ('結果【待填：錄完後更新】', {'color': GREY})], size=14, space=6)
-
-    s = d.slide('接下來的時程（草案）', notes='時程待與指導老師討論；EMBC 2027 截止日以官網為準（第三方列表為 2027-01-24）。')
-    plan = [('自我測試（9 手勢、4 顆）；12 月中進度報告', 0, 2), ('EMBC 2027 投稿（公開資料：獨立檢驗）', 1, 3), ('IRB；能量量測；真 Kinova 整條接起來', 1, 3),
-            ('先導實驗（健常人、跨日）', 3, 5), ('正式實驗／病患個案（視 IRB）', 5, 7), ('分析與撰寫', 6, 8)]
-    months = ['11月', '12月', '1月', '2月', '3月', '4月', '5月', '6月']
-    x0, cw = 5.6, 0.89
-    for j, m_ in enumerate(months):
-        text(s, x0 + j * cw, 1.45, cw, 0.35, m_, size=12, color=GREY, align=PP_ALIGN.CENTER)
-    for i, (t_, a0, a1) in enumerate(plan):
-        y = 1.95 + i * 0.7
-        text(s, 0.6, y, 4.9, 0.6, t_, size=15, anchor=MSO_ANCHOR.MIDDLE)
-        box(s, x0, y + 0.08, cw * len(months), 0.45, fill=LIGHT, radius=0.5)
-        box(s, x0 + a0 * cw, y + 0.08, (a1 - a0) * cw, 0.45, fill=CORAL if i == 0 else TEAL, radius=0.5)
-
-    s = d.slide('需要老師決定或討論的事', dark=True, notes='建議：方向改為「每次配戴的短校正＋任務標籤」；EMBC 用公開資料投獨立檢驗；IRB 早點準備。')
-    for i, t_ in enumerate(['論文主軸改為「每次配戴的短校正＋任務提供的標籤」？', '自我測試需不需要 IRB 或實驗室同意？多人先導實驗的 IRB 何時送？',
-                            'EMBC 2027 用公開資料投「獨立檢驗」這篇，可以嗎？作者順序？', '病患個案的族群與時程']):
-        y = 1.6 + i * 1.2
-        circle_num(s, 0.9, y + 0.1, i + 1, fill=CORAL, d=0.6)
-        text(s, 1.8, y, 10.6, 0.8, t_, size=20, color=WHITE, anchor=MSO_ANCHOR.MIDDLE)
-
-    s = d.slide('參考文獻', notes='標＊者還沒打開原文逐字確認。')
-    refs = ['Jiang, Ma, Nazarpour (2024). Posture-invariant myoelectric control with self-calibrating random forests. Frontiers in Neurorobotics.',
-            'Jiang et al. (2025). Plug-and-play myoelectric control via a self-calibrating random forest common model. Journal of Neural Engineering.',
-            'Kyranou, Szymaniak, Nazarpour (2025). 8-participant two-day Trigno dataset. Scientific Data.',
-            'Vidovic et al. (2016). Improving the robustness of myoelectric pattern recognition for upper limb prostheses by covariate shift adaptation. IEEE TNSRE 24(9).',
-            'Campbell, Eddy, Bateman, Côté-Allard, Scheme (2024). Context-informed incremental learning improves both the performance and resilience of myoelectric control. J NeuroEng Rehabil 21:70.',
-            'Scheme, Hudgins, Englehart (2013). Confidence-based rejection for improved pattern recognition myoelectric control. IEEE TBME 60(6).',
-            'Chen, Wiesel, Eldar, Hero (2010). Shrinkage algorithms for MMSE covariance estimation. IEEE Transactions on Signal Processing.（OAS）',
-            '＊Palermo et al. (2017). Repeatability of grasp recognition for robotic hand prosthesis control based on sEMG data. ICORR 2017.（NinaPro DB6）']
-    text(s, 0.6, 1.4, 12.1, 5.0, refs, size=12, color=INK, space=5)
-    text(s, 0.6, 6.55, 12.1, 0.35, '＊ 尚未打開原文逐字核對', size=11, color=GREY)
 
     d.prs.save(out)
     print(f'{d.n} slides -> {out}')
