@@ -41,6 +41,15 @@ Rule 1 (35.45; the gesture set), fixed before the recording, n = 1 self-test, pi
 Rule 2 (35.49; soft labels with 9 gestures), fixed before the recording, same rule as R12 of selftest_analysis:
   D(S9) = mean over P1 and P2 of (cue_soft - cue) window accuracy, per day; D_bar = mean over days.
   GO if D_bar >= +2 points and D > 0 on at least ceil(2/3 x days) days; else NO-GO. S7 and S5 reported, not decided.
+Rule 3 (35.53; accumulation across donnings), fixed before the first 9-gesture recording (2026-11-17), needs >= 2 days
+with the same placement:
+  acc = one model carried across the days as on the board: day 1 = its cued pass; each later day its own z-score from
+  its cued windows, which are ADDED to the running sums (Model.new_session); no task labels. cue = that day's cued
+  pass only. Per later day d: D3_d = A_acc - A_cue, A = window accuracy over all probe windows (P0-P2 pooled), S9.
+  GO if mean D3 >= +2 points and D3 > 0 on at least ceil(2/3 x (days - 1)) later days; else NO-GO.
+  Reported, not decided: S7, S5, and acc_soft (acc + every day's soft labels) - cue.
+Also reported: the board's real-time commands in the task segments (cued-pass model): right / wrong / none and the
+latency from the cue to the first command (TaskScreen latency_ms, median and quartiles; includes the user's reaction).
 Also reported: per probe, cue-level majority accuracy, bootstrap 95 % intervals over cues (2000 resamples), per-class
 recall and the 9-class confusion matrix (cue), chance 1 / |S|, offline command accuracy in the task trials, and the
 same with --cal-s 2 (first 2 s of each cue).
@@ -130,9 +139,13 @@ def load_day(folder, name, cal_s):
                     if len(w) >= K_DC:
                         events.append((on[r.step].t, 'trial', (w, G[COMMAND[r.target]])))
     events.sort(key=lambda e: e[0])
+    # the board's own real-time commands in the task (cued-pass model, TaskScreen trial_end: result, latency_ms from
+    # the cue to the first command)
+    live = [(r.result, float(r.latency_ms)) if r.latency_ms not in ('', 'nan') else (r.result, np.nan)
+            for r in task.itertuples() if r.event == 'trial_end' and r.segment == 'task']
     return dict(name=name, F=F, cal_rows=np.concatenate(cue_rows), cal_lab=np.concatenate(cue_lab), probes=probes,
                 events=events, rate=rate, cal_counts=np.bincount(np.concatenate(cue_lab), minlength=9),
-                trials=sum(e[1] == 'trial' for e in events))
+                trials=sum(e[1] == 'trial' for e in events), live=live)
 
 
 class Model:
@@ -151,6 +164,20 @@ class Model:
         self.s = np.zeros((K, Zq.shape[1]))
         np.add.at(self.s, idx, Zq)
         self.G = Zq.T @ Zq
+        self.fit()
+
+    def new_session(self, F, rows, lab):
+        """next donning, as the board: the session's z-score from its own cued windows, which are ADDED to the running
+        sums kept from earlier days (no forgetting between days), then refit"""
+        keep = np.isin(lab, self.classes)
+        Xc, yc = F[rows[keep]], lab[keep]
+        self.mu, sd = Xc.mean(0), Xc.std(0)
+        self.inv = np.where(sd > 0, 1.0 / np.where(sd > 0, sd, 1.0), 0.0)
+        Zq = self.z(Xc)
+        idx = np.array([self.classes.index(c) for c in yc])
+        self.n = self.n + np.bincount(idx, minlength=len(self.classes))
+        np.add.at(self.s, idx, Zq)
+        self.G = self.G + Zq.T @ Zq
         self.fit()
 
     def z(self, X):
@@ -197,9 +224,25 @@ def decide(mdl, X):
 
 def replay(day, sname, cond):
     """-> per probe a list of (cue, true, preds); command counts in the task trials"""
-    classes = SETS[sname]
+    mdl = Model(day['F'], day['cal_rows'], day['cal_lab'], SETS[sname])
+    return run_day(day, SETS[sname], mdl, cond == 'cue_soft')
+
+
+def replay_days(days, sname, soft):
+    """rule 3: one model carried across the days (acc / acc_soft); -> per day the run_day result"""
+    out, mdl = [], None
+    for day in days:
+        if mdl is None:
+            mdl = Model(day['F'], day['cal_rows'], day['cal_lab'], SETS[sname])
+        else:
+            mdl.new_session(day['F'], day['cal_rows'], day['cal_lab'])
+        out.append(run_day(day, SETS[sname], mdl, soft))
+    return out
+
+
+def run_day(day, classes, mdl, soft):
     F = day['F']
-    mdl = Model(F, day['cal_rows'], day['cal_lab'], classes)
+    cond = 'cue_soft' if soft else 'cue'
     probes = {}
     cmd = dict(trials=0, cmd=0, ok=0, miss=0)
     for _, kind, pay in day['events']:
@@ -305,6 +348,15 @@ def main():
                 m = res[s][c][1]
                 p(f"{s} {c:8s}: trials {m['trials']}, commands {m['cmd']}, right {m['ok']}, none {m['miss']}, "
                   f"command accuracy {100 * m['ok'] / max(m['cmd'], 1):.1f} %")
+        live = d['live']
+        if live:
+            res_n = {r: sum(1 for x, _ in live if x == r) for r in sorted({x for x, _ in live})}
+            lat_all = np.array([v for _, v in live if np.isfinite(v)])
+            lat_ok = np.array([v for x, v in live if x == 'success' and np.isfinite(v)])
+            q = lambda a: f'median {np.median(a):.0f} ms (quartiles {np.percentile(a, 25):.0f}-{np.percentile(a, 75):.0f})' if len(a) else 'none'  # noqa: E731
+            p(f"\nboard's real-time commands in the task (cued-pass model, S9): " + ', '.join(f'{k} {v}' for k, v in res_n.items())
+              + f' of {len(live)}')
+            p(f'  latency cue -> first command: all commands {q(lat_all)}; right commands {q(lat_ok)}')
     mean = {s: float(np.mean(A[s])) for s in ORDER}
     ok = [s for s in ORDER if mean[s] >= THRESHOLD]
     p('\nrule 1, mean over days: ' + ', '.join(f'{s} {mean[s]:.1f} %' for s in ORDER))
@@ -321,6 +373,22 @@ def main():
         verdict = 'GO' if dbar >= 2.0 and pos >= need else 'NO-GO'
         p(f'RULE 2 DECISION (pre-registered): S9 D_bar = {dbar:+.2f}, positive on {pos}/{len(D["S9"])} days '
           f'(need {need}) -> {verdict}')
+    if len(days) >= 2:
+        p('\nrule 3: accumulation across donnings; pooled probe window accuracy % on each later day')
+        D3 = {}
+        for s in ORDER:
+            cue = [win_acc([x for pr in replay(dd, s, 'cue')[0] for x in pr]) for dd in days]
+            acc = [win_acc([x for pr in r[0] for x in pr]) for r in replay_days(days, s, False)]
+            accs = [win_acc([x for pr in r[0] for x in pr]) for r in replay_days(days, s, True)]
+            D3[s] = [acc[k] - cue[k] for k in range(1, len(days))]
+            p(f'{s}: ' + '  '.join(f"{days[k]['name']}: cue {cue[k]:5.1f}, acc {acc[k]:5.1f}, acc_soft {accs[k]:5.1f}"
+                                   for k in range(1, len(days)))
+              + f'   D3 = {np.mean(D3[s]):+.2f}, acc_soft - cue {np.mean([accs[k] - cue[k] for k in range(1, len(days))]):+.2f}')
+        dbar = float(np.mean(D3['S9']))
+        pos = sum(x > 0 for x in D3['S9'])
+        need = math.ceil(2 / 3 * len(D3['S9']))
+        p(f"RULE 3 DECISION (pre-registered): S9 mean D3 = {dbar:+.2f}, positive on {pos}/{len(D3['S9'])} later days "
+          f"(need {need}) -> {'GO' if dbar >= 2.0 and pos >= need else 'NO-GO'}")
         for s in ('S7', 'S5'):
             if D[s]:
                 p(f'   (reported, not decided) {s} D_bar = {np.mean(D[s]):+.2f}')
