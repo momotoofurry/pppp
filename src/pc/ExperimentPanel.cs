@@ -32,7 +32,12 @@ class ExperimentPanel : Form
     readonly TextBox cmdBox = new TextBox();
     readonly List<Control> needBridge = new List<Control>(), needIdle = new List<Control>();
     readonly Button[] calBtn = new Button[9];
+    readonly int[] calCount = new int[9];          // cued passes done per gesture since 開始錄製
+    // cued passes per gesture before calibrate: 9 gestures 2 (2026-11-17, report 35.48: firmware rtl_task_9c2 keeps
+    // RTL_LABEL_MAX = 810 = 3 passes, room to redo); 6 gestures 1
+    int Passes { get { return Nine ? 2 : 1; } }
     Button calibrateBtn;
+    Label calHint;
     TextBox room, skin, strap, photo, exercise, freeNote, dest;
 
     Process bridge, tool;
@@ -97,11 +102,11 @@ class ExperimentPanel : Form
         Row(g, envBtn); needBridge.Add(envBtn);
 
         // ---- SOP 5.3: cue pass
-        g = Group(left, "④ 一輪提示（中立姿勢，5.3）");
-        g.Controls.Add(Hint("按下去就馬上做該手勢並維持，看到 calend 再放鬆 2–3 秒。做錯就再按一次同一個。"));
+        g = Group(left, "④ 提示輪（中立姿勢，5.3；9 手勢做兩輪）");
+        calHint = Hint(""); g.Controls.Add(calHint);
         for (int i = 0; i < 9; i++) {
             int k = i;
-            calBtn[i] = Btn("cal " + i, delegate { Send("cal " + k); Mark(calBtn[k]); });
+            calBtn[i] = Btn("cal " + i, delegate { Send("cal " + k); calCount[k]++; ShowCal(k); });
             calBtn[i].Width = 170; needBridge.Add(calBtn[i]);
         }
         Row(g, calBtn[0], calBtn[1], calBtn[2]); Row(g, calBtn[3], calBtn[4], calBtn[5]); Row(g, calBtn[6], calBtn[7], calBtn[8]);
@@ -208,12 +213,24 @@ class ExperimentPanel : Form
     void UpdateGestures()
     {
         for (int i = 0; i < 9; i++) {
+            calCount[i] = 0;
             calBtn[i].Visible = i < K;
-            if (i < K) calBtn[i].Text = "cal " + i + "  " + GESTURE_ZH[i];
-            calBtn[i].BackColor = SystemColors.Control;
+            ShowCal(i);
         }
-        calibrateBtn.Text = "calibrate（" + K + " 個都做完再按）";
+        calibrateBtn.Text = Passes == 1 ? "calibrate（" + K + " 個都做完再按）" : "calibrate（" + K + " 個各做 " + Passes + " 輪再按）";
         calibrateBtn.BackColor = SystemColors.Control;
+        if (calHint != null)
+            calHint.Text = Passes == 1
+                ? "按下去就馬上做該手勢並維持，看到 calend 再放鬆 2–3 秒。做錯就再按一次同一個。"
+                : "第一輪 cal 0 → cal " + (K - 1) + "，再第二輪 cal 0 → cal " + (K - 1) + "。按下去就馬上做該手勢並維持 4 秒，看到 calend 再放鬆 2–3 秒。\n按鈕後面會顯示做了幾次；做錯就再按一次同一個（會變 3 次，沒關係）。";
+    }
+
+    void ShowCal(int i)
+    {
+        if (i >= K) return;
+        int n = calCount[i];
+        calBtn[i].Text = "cal " + i + "  " + GESTURE_ZH[i] + (n > 0 ? "  " + n + " 次" : "");
+        calBtn[i].BackColor = n >= Passes ? Color.PaleGreen : n > 0 ? Color.Khaki : SystemColors.Control;
     }
 
     void UpdateName()
@@ -302,7 +319,7 @@ class ExperimentPanel : Form
         try {
             bridge = Launch(args, true);
             bridgeIn = new StreamWriter(bridge.StandardInput.BaseStream, Encoding.Default) { AutoFlush = true };
-            foreach (var b in calBtn) { b.BackColor = SystemColors.Control; b.Text = b.Text.Replace(" ✓", ""); }
+            for (int i = 0; i < 9; i++) { calCount[i] = 0; ShowCal(i); }
             calibrateBtn.BackColor = SystemColors.Control; calibrateBtn.Text = calibrateBtn.Text.Replace(" ✓", "");
             bridge.Exited += delegate {
                 Log("（橋接程式已結束，代碼 " + bridge.ExitCode + "）", Color.SkyBlue);
@@ -338,8 +355,8 @@ class ExperimentPanel : Form
     void Calibrate()
     {
         var missing = new List<string>();
-        for (int i = 0; i < K; i++) if (!calBtn[i].Text.EndsWith(" ✓")) missing.Add("cal " + i + " " + GESTURE_ZH[i]);
-        if (missing.Count > 0 && MessageBox.Show("還沒做：" + string.Join("、", missing) + "\n還是要 calibrate？", Text, MessageBoxButtons.YesNo) != DialogResult.Yes) return;
+        for (int i = 0; i < K; i++) if (calCount[i] < Passes) missing.Add("cal " + i + " " + GESTURE_ZH[i] + "（" + calCount[i] + "/" + Passes + "）");
+        if (missing.Count > 0 && MessageBox.Show("次數不夠：" + string.Join("、", missing) + "\n還是要 calibrate？", Text, MessageBoxButtons.YesNo) != DialogResult.Yes) return;
         Send("calibrate"); Mark(calibrateBtn);
     }
 

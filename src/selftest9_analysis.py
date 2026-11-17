@@ -1,7 +1,8 @@
 """Self-test with the 9 directional gestures (report 35.45, 2026-11-17): how many gestures can 4 sensors carry?
 
 Recording (SOP 3B / 5, panel gesture set "9 方向", files <subj>_d<day>_G_*): TrignoBridge run --firmware lda --classes 9
-(board: rtl_task_9c), a cued pass of the 9 gestures (cal 0-8, 4 s each, then calibrate), then TaskScreen --gestures nine
+(board: rtl_task_9c2), TWO cued passes of the 9 gestures (cal 0-8 twice, 4 s each, then calibrate; report 35.48, decided
+2026-11-17 before recording after the DB2 simulation 35.47), then TaskScreen --gestures nine
 --segments labelled,labelled,labelled --reps 3 --postures selftest: three probes P0 (neutral), P1 (A then B),
 P2 (C then A), each 3 x 9 cues of 2 s in a random order. Cued only: no task labels.
 
@@ -13,8 +14,8 @@ Gesture sets compared on the SAME recording (each one is a separate model, as if
   S7  without Point and ThumbUp (the single-finger gestures): 4 wrist directions + HandOpen + Fist + Rest
   S5  the 4 wrist directions + Rest (a mode switch would carry the rest of the commands)
 
-Model per set and day, as on the board (rt_lda.c): the cued windows of the set's gestures (every accepted 'cal g' of
-the cued pass, the last 30 windows of each = windows 9..38 after its stream reset; a redone gesture adds its windows
+Model per set and day, as on the board (rt_lda.c): the cued windows of the set's gestures (every accepted 'cal g'
+before the first segment, both passes and any redo, the last 30 windows of each = windows 9..38 after its stream reset,
 like the board's buffer) give the z-score of the session (mean, population SD); Q5.10; OAS-shrunk pooled covariance
 LDA with equal priors (lda_robust.oas_solve). Test = the probe cues whose gesture is in the set: the middle 10 windows
 of [cue_on + 0.5 s, cue_off] (selftest_analysis.mid / inside), argmax over the set's classes.
