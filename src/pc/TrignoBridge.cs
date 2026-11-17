@@ -57,6 +57,9 @@
 //       board test without the Trigno: the recorded stream of src/board_replay.py (stream.bin, schedule.csv,
 //       windows.csv) sent in real time; prints the board's status events and its accuracy per block.
 // Gestures: 0 Power, 1 Lateral, 2 Tripod, 3 Pointer, 4 Open, 5 Rest.
+// --classes 9 (only with --firmware lda and the 9-class build rtl_task_9c, 2026-11-17): 0 WristExt (up), 1 WristFlex
+// (down), 2 RadialDev (left), 3 UlnarDev (right), 4 Point (forward), 5 ThumbUp (back), 6 HandOpen (gripper open),
+// 7 Fist (gripper close), 8 Rest; cal / verify take 0-8, task <expected 0-7> <mask 0-255>.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -75,8 +78,20 @@ static class Proto
     public const byte FORGET = 11, TASK_LABEL = 12, SET_GATE = 13;          // LDA firmware (rt_lda.h)
     public const int CH = 8, FRAMES_PER_PACKET = 20, MAX_PAYLOAD = 512, OVERHEAD = 9;
     public const double LSB_VOLT = 2.5e-7;
-    public static readonly string[] GESTURES = { "Power", "Lateral", "Tripod", "Pointer", "Open", "Rest" };
-    public static readonly string[] COMMANDS = { "none", "pose_A", "grip", "pose_B", "release", "home" };   // 5 = home: Lateral, pilot-freeze-5
+    public static string[] GESTURES = { "Power", "Lateral", "Tripod", "Pointer", "Open", "Rest" };
+    public static string[] COMMANDS = { "none", "pose_A", "grip", "pose_B", "release", "home" };   // 5 = home: Lateral, pilot-freeze-5
+    // --classes 9 (LDA firmware built with -DLD_CLASSES=9 -DDC_CLASSES=9, decision.h; 2026-11-17): Rest last
+    public static readonly string[] GESTURES9 = { "WristExt", "WristFlex", "RadialDev", "UlnarDev", "Point", "ThumbUp",
+                                                  "HandOpen", "Fist", "Rest" };
+    public static readonly string[] COMMANDS9 = { "none", "up", "down", "left", "right", "forward", "back", "grip_open",
+                                                  "grip_close" };
+    public static int K { get { return GESTURES.Length; } }
+    public static string GestureList()
+    {
+        var s = new List<string>();
+        for (int g = 0; g < K; g++) s.Add(g + " " + GESTURES[g]);
+        return string.Join(", ", s);
+    }
     static ushort seqSamples, seqControl;
 
     public static ushort Crc16(byte[] b, int off, int n)          // CRC-16/CCITT-FALSE
@@ -707,7 +722,7 @@ static class Program
     // day-1 calibration check (report 22): 10 predictions per gesture, pass at >= 70 % of the 60
     const int VERIFY_WINDOWS = 10, VERIFY_PASS_PCT = 70;
     static int verifyG = -1, verifyLeft;
-    static readonly int[] vOk = new int[6], vN = new int[6];
+    static readonly int[] vOk = new int[16], vN = new int[16];
     static readonly object vLock = new object();
 
     static void VerifyPred(int cls)
@@ -721,10 +736,10 @@ static class Program
                                             clock.Elapsed.TotalSeconds, verifyG, Proto.GESTURES[verifyG], vOk[verifyG], vN[verifyG]));
             verifyG = -1;
             int ok = 0, n = 0, done = 0;
-            for (int g = 0; g < 6; g++) { ok += vOk[g]; n += vN[g]; done += vN[g] > 0 ? 1 : 0; }
-            if (done == 6)
+            for (int g = 0; g < Proto.K; g++) { ok += vOk[g]; n += vN[g]; done += vN[g] > 0 ? 1 : 0; }
+            if (done == Proto.K)
                 Console.WriteLine(string.Format(IC, "verify total: {0}/{1} = {2:F0} % -> {3}", ok, n, 100.0 * ok / n,
-                                                100 * ok >= VERIFY_PASS_PCT * n ? "PASS" : "FAIL: redo the calibration (cal 0-5, calibrate)"));
+                                                100 * ok >= VERIFY_PASS_PCT * n ? "PASS" : "FAIL: redo the calibration (cal 0-" + (Proto.K - 1) + ", calibrate)"));
         }
     }
     // cal <g> = reset + CAL_START, then CAL_END by itself after CAL_FRAMES samples have gone out (4 s: windows 9..38
@@ -778,7 +793,7 @@ static class Program
         if (c == "reset") Send(Proto.Control(Proto.STREAM_RESET));
         else if (c == "cal" && p.Length == 2) {
             int g = int.Parse(p[1]);
-            if (g < 0 || g > 5) { Console.WriteLine("gesture 0-5: 0 Power, 1 Lateral, 2 Tripod, 3 Pointer, 4 Open, 5 Rest"); return false; }
+            if (g < 0 || g >= Proto.K) { Console.WriteLine("gesture 0-" + (Proto.K - 1) + ": " + Proto.GestureList()); return false; }
             StartAuto(Proto.CAL_START, g, Proto.CAL_END, CAL_FRAMES, "calend (auto, " + CAL_S + " s): you can relax");
             Console.WriteLine(string.Format(IC, "[{0:F1} s] cal {1} ({2}): do the gesture now and hold it; calend comes by itself after {3} s",
                                             clock.Elapsed.TotalSeconds, g, Proto.GESTURES[g], CAL_S));
@@ -787,7 +802,7 @@ static class Program
         else if (c == "calend") { lock (txLock) { Send(Proto.Control(Proto.CAL_END)); autoStart = -1; } }
         else if (c == "verify" && p.Length == 2) {
             int g = int.Parse(p[1]);
-            if (g < 0 || g > 5) { Console.WriteLine("gesture 0-5: 0 Power, 1 Lateral, 2 Tripod, 3 Pointer, 4 Open, 5 Rest"); return false; }
+            if (g < 0 || g >= Proto.K) { Console.WriteLine("gesture 0-" + (Proto.K - 1) + ": " + Proto.GestureList()); return false; }
             lock (vLock) { vOk[g] = 0; vN[g] = 0; verifyG = g; verifyLeft = VERIFY_WINDOWS; }
             Send(Proto.Control(Proto.STREAM_RESET));
             Console.WriteLine(string.Format(IC, "[{0:F1} s] verify {1} ({2}): do the gesture now and hold it (about 2 s)",
@@ -818,8 +833,9 @@ static class Program
             Send(Proto.Control(Proto.SET_GATE, k, mode));
         }
         else if (c == "task" && (p.Length == 3 || p.Length == 4)) {
-            int e = int.Parse(p[1]), m = int.Parse(p[2]);
-            if (e < 0 || e > 4 || m < 0 || m > 31) { Console.WriteLine("task <expected 0-4> <valid mask 0-31> [window]"); return false; }
+            int e = int.Parse(p[1]), m = int.Parse(p[2]), mmax = (1 << (Proto.K - 1)) - 1;
+            if (e < 0 || e > Proto.K - 2 || m < 0 || m > mmax) {
+                Console.WriteLine("task <expected 0-" + (Proto.K - 2) + "> <valid mask 0-" + mmax + "> [window]"); return false; }
             Send(p.Length == 4 ? Proto.Control(Proto.TASK_LABEL, e, m, (int)uint.Parse(p[3])) : Proto.Control(Proto.TASK_LABEL, e, m));
             return true;                                          // quiet: one per robot command
         }
@@ -844,7 +860,7 @@ static class Program
                 var f = Encoding.ASCII.GetString(b).Trim().Split(',');
                 int e, m; uint w;
                 if (f.Length != 4 || f[0] != "task" || !int.TryParse(f[1], out e) || !int.TryParse(f[2], out m)
-                    || !uint.TryParse(f[3], out w) || e < 0 || e > 4 || m < 0 || m > 31) continue;
+                    || !uint.TryParse(f[3], out w) || e < 0 || e > Proto.K - 2 || m < 0 || m >= (1 << (Proto.K - 1))) continue;
                 if (DoCommand(string.Format(IC, "task {0} {1} {2}", e, m, w))) Interlocked.Increment(ref TaskLabelsSent);
             }
         }
@@ -889,13 +905,13 @@ static class Program
         if (type == Proto.COMMAND && p.Length >= 12) {
             int cmd = p[8], cls = p[9];
             return string.Format(IC, "command,{0},{1},{2},{3},,{4:F3},,,", BitConverter.ToUInt32(p, 0), BitConverter.ToUInt32(p, 4),
-                                 cls < 6 ? Proto.GESTURES[cls] : cls.ToString(), cmd < Proto.COMMANDS.Length ? Proto.COMMANDS[cmd] : cmd.ToString(),
+                                 cls < Proto.K ? Proto.GESTURES[cls] : cls.ToString(), cmd < Proto.COMMANDS.Length ? Proto.COMMANDS[cmd] : cmd.ToString(),
                                  BitConverter.ToUInt16(p, 10) / 1000.0);
         }
         if (type == Proto.PRED && p.Length >= 13) {
             int cls = p[8];
             return string.Format(IC, "pred,{0},{1},{2},,{3},{4:F3},{5},,", BitConverter.ToUInt32(p, 0), BitConverter.ToUInt32(p, 4),
-                                 cls < 6 ? Proto.GESTURES[cls] : cls.ToString(), p[9], BitConverter.ToUInt16(p, 10) / 1000.0, p[12]);
+                                 cls < Proto.K ? Proto.GESTURES[cls] : cls.ToString(), p[9], BitConverter.ToUInt16(p, 10) / 1000.0, p[12]);
         }
         if (type == Proto.STATUS && p.Length >= 8) {
             int ev = p[0], v = BitConverter.ToInt32(p, 4);
@@ -935,6 +951,13 @@ static class Program
         lock (opsCsv) { opsCsv.WriteLine(UnixMs().ToString("F1", IC) + ",note slots " + slotSpec + " -> ch 1-" + Proto.CH + ",1"); opsCsv.Flush(); }
         OpenUdp(Get(a, "udp", "50555"));
         lda = Get(a, "firmware", "freeze") == "lda";
+        string classes = Get(a, "classes", "6");
+        if (classes == "9") {
+            if (!lda) { Console.WriteLine("--classes 9 needs --firmware lda (the 9-class LDA build rtl_task_9c)"); return 1; }
+            Proto.GESTURES = Proto.GESTURES9; Proto.COMMANDS = Proto.COMMANDS9;
+        } else if (classes != "6") { Console.WriteLine("--classes: 6 or 9"); return 1; }
+        Console.WriteLine("gestures (" + Proto.K + "): " + Proto.GestureList());
+        lock (opsCsv) { opsCsv.WriteLine(UnixMs().ToString("F1", IC) + ",note classes " + Proto.K + " " + string.Join(" ", Proto.GESTURES) + ",1"); opsCsv.Flush(); }
         gateOn = !lda && Get(a, "gate", "1") != "0";
         if (lda) Console.WriteLine("firmware lda: LDA main line (rt_lda.c); no alignment gate; extra commands forget | gate | task");
         Console.WriteLine(gateOn ? "alignment gate on: board commands are forwarded only after a good 'align' (--gate 0: off)"
@@ -970,7 +993,7 @@ static class Program
             var input = new Thread(() => { string l; while (!stop && (l = Console.ReadLine()) != null) DoCommand(l); });
             input.IsBackground = true;
             input.Start();
-            Console.WriteLine("commands: reset | cal <0-5> | calend | calibrate | load | adapt <0|1> | verify <0-5> | align | decision <tau> <k> | report <0|1> | note <text> | status | quit");
+            Console.WriteLine("commands: reset | cal <0-" + (Proto.K - 1) + "> | calend | calibrate | load | adapt <0|1> | verify <0-" + (Proto.K - 1) + "> | align | decision <tau> <k> | report <0|1> | note <text> | status | quit");
         }
 
         Console.WriteLine("START -> " + tcu.Command("START"));

@@ -16,9 +16,16 @@
 #pragma once
 #include <stdint.h>
 
+#ifndef DC_CLASSES
 #define DC_CLASSES 6
+#endif
 
 enum { DC_NONE = 0, DC_POSE_A = 1, DC_GRIP = 2, DC_POSE_B = 3, DC_RELEASE = 4, DC_HOME = 5 };
+/* 9 classes (-DDC_CLASSES=9 -DLD_CLASSES=9, 2026-11-17): wrist extension, wrist flexion, radial deviation, ulnar
+ * deviation, index point, thumb up, hand open, fist, Rest -> up, down, left, right, forward, back, gripper open,
+ * gripper close, none. Command code = class + 1. */
+enum { DC9_UP = 1, DC9_DOWN = 2, DC9_LEFT = 3, DC9_RIGHT = 4, DC9_FORWARD = 5, DC9_BACK = 6, DC9_GRIP_OPEN = 7,
+       DC9_GRIP_CLOSE = 8 };
 
 typedef struct {
     uint16_t tau_permille;      /* rejection threshold, 0..1000 */

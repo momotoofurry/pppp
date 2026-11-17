@@ -14,7 +14,14 @@ using System.Windows.Forms;
 class ExperimentPanel : Form
 {
     static readonly string DIR = AppDomain.CurrentDomain.BaseDirectory;
-    static readonly string[] GESTURE_ZH = { "握拳", "側捏", "三指捏", "食指指出", "張開", "放鬆" };
+    static readonly string[] GESTURE6_ZH = { "握拳", "側捏", "三指捏", "食指指出", "張開", "放鬆" };
+    // 9 directional gestures (2026-11-17; TrignoBridge --classes 9, firmware rtl_task_9c); files <subj>_d<day>_G_*
+    static readonly string[] GESTURE9_ZH = { "手腕上翹（上）", "手腕下彎（下）", "往拇指側偏（左）", "往小指側偏（右）",
+                                             "食指指出（前）", "比讚（後）", "五指張開（夾開）", "握拳（夾緊）", "放鬆（停）" };
+    string[] GESTURE_ZH { get { return Nine ? GESTURE9_ZH : GESTURE6_ZH; } }
+    readonly ComboBox gset = new ComboBox();
+    bool Nine { get { return gset.SelectedIndex != 1; } }
+    string Cond { get { return Nine ? "G" : "A"; } }
     static readonly Font UI = new Font("Microsoft JhengHei UI", 10.5f);
     static readonly Font UIB = new Font("Microsoft JhengHei UI", 11f, FontStyle.Bold);
 
@@ -24,7 +31,7 @@ class ExperimentPanel : Form
     readonly RichTextBox log = new RichTextBox();
     readonly TextBox cmdBox = new TextBox();
     readonly List<Control> needBridge = new List<Control>(), needIdle = new List<Control>();
-    readonly Button[] calBtn = new Button[6];
+    readonly Button[] calBtn = new Button[9];
     Button calibrateBtn;
     TextBox room, skin, strap, photo, exercise, freeNote, dest;
 
@@ -32,7 +39,7 @@ class ExperimentPanel : Form
     StreamWriter bridgeIn;
     bool verifyAfterQuit;
 
-    string Name0 { get { return subj.Text.Trim() + "_d" + day.Text + "_A"; } }
+    string Name0 { get { return subj.Text.Trim() + "_d" + day.Text + "_" + Cond; } }
     bool BridgeOn { get { return bridge != null && !bridge.HasExited; } }
     bool ToolOn { get { return tool != null && !tool.HasExited; } }
 
@@ -57,6 +64,10 @@ class ExperimentPanel : Form
         rate.AccessibleName = "採樣率"; slots.AccessibleName = "slots"; tcu.AccessibleName = "TCU 位址"; com.AccessibleName = "板子"; day.AccessibleName = "第幾天";
         Row(g, Lbl("代號"), subj, Lbl("第幾天"), day, Lbl("板子"), com, refresh);
         Row(g, Lbl("採樣率"), rate, Lbl("slots"), slots, Lbl("TCU 位址"), tcu);
+        gset.DropDownStyle = ComboBoxStyle.DropDownList; gset.Width = 260; gset.AccessibleName = "手勢組";
+        gset.Items.AddRange(new object[] { "9 方向手勢（檔名 _G，板子要 9 類韌體）", "6 抓握手勢（舊，檔名 _A）" });
+        gset.SelectedIndex = 0;
+        Row(g, Lbl("手勢組"), gset);
         g.Controls.Add(Hint("空白 = 預設（2000 Hz、slots 1-8、本機）。採樣率只在 check 量到不是 2000 時才填。"));
         nameLbl.AutoSize = true; nameLbl.Font = UIB; g.Controls.Add(nameLbl);
         subj.TextChanged += delegate { UpdateName(); }; day.SelectedIndexChanged += delegate { UpdateName(); };
@@ -88,13 +99,15 @@ class ExperimentPanel : Form
         // ---- SOP 5.3: cue pass
         g = Group(left, "④ 一輪提示（中立姿勢，5.3）");
         g.Controls.Add(Hint("按下去就馬上做該手勢並維持，看到 calend 再放鬆 2–3 秒。做錯就再按一次同一個。"));
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 9; i++) {
             int k = i;
-            calBtn[i] = Btn("cal " + i + "  " + GESTURE_ZH[i], delegate { Send("cal " + k); Mark(calBtn[k]); });
-            calBtn[i].Width = 165; needBridge.Add(calBtn[i]);
+            calBtn[i] = Btn("cal " + i, delegate { Send("cal " + k); Mark(calBtn[k]); });
+            calBtn[i].Width = 170; needBridge.Add(calBtn[i]);
         }
-        Row(g, calBtn[0], calBtn[1], calBtn[2]); Row(g, calBtn[3], calBtn[4], calBtn[5]);
-        calibrateBtn = Btn("calibrate（6 個都做完再按）", delegate { Calibrate(); }); calibrateBtn.Width = 300;
+        Row(g, calBtn[0], calBtn[1], calBtn[2]); Row(g, calBtn[3], calBtn[4], calBtn[5]); Row(g, calBtn[6], calBtn[7], calBtn[8]);
+        calibrateBtn = Btn("calibrate", delegate { Calibrate(); }); calibrateBtn.Width = 300;
+        gset.SelectedIndexChanged += delegate { UpdateGestures(); UpdateName(); };
+        UpdateGestures();
         Row(g, calibrateBtn); needBridge.Add(calibrateBtn);
 
         // ---- SOP 5.3b / 5.4: screens
@@ -190,6 +203,19 @@ class ExperimentPanel : Form
         else Log("找不到任何 COM 埠：板子有接上嗎？接上後按「重新找」。", Color.OrangeRed);
     }
 
+    int K { get { return Nine ? 9 : 6; } }
+
+    void UpdateGestures()
+    {
+        for (int i = 0; i < 9; i++) {
+            calBtn[i].Visible = i < K;
+            if (i < K) calBtn[i].Text = "cal " + i + "  " + GESTURE_ZH[i];
+            calBtn[i].BackColor = SystemColors.Control;
+        }
+        calibrateBtn.Text = "calibrate（" + K + " 個都做完再按）";
+        calibrateBtn.BackColor = SystemColors.Control;
+    }
+
     void UpdateName()
     {
         nameLbl.Text = "今天的檔名：" + Name0;
@@ -201,7 +227,7 @@ class ExperimentPanel : Form
         bool on = BridgeOn, busy = ToolOn;
         foreach (var c in needBridge) c.Enabled = on;
         foreach (var c in needIdle) c.Enabled = !on && !busy;
-        subj.Enabled = day.Enabled = com.Enabled = rate.Enabled = slots.Enabled = tcu.Enabled = !on;
+        subj.Enabled = day.Enabled = com.Enabled = rate.Enabled = slots.Enabled = tcu.Enabled = gset.Enabled = !on;
         state.Text = on ? "● 錄製中：" + Name0 : busy ? "… 工具執行中" : "○ 未開始";
         state.ForeColor = on ? Color.ForestGreen : busy ? Color.DarkOrange : Color.Gray;
     }
@@ -268,7 +294,7 @@ class ExperimentPanel : Form
             MessageBox.Show(Name0 + "_emg.csv 已經存在：今天已經錄過。\n不要刪舊檔，先停下來問。", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        string args = "run --port " + com.Text.Trim() + " --firmware lda";
+        string args = "run --port " + com.Text.Trim() + " --firmware lda" + (Nine ? " --classes 9" : "");
         if (rate.Text.Trim() != "") args += " --rate " + rate.Text.Trim();
         if (slots.Text.Trim() != "") args += " --slots " + slots.Text.Trim();
         args += TcuArg();
@@ -312,7 +338,7 @@ class ExperimentPanel : Form
     void Calibrate()
     {
         var missing = new List<string>();
-        for (int i = 0; i < 6; i++) if (!calBtn[i].Text.EndsWith(" ✓")) missing.Add("cal " + i + " " + GESTURE_ZH[i]);
+        for (int i = 0; i < K; i++) if (!calBtn[i].Text.EndsWith(" ✓")) missing.Add("cal " + i + " " + GESTURE_ZH[i]);
         if (missing.Count > 0 && MessageBox.Show("還沒做：" + string.Join("、", missing) + "\n還是要 calibrate？", Text, MessageBoxButtons.YesNo) != DialogResult.Yes) return;
         Send("calibrate"); Mark(calibrateBtn);
     }
@@ -320,9 +346,14 @@ class ExperimentPanel : Form
     void StartScreen(bool warmup)
     {
         string exe = Path.Combine(DIR, "TaskScreen.exe");
-        string args = warmup
-            ? "--subject W00 --day " + day.Text + " --cond A --segments labelled,task --reps 1 --n 10 --postures selftest"
-            : "--subject " + subj.Text.Trim() + " --day " + day.Text + " --cond A --segments labelled,task,labelled,task,labelled --reps 2 --n 40 --postures selftest";
+        // 9 gestures (2026-11-17): cued only, three labelled segments of 3 x 9 cues (neutral; A then B; C then A)
+        string args = Nine
+            ? (warmup
+               ? "--subject W00 --day " + day.Text + " --cond G --gestures nine --segments labelled --reps 1 --postures selftest"
+               : "--subject " + subj.Text.Trim() + " --day " + day.Text + " --cond G --gestures nine --segments labelled,labelled,labelled --reps 3 --postures selftest")
+            : (warmup
+               ? "--subject W00 --day " + day.Text + " --cond A --segments labelled,task --reps 1 --n 10 --postures selftest"
+               : "--subject " + subj.Text.Trim() + " --day " + day.Text + " --cond A --segments labelled,task,labelled,task,labelled --reps 2 --n 40 --postures selftest");
         if (!warmup && Directory.GetFiles(DIR, Name0 + "*_task.csv").Length > 0 &&
             MessageBox.Show("今天已經開過正式提示畫面（有 " + Name0 + "_task.csv）。\n只有畫面當掉或關掉時才需要再開。要再開嗎？", Text, MessageBoxButtons.YesNo) != DialogResult.Yes) return;
         if (!warmup && calibrateBtn.BackColor != Color.PaleGreen &&

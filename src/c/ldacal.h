@@ -17,7 +17,9 @@
 #include <stdint.h>
 
 #define LD_DIM 80
-#define LD_CLASSES 6
+#ifndef LD_CLASSES
+#define LD_CLASSES 6            /* -DLD_CLASSES=9 for the 9 directional gestures (2026-11-17); Rest is the last class */
+#endif
 #define LD_Q 1024.0f            /* Q5.10 */
 #define LD_TRI (LD_DIM * (LD_DIM + 1) / 2)
 

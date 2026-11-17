@@ -3652,6 +3652,53 @@ PC 上，探索性。要回答口試或審稿常問的問題：為什麼用 LDA�
 - 整體準確率偏低（P0 52.5 %），P1 又掉到 22.5 %。4 顆感測器分 6 種抓握很難。
 - 輸出檔：`D:\selftest_data\T00\analysis_2026-11-17\`（`cal4`、`cal2`、`a4.log`、`a2.log`）。
 
+### 35.45 自我測試改成 9 個方向手勢，只做提示（2026-11-17；尚未錄，錄之前修改）
+
+**使用者的決定**：
+- 控制手臂要 8 個動作：前、後、左、右、上、下、夾爪開、夾爪夾。再加上放鬆（停止），一共 9 類。
+- 前後的手勢：前 = 食指指出，後 = 比讚。夾爪用兩個手勢：開 = 五指張開，夾 = 握拳。
+- 只有 4 顆感測器，單一手指的手勢可能分不開。所以 9 個都錄，再用同一份資料比較 9、7、5 類（`src/selftest9_analysis.py`）。
+
+| 類別 | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|---|
+| 手勢 | WristExt | WristFlex | RadialDev | UlnarDev | Point | ThumbUp | HandOpen | Fist | Rest |
+| 指令 | up | down | left | right | forward | back | grip_open | grip_close | – |
+
+**韌體**（`src/c` 和 `D:\stm32\blink_leaf\emg_rtl_task`；修改前的板子原始碼備份在 `backup\emg_rtl_task_before_9class_2026-11-17`）：
+- 改了什麼：
+  - `ldacal.h` 的 `LD_CLASSES`、`decision.h` 的 `DC_CLASSES` 可以用 `-D` 改，預設還是 6；
+  - `decision.c` 加 9 類的指令表（指令碼 = 類別 + 1）；
+  - `rt_lda.c` 用 `_Static_assert` 檢查兩個類別數相同，而且非 Rest 類別不超過 8 個（任務標籤的 valid mask 只有 1 byte）。
+- 6 類版本不受影響：不加旗標重新編譯的燒錄映像和 `rtl_task_cal4` 逐 byte 相同（binary md5 5a69be06…）。
+- `build/rtl_task_9c` 的建置旗標：`-DRTL_LABEL_MAX=540 -DLD_CLASSES=9 -DDC_CLASSES=9`。
+  - 540 = 9 個手勢 × 30 視窗 × 2（留空間重做）。
+  - RAM 240060 B（234.4 KB / 512 KB）；`s_lab_x` 172800 B，`s_sum` 2880 B；ELF md5 c15be982…。
+- 燒錄：燒錄前讀回 bank 1 和模型 sector（`backup\board_bank1_rtl_task_cal4_2026-11-17.bin`、`board_sector_2026-11-17.bin`）。燒錄後驗證通過，模型 sector 的 md5 不變（68893f3b…）。
+
+**PC 工具**：
+- `TrignoBridge --classes 9`：只能和 `--firmware lda` 一起用。手勢和指令名稱換成上表；cal / verify 0–8；task 的期望類別 0–7、mask 0–255；ops.csv 記下 `note classes 9 ...`。
+- `TaskScreen --gestures nine`：中文提示；只允許 labelled / noncontrol / tlx 段。
+- `ExperimentPanel`：新增「手勢組」選項，預設 9 方向。
+  - 9 個 cal 按鈕；
+  - 檔名 `<代號>_d<天>_G`，和 6 手勢的 `_A` 分開；
+  - 正式畫面：`--gestures nine --segments labelled,labelled,labelled --reps 3 --postures selftest`。
+- 舊的 exe 在 `lab_kit_selftest\_舊版_2026-11-17_6手勢\`。
+
+**驗證**（真的板子 COM6，假 TCU 在 127.0.0.2）：
+- cal 0–8 加 calibrate：結果 0，fit 23.8 ms（270 個視窗，9 類）。
+- TaskScreen `--auto` 跑完 3 段，27 個提示涵蓋 9 個手勢，姿勢切換有記錄。
+- 板子送出 9 類的指令名稱。
+- 分析程式：
+  - 假 TCU 的雜訊得到接近亂猜的結果（S9 11.9 %，亂猜 11.1 %）；
+  - 注入固定的手勢通道增益（穩定雜訊上）得到 100 %（4 s 和 2 s 都是）。
+  - 第一次注入是加在假 TCU 每 3 秒切換 10 倍的雜訊上，只得到約 50 %，原因是測試資料，不是分析程式。
+
+**判準**（錄之前定好，寫在 `selftest9_analysis.py` 的 docstring）：
+- A(S) = 3 段 probe 合併後的視窗準確率。
+- 選 A(S) ≥ 85 % 的組合裡最大的一組；都不到 85 % 的話，選最準的一組，並在手臂實驗前修改貼法或手勢。
+- 85 % 是 Claude 選的值，使用者可以在錄之前改。
+- 另外報告：每段 probe、每個提示的多數決、95 % 區間、每類的 recall、9 類混淆矩陣，以及 `--cal-s 2`。
+
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|

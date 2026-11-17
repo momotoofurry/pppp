@@ -6,6 +6,7 @@
 //              [--commands grip,release,pose_A,pose_B,home] [--n 40] [--timeout 5] [--rest 2.5]
 //              [--reps 5] [--cue 2] [--gap 3] [--practice 120] [--items 1,2,3,5] [--item 60]
 //              [--retry 0|1] [--udp 50555] [--fake] [--auto] [--windowed] [--postures selftest]
+//              [--gestures six|nine]   nine (2026-11-17): the 9 directional gestures, labelled segments only
 // --postures selftest (SELFTEST.md, SOP section 4): a line at the top tells the arm posture of the next cue / trial;
 // it turns gold with '換姿勢 →' at the rest where the posture changes, and the change is logged as event 'posture'
 // (target = N / A / B / C). 1st labelled segment: neutral; 2nd: A then B after half the cues; 3rd: C then A; task
@@ -58,9 +59,17 @@ class Step
 class TaskForm : Form
 {
     static readonly CultureInfo IC = CultureInfo.InvariantCulture;
-    static readonly string[] GESTURES = { "Power", "Lateral", "Tripod", "Pointer", "Open", "Rest" };
-    static readonly Dictionary<string, string> GESTURE_ZH = new Dictionary<string, string> {
+    static string[] GESTURES = { "Power", "Lateral", "Tripod", "Pointer", "Open", "Rest" };
+    static Dictionary<string, string> GESTURE_ZH = new Dictionary<string, string> {
         { "Power", "握拳" }, { "Lateral", "側捏" }, { "Tripod", "三指捏" }, { "Pointer", "食指指出" }, { "Open", "張開" }, { "Rest", "放鬆" } };
+    // --gestures nine (2026-11-17): the 9 classes of TrignoBridge --classes 9 / firmware rtl_task_9c; only labelled
+    // segments (the cued-command task and practice use the 6-gesture commands)
+    static readonly string[] GESTURES9 = { "WristExt", "WristFlex", "RadialDev", "UlnarDev", "Point", "ThumbUp", "HandOpen",
+                                           "Fist", "Rest" };
+    static readonly Dictionary<string, string> GESTURE9_ZH = new Dictionary<string, string> {
+        { "WristExt", "手腕上翹（上）" }, { "WristFlex", "手腕下彎（下）" }, { "RadialDev", "往拇指側偏（左）" },
+        { "UlnarDev", "往小指側偏（右）" }, { "Point", "食指指出（前）" }, { "ThumbUp", "比讚（後）" },
+        { "HandOpen", "五指張開（夾爪開）" }, { "Fist", "握拳（夾爪夾）" }, { "Rest", "放鬆（停）" } };
     // command -> (screen name, gesture) of decision.c; 'home' (Lateral) is sent by the firmware since pilot-freeze-5 (PROTOCOL.md 5)
     static readonly Dictionary<string, string[]> COMMAND = new Dictionary<string, string[]> {
         { "grip", new[] { "夾", "Tripod" } }, { "release", new[] { "放", "Open" } }, { "pose_A", new[] { "位置 A", "Power" } },
@@ -124,6 +133,12 @@ class TaskForm : Form
         subject = Get("subject", null); day = Get("day", null); cond = Get("cond", null);
         if (subject == null || day == null || cond == null) throw new ArgumentException("--subject, --day and --cond are required");
         segs = Get("segments", "labelled,practice,task,labelled,noncontrol").Split(',');
+        string gset = Get("gestures", "six");
+        if (gset == "nine") {
+            foreach (var sg in segs)
+                if (sg == "task" || sg == "practice") throw new ArgumentException("--gestures nine: only labelled / noncontrol / tlx segments");
+            GESTURES = GESTURES9; GESTURE_ZH = GESTURE9_ZH;
+        } else if (gset != "six") throw new ArgumentException("--gestures: six or nine");
         commands = Get("commands", "grip,release,pose_A,pose_B,home").Split(',');
         foreach (var c in commands) if (!COMMAND.ContainsKey(c)) throw new ArgumentException("unknown command " + c);
         nTrials = int.Parse(Get("n", "40")); reps = int.Parse(Get("reps", "5"));
@@ -149,6 +164,7 @@ class TaskForm : Form
                           subject, day, string.Join(" ", segs), string.Join(" ", commands), nTrials, timeoutMs / 1000, fake ? 1 : 0,
                           retry ? 1 : 0)
             + (postures != "" ? " postures " + postures : "")
+            + " gestures " + string.Join(" ", GESTURES)
             + (udp != null ? " udp " + port : " udp off"));
 
         Text = "TaskScreen";

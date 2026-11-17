@@ -6,6 +6,10 @@
 
 #include "features.h"
 
+/* the class of a window indexes the decision votes; the task label's valid mask is one byte (bit c = class c) */
+_Static_assert(LD_CLASSES == DC_CLASSES, "build with the same -DLD_CLASSES and -DDC_CLASSES");
+_Static_assert(LD_CLASSES - 1 <= 8, "RTL_TASK_LABEL's valid mask has 8 bits for the non-Rest classes");
+
 static rtl_config_t s_cfg;
 static pk_parser_t s_pk;
 static rtl_counters_t s_cnt;

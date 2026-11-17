@@ -1,8 +1,16 @@
 /* Low-confidence rejection + k-window agreement. See decision.h. */
 #include "decision.h"
 
+#if DC_CLASSES == 6
 /* Power, Lateral, Tripod, Pointer, Open, Rest (pilot-freeze-5: Lateral = home, PROTOCOL.md 5) */
 const uint8_t dc_class_command[DC_CLASSES] = {DC_POSE_A, DC_HOME, DC_GRIP, DC_POSE_B, DC_RELEASE, DC_NONE};
+#elif DC_CLASSES == 9
+/* wrist ext, wrist flex, radial dev, ulnar dev, index point, thumb up, hand open, fist, Rest (decision.h) */
+const uint8_t dc_class_command[DC_CLASSES] = {DC9_UP, DC9_DOWN, DC9_LEFT, DC9_RIGHT, DC9_FORWARD, DC9_BACK,
+                                              DC9_GRIP_OPEN, DC9_GRIP_CLOSE, DC_NONE};
+#else
+#error "DC_CLASSES: 6 or 9"
+#endif
 
 void dc_init(dc_state_t *s, uint16_t tau_permille, uint8_t k)
 {
