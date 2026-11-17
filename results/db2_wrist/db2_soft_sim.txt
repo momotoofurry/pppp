@@ -1,0 +1,78 @@
+subject cfg   set          cue    cue_soft  cue_soft30    cue_true   task trials
+      1 4ch   S9         63.6        66.3        63.7        66.1   16
+      1 4ch   S7         79.2        78.9        78.9        77.9   12
+      1 4ch   S5         81.8        82.6        83.5        83.1   8
+      1 ring8 S9         75.0        75.6        75.5        76.1   16
+      1 ring8 S7         87.4        86.8        86.8        86.1   12
+      1 ring8 S5         89.2        87.3        86.4        88.6   8
+      2 4ch   S9         32.6        37.2        36.4        38.6   16
+      2 4ch   S7         37.7        40.1        39.4        42.5   12
+      2 4ch   S5         56.4        57.5        58.0        57.4   8
+      2 ring8 S9         35.4        46.3        47.5        49.7   16
+      2 ring8 S7         42.3        50.8        47.9        54.0   12
+      2 ring8 S5         64.9        65.8        66.2        68.2   8
+      3 4ch   S9         52.8        54.3        52.8        56.3   16
+      3 4ch   S7         60.0        62.1        62.4        66.3   12
+      3 4ch   S5         75.6        77.1        77.0        79.9   8
+      3 ring8 S9         67.6        69.1        69.2        70.6   16
+      3 ring8 S7         76.9        68.8        68.3        72.1   12
+      3 ring8 S5         91.8        82.1        81.9        86.4   8
+      4 4ch   S9         39.8        45.8        42.4        46.8   16
+      4 4ch   S7         43.1        47.0        45.7        48.0   12
+      4 4ch   S5         50.7        55.1        53.7        55.7   8
+      4 ring8 S9         31.3        38.2        32.0        38.3   16
+      4 ring8 S7         36.8        45.2        45.3        44.2   12
+      4 ring8 S5         47.3        54.2        47.7        57.2   8
+      5 4ch   S9         58.2        62.7        60.4        63.3   16
+      5 4ch   S7         72.1        76.1        75.1        76.2   12
+      5 4ch   S5         79.2        81.8        81.7        82.4   8
+      5 ring8 S9         67.1        69.8        70.1        69.4   16
+      5 ring8 S7         76.2        82.4        82.4        78.4   12
+      5 ring8 S5         76.9        73.4        73.4        77.5   8
+
+mean (SD) over subjects, balanced accuracy % (4ch: median over the 28 ring pairs per subject)
+4ch   S9: cue  49.4 (11.6)  cue_soft  53.3 (10.7)  cue_soft30  51.2 (10.4)  cue_true  54.2 (10.3)   soft - cue  +3.9, better in 5/5
+4ch   S7: cue  58.4 (16.0)  cue_soft  60.9 (15.4)  cue_soft30  60.3 (15.6)  cue_true  62.2 (14.5)   soft - cue  +2.4, better in 4/5
+4ch   S5: cue  68.8 (12.7)  cue_soft  70.8 (12.0)  cue_soft30  70.8 (12.5)  cue_true  71.7 (12.4)   soft - cue  +2.1, better in 5/5
+ring8 S9: cue  55.3 (18.2)  cue_soft  59.8 (14.7)  cue_soft30  58.9 (16.5)  cue_true  60.8 (14.4)   soft - cue  +4.5, better in 5/5
+ring8 S7: cue  63.9 (20.4)  cue_soft  66.8 (16.5)  cue_soft30  66.1 (17.1)  cue_true  67.0 (15.5)   soft - cue  +2.9, better in 3/5
+ring8 S5: cue  74.0 (16.4)  cue_soft  72.6 (11.7)  cue_soft30  71.1 (13.6)  cue_true  75.6 (11.7)   soft - cue  -1.5, better in 2/5
+subject cfg   set          cue    cue_soft  cue_soft30    cue_true   task trials
+      6 4ch   S9         53.8        62.5        60.4        63.6   16
+      6 4ch   S7         58.2        67.7        65.3        68.8   12
+      6 4ch   S5         65.9        74.0        71.0        75.4   8
+      6 ring8 S9         56.8        69.8        66.1        70.0   16
+      6 ring8 S7         67.0        77.9        78.1        80.4   12
+      6 ring8 S5         81.3        87.7        83.3        89.5   8
+      7 4ch   S9         33.9        36.7        36.1        37.2   16
+      7 4ch   S7         36.9        40.3        39.1        40.8   12
+      7 4ch   S5         45.4        47.6        47.7        47.8   8
+      7 ring8 S9         38.8        41.6        40.4        41.3   16
+      7 ring8 S7         40.5        45.1        44.4        45.4   12
+      7 ring8 S5         48.5        54.7        52.6        51.4   8
+      8 4ch   S9         46.7        52.9        50.0        53.2   16
+      8 4ch   S7         51.6        56.8        52.8        56.7   12
+      8 4ch   S5         48.5        53.0        53.4        52.2   8
+      8 ring8 S9         54.7        59.4        58.4        66.0   16
+      8 ring8 S7         59.2        62.6        61.7        63.4   12
+      8 ring8 S5         53.1        59.2        54.9        61.6   8
+      9 4ch   S9         61.1        65.0        64.8        65.9   16
+      9 4ch   S7         73.8        77.1        76.4        78.2   12
+      9 4ch   S5         75.2        79.1        78.1        81.8   8
+      9 ring8 S9         68.3        71.1        71.4        74.4   16
+      9 ring8 S7         82.3        83.1        85.4        88.7   12
+      9 ring8 S5         81.0        78.8        75.3        84.9   8
+     10 4ch   S9         60.7        62.1        60.6        63.4   16
+     10 4ch   S7         66.2        67.5        67.0        68.1   12
+     10 4ch   S5         62.9        63.0        61.8        61.1   8
+     10 ring8 S9         78.0        80.2        78.4        80.3   16
+     10 ring8 S7         76.0        77.6        77.3        77.0   12
+     10 ring8 S5         72.3        67.5        66.7        69.8   8
+
+mean (SD) over subjects, balanced accuracy % (4ch: median over the 28 ring pairs per subject)
+4ch   S9: cue  51.2 (10.2)  cue_soft  55.9 (10.4)  cue_soft30  54.4 (10.4)  cue_true  56.7 (10.7)   soft - cue  +4.6, better in 5/5
+4ch   S7: cue  57.4 (12.6)  cue_soft  61.9 (12.6)  cue_soft30  60.1 (12.9)  cue_true  62.5 (12.8)   soft - cue  +4.5, better in 5/5
+4ch   S5: cue  59.6 (11.1)  cue_soft  63.3 (12.0)  cue_soft30  62.4 (11.1)  cue_true  63.7 (13.1)   soft - cue  +3.8, better in 5/5
+ring8 S9: cue  59.3 (13.3)  cue_soft  64.4 (13.2)  cue_soft30  62.9 (13.0)  cue_true  66.4 (13.4)   soft - cue  +5.1, better in 5/5
+ring8 S7: cue  65.0 (14.6)  cue_soft  69.3 (13.9)  cue_soft30  69.3 (14.7)  cue_true  71.0 (15.2)   soft - cue  +4.2, better in 5/5
+ring8 S5: cue  67.2 (13.9)  cue_soft  69.6 (12.2)  cue_soft30  66.5 (11.7)  cue_true  71.4 (14.2)   soft - cue  +2.3, better in 3/5
