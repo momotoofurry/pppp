@@ -101,18 +101,21 @@ def split_standard(a, ra, same, since, rest_ok):
     return cal, test
 
 
+CAL_N, CAL_REPS, TEST_FROM = 30, 2, 3            # --passes 1 (default): 30 windows from reps 1-2, test reps 3-6
+
+
 def split(a, ra, same, since, rest_ok):
     cal, test = {}, {}
     for g, mv in enumerate(DB2_MOVE):
         if mv == 0:
             idx = np.flatnonzero(rest_ok)
-            cal[g] = idx[:30]
-            later = idx[30:]
+            cal[g] = idx[:CAL_N]
+            later = idx[CAL_N:]
             test[g] = later[np.linspace(0, len(later) - 1, min(150, len(later))).astype(int)] if len(later) else later
         else:
             ok = (a == mv) & same & (since >= 0.5)
-            cal[g] = np.flatnonzero(ok & (ra <= 2) & (ra >= 1))[:30]
-            test[g] = np.flatnonzero(ok & (ra >= 3))
+            cal[g] = np.flatnonzero(ok & (ra <= CAL_REPS) & (ra >= 1))[:CAL_N]
+            test[g] = np.flatnonzero(ok & (ra >= TEST_FROM))
     return cal, test
 
 
@@ -151,7 +154,13 @@ def main():
     ap.add_argument('--out', default=None)
     ap.add_argument('--split', choices=['short', 'standard'], default='short',
                     help='short = the self-test cued pass (default); standard = reps 1,3,4,6 / 2,5 (sanity reference)')
+    ap.add_argument('--passes', type=int, default=0,
+                    help='0: the default short split (30 windows, reps 1-2 / test 3-6); 1-3: N x 30 cued windows per '
+                         'gesture from reps 1-3, always tested on reps 4-6 so that 1, 2, 3 passes are compared fairly')
     args = ap.parse_args()
+    global CAL_N, CAL_REPS, TEST_FROM
+    if args.passes:
+        CAL_N, CAL_REPS, TEST_FROM = 30 * args.passes, 3, 4
     a_, b_ = (args.subjects.split('-') + [None])[:2]
     subs = list(range(int(a_), int(b_ or a_) + 1))
     lines = []
@@ -190,7 +199,8 @@ def main():
         f"{s} {sum(v >= 85 for v in res['4ch_median'][s])}/{len(subs)}" for s in ORDER))
     if args.out:
         os.makedirs(args.out, exist_ok=True)
-        with open(os.path.join(args.out, f'db2_wrist_sim_{args.split}.txt'), 'w', encoding='utf-8') as f:
+        tag = args.split + (f'_passes{args.passes}' if args.passes else '')
+        with open(os.path.join(args.out, f'db2_wrist_sim_{tag}.txt'), 'w', encoding='utf-8') as f:
             f.write('\n'.join(lines) + '\n')
 
 
