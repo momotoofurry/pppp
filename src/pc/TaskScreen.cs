@@ -6,7 +6,8 @@
 //              [--commands grip,release,pose_A,pose_B,home] [--n 40] [--timeout 5] [--rest 2.5]
 //              [--reps 5] [--cue 2] [--gap 3] [--practice 120] [--items 1,2,3,5] [--item 60]
 //              [--retry 0|1] [--udp 50555] [--fake] [--auto] [--windowed] [--postures selftest]
-//              [--gestures six|nine]   nine (2026-11-17): the 9 directional gestures, labelled segments only
+//              [--gestures six|nine]   nine (2026-11-17): the 9 directional gestures; the task's commands are then
+//                                      up, down, left, right, forward, back, grip_open, grip_close (fake keys 1-8)
 // --postures selftest (SELFTEST.md, SOP section 4): a line at the top tells the arm posture of the next cue / trial;
 // it turns gold with '換姿勢 →' at the rest where the posture changes, and the change is logged as event 'posture'
 // (target = N / A / B / C). 1st labelled segment: neutral; 2nd: A then B after half the cues; 3rd: C then A; task
@@ -71,10 +72,16 @@ class TaskForm : Form
         { "UlnarDev", "往小指側偏（右）" }, { "Point", "食指指出（前）" }, { "ThumbUp", "比讚（後）" },
         { "HandOpen", "五指張開（夾爪開）" }, { "Fist", "握拳（夾爪夾）" }, { "Rest", "放鬆（停）" } };
     // command -> (screen name, gesture) of decision.c; 'home' (Lateral) is sent by the firmware since pilot-freeze-5 (PROTOCOL.md 5)
-    static readonly Dictionary<string, string[]> COMMAND = new Dictionary<string, string[]> {
+    // --gestures nine: the arm commands of TrignoBridge --classes 9 (decision.h DC9_*), command -> (screen, gesture)
+    static readonly Dictionary<string, string[]> COMMAND9 = new Dictionary<string, string[]> {
+        { "up", new[] { "往上", "WristExt" } }, { "down", new[] { "往下", "WristFlex" } }, { "left", new[] { "往左", "RadialDev" } },
+        { "right", new[] { "往右", "UlnarDev" } }, { "forward", new[] { "往前", "Point" } }, { "back", new[] { "往後", "ThumbUp" } },
+        { "grip_open", new[] { "夾爪打開", "HandOpen" } }, { "grip_close", new[] { "夾爪夾緊", "Fist" } } };
+    static readonly string[] FAKE_KEYS9 = { "up", "down", "left", "right", "forward", "back", "grip_open", "grip_close" };
+    static Dictionary<string, string[]> COMMAND = new Dictionary<string, string[]> {
         { "grip", new[] { "夾", "Tripod" } }, { "release", new[] { "放", "Open" } }, { "pose_A", new[] { "位置 A", "Power" } },
         { "pose_B", new[] { "位置 B", "Pointer" } }, { "home", new[] { "回原位", "Lateral" } } };
-    static readonly string[] FAKE_KEYS = { "pose_A", "grip", "pose_B", "release", "home" };
+    static string[] FAKE_KEYS = { "pose_A", "grip", "pose_B", "release", "home" };
     static readonly string[] ITEMS = { "", "放鬆，手自然放在桌上", "拿杯子喝水、放回", "打鍵盤", "摸臉、扶眼鏡", "前臂旋前、旋後",
                                        "轉頭、交談", "站起來走幾步再坐下", "在機器人旁邊，但不打算控制" };
     static readonly Dictionary<string, string> SEG_ZH = new Dictionary<string, string> {
@@ -135,11 +142,9 @@ class TaskForm : Form
         segs = Get("segments", "labelled,practice,task,labelled,noncontrol").Split(',');
         string gset = Get("gestures", "six");
         if (gset == "nine") {
-            foreach (var sg in segs)
-                if (sg == "task" || sg == "practice") throw new ArgumentException("--gestures nine: only labelled / noncontrol / tlx segments");
-            GESTURES = GESTURES9; GESTURE_ZH = GESTURE9_ZH;
+            GESTURES = GESTURES9; GESTURE_ZH = GESTURE9_ZH; COMMAND = COMMAND9; FAKE_KEYS = FAKE_KEYS9;
         } else if (gset != "six") throw new ArgumentException("--gestures: six or nine");
-        commands = Get("commands", "grip,release,pose_A,pose_B,home").Split(',');
+        commands = Get("commands", gset == "nine" ? string.Join(",", FAKE_KEYS9) : "grip,release,pose_A,pose_B,home").Split(',');
         foreach (var c in commands) if (!COMMAND.ContainsKey(c)) throw new ArgumentException("unknown command " + c);
         nTrials = int.Parse(Get("n", "40")); reps = int.Parse(Get("reps", "5"));
         if (nTrials % commands.Length != 0) throw new ArgumentException("--n must be a multiple of the number of commands (balanced targets)");
@@ -474,7 +479,7 @@ class TaskForm : Form
     void OnKey(object sender, KeyEventArgs e)
     {
         double now = Now();
-        if (fake && e.KeyCode >= Keys.D1 && e.KeyCode <= Keys.D5) {
+        if (fake && e.KeyCode >= Keys.D1 && e.KeyCode < Keys.D1 + FAKE_KEYS.Length) {
             string c = FAKE_KEYS[e.KeyCode - Keys.D1];
             OnCommand(now, c, COMMAND[c][1], "", "fake");
             return;

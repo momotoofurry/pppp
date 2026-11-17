@@ -363,11 +363,12 @@ class ExperimentPanel : Form
     void StartScreen(bool warmup)
     {
         string exe = Path.Combine(DIR, "TaskScreen.exe");
-        // 9 gestures (2026-11-17): cued only, three labelled segments of 3 x 9 cues (neutral; A then B; C then A)
+        // 9 gestures (2026-11-17, report 35.49): as the 6-gesture day, labelled / task / labelled / task / labelled; each
+        // labelled segment 3 x 9 cues, each task segment 40 trials = 8 arm commands x 5 (soft labels replayed offline)
         string args = Nine
             ? (warmup
-               ? "--subject W00 --day " + day.Text + " --cond G --gestures nine --segments labelled --reps 1 --postures selftest"
-               : "--subject " + subj.Text.Trim() + " --day " + day.Text + " --cond G --gestures nine --segments labelled,labelled,labelled --reps 3 --postures selftest")
+               ? "--subject W00 --day " + day.Text + " --cond G --gestures nine --segments labelled,task --reps 1 --n 8 --postures selftest"
+               : "--subject " + subj.Text.Trim() + " --day " + day.Text + " --cond G --gestures nine --segments labelled,task,labelled,task,labelled --reps 3 --n 40 --postures selftest")
             : (warmup
                ? "--subject W00 --day " + day.Text + " --cond A --segments labelled,task --reps 1 --n 10 --postures selftest"
                : "--subject " + subj.Text.Trim() + " --day " + day.Text + " --cond A --segments labelled,task,labelled,task,labelled --reps 2 --n 40 --postures selftest");

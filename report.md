@@ -3796,6 +3796,56 @@ PC 上，探索性。要回答口試或審稿常問的問題：為什麼用 LDA�
 - 兩輪加一次重做，共 19 個 cal = 570 個視窗；緩衝區沒有滿（沒有 LABEL_FULL）。
 - calibrate 結果 0，fit 44.8 ms。
 
+### 35.49 9 手勢加上任務軟標籤（2026-11-17；尚未錄，錄之前修改）
+
+**使用者的決定**：軟標籤是論文的主方法，9 手勢的自我測試也要測。錄法和 6 手勢那天一樣，板子在錄的時候不學，軟標籤是錄完以後離線重播算出來的。
+
+**錄製流程**：
+- 提示輪兩輪（35.48）。
+- 接著 `TaskScreen --gestures nine --segments labelled,task,labelled,task,labelled --reps 3 --n 40 --postures selftest`：
+  - P0、P1、P2：有標籤段，每段 3 × 9 個提示；
+  - T1、T2：任務段，每段 40 次，8 個手臂指令各 5 次。
+- 總共約 20 分鐘。
+
+**程式**：
+- `TaskScreen`：`--gestures nine` 時，任務的指令改成 up、down、left、right、forward、back、grip_open、grip_close（畫面顯示「往上」…「夾爪夾緊」加上手勢）；`--fake` 的按鍵改成 1–8。
+- `ExperimentPanel`：9 手勢的正式畫面和暖身加上任務段（暖身是 labelled + task，n 8）。
+- `selftest9_analysis.py`：
+  - 條件 cue：提示輪的模型，之後不變。
+  - 條件 cue_soft：每個任務 trial 一個軟標籤，做法和 RTL_TASK_LABEL 一樣：
+    - 前 3 個相同、非 Rest 的預測當作指令；
+    - prior：期望的指令 1 − EPS，其他指令平分 EPS，Rest 為 P0；
+    - q ∝ prior × exp(BETA × 平均判別值)；
+    - 先遺忘（× 0.97），再加入，然後重新 fit。
+  - 提示輪和板子一樣用累加和，不遺忘。
+  - S9、S7、S5 各自重播。
+
+**判準 2**（錄之前定好，和 6 手勢的 R12 同一條規則）：
+- D(S9) = P1、P2 的 (cue_soft − cue) 視窗準確率平均。
+- D_bar ≥ +2 分，而且在至少 ceil(2/3 × 天數) 天是正的，才算 GO。
+- S7、S5 只報告，不做判定。判準 1（85 %）不變。
+
+**驗證**（真的板子 COM6 + 假 TCU；時間縮短：reps 1、n 8，提示 2 s、間隔 1 s、timeout 2 s）：
+- 兩輪提示加 calibrate：結果 0，fit 42.7 ms。5 段都跑完；任務 trial 涵蓋 8 個指令。
+- 提示畫面認得板子送出的 9 類指令名稱（雜訊下：1 對、6 錯、9 逾時）。
+- 分析程式：
+  - 雜訊：接近亂猜（S9 8.5 %）。
+  - 注入固定的手勢增益：cue 和 cue_soft 都是 100 %，D = 0 → NO-GO。這是正確的，因為沒有東西可以學。
+  - 注入偏移（從第一個任務 trial 開始，每個手勢的通道增益改變，像是感測器移位）：
+
+    | 組合 | P1 cue → cue_soft | P2 cue → cue_soft | D |
+    |---|---|---|---|
+    | S9 | 55.6 → 66.7 | 56.7 → 66.7 | +10.56 → GO |
+    | S7 | 71.4 → 85.7 | 70.0 → 84.3 | +14.29 |
+    | S5 | 80.0 → 90.0 | 80.0 → 94.0 | +12.00 |
+
+    在這份測試資料裡，一個任務段只有 8 個 trial。
+
+**安裝**：
+- `lab_kit_selftest` 的 TaskScreen.exe（md5 1623ca51…）、ExperimentPanel.exe（md5 7aa64f9c…）已更新。
+- 這次只改了 TaskScreen 和 ExperimentPanel，TrignoBridge 沒動。
+- SOP 4A 已更新：5 段交替、任務段的做法、姿勢；板子判斷錯也照畫面上的指令做。
+
 ## 附錄：檔案
 | 類別 | 檔案 |
 |---|---|
