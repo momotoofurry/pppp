@@ -1,0 +1,91 @@
+GrabMyo 4ch, 43 participants; balanced accuracy %, day 1 / day 8 / day 29; later = mean of days 8, 29
+
+===== G9
+  cue      67.6 /  70.9 /  70.8
+  acc      67.6 /  74.1 /  75.0
+  self     67.5 /  73.3 /  73.4
+  ciil1    72.9 /  76.9 /  76.6
+  soft1    71.1 /  76.3 /  76.3
+  ciil2    71.7 /  76.3 /  76.2
+  soft2    70.2 /  75.6 /  75.5
+  ciil30   61.4 /  67.4 /  67.1
+  soft30   69.9 /  74.5 /  74.4
+  later, difference vs acc:
+    self    -1.21  (95 % CI -2.09 to -0.33), better in 14/43
+    ciil1   +2.15  (95 % CI +1.32 to +3.02), better in 32/43
+    soft1   +1.70  (95 % CI +0.89 to +2.57), better in 30/43
+    ciil2   +1.68  (95 % CI +0.86 to +2.56), better in 30/43
+    soft2   +0.96  (95 % CI +0.16 to +1.77), better in 24/43
+    ciil30  -7.36  (95 % CI -8.55 to -6.14), better in 4/43
+    soft30  -0.15  (95 % CI -0.85 to +0.60), better in 18/43
+  later, difference vs self:
+    acc     +1.21  (95 % CI +0.33 to +2.09), better in 29/43
+    ciil1   +3.36  (95 % CI +2.76 to +4.00), better in 43/43
+    soft1   +2.91  (95 % CI +2.44 to +3.43), better in 43/43
+    ciil2   +2.90  (95 % CI +2.36 to +3.48), better in 42/43
+    soft2   +2.17  (95 % CI +1.74 to +2.65), better in 43/43
+    ciil30  -6.15  (95 % CI -7.36 to -4.94), better in 2/43
+    soft30  +1.06  (95 % CI +0.53 to +1.64), better in 29/43
+  soft1 - ciil1: -0.45, better in 13/43
+  soft2 - ciil2: -0.73, better in 14/43
+  soft30 - ciil30: +7.22, better in 41/43
+
+===== G7
+  cue      76.6 /  80.6 /  78.6
+  acc      76.6 /  83.2 /  82.2
+  self     77.6 /  82.9 /  81.3
+  ciil1    81.1 /  85.1 /  83.0
+  soft1    79.5 /  84.5 /  82.8
+  ciil2    80.1 /  84.3 /  82.7
+  soft2    78.7 /  84.0 /  82.4
+  ciil30   69.5 /  74.7 /  74.5
+  soft30   78.8 /  83.6 /  81.8
+  later, difference vs acc:
+    self    -0.58  (95 % CI -1.37 to +0.23), better in 16/43
+    ciil1   +1.39  (95 % CI +0.70 to +2.08), better in 30/43
+    soft1   +0.95  (95 % CI +0.28 to +1.62), better in 26/43
+    ciil2   +0.80  (95 % CI +0.08 to +1.50), better in 24/43
+    soft2   +0.51  (95 % CI -0.17 to +1.22), better in 23/43
+    ciil30  -8.09  (95 % CI -9.41 to -6.89), better in 0/43
+    soft30  +0.02  (95 % CI -0.68 to +0.75), better in 20/43
+  later, difference vs self:
+    acc     +0.58  (95 % CI -0.23 to +1.37), better in 27/43
+    ciil1   +1.97  (95 % CI +1.48 to +2.48), better in 37/43
+    soft1   +1.53  (95 % CI +1.12 to +1.98), better in 39/43
+    ciil2   +1.38  (95 % CI +0.97 to +1.81), better in 34/43
+    soft2   +1.09  (95 % CI +0.75 to +1.45), better in 35/43
+    ciil30  -7.51  (95 % CI -8.99 to -6.17), better in 1/43
+    soft30  +0.60  (95 % CI +0.11 to +1.09), better in 28/43
+  soft1 - ciil1: -0.44, better in 11/43
+  soft2 - ciil2: -0.29, better in 16/43
+  soft30 - ciil30: +8.11, better in 43/43
+
+===== G5
+  cue      82.3 /  83.8 /  83.0
+  acc      82.3 /  86.8 /  86.7
+  self     83.0 /  87.3 /  86.5
+  ciil1    84.5 /  88.7 /  87.3
+  soft1    83.6 /  88.2 /  87.1
+  ciil2    83.6 /  88.4 /  86.9
+  soft2    83.3 /  87.7 /  86.8
+  ciil30   73.8 /  77.6 /  79.2
+  soft30   83.3 /  87.1 /  85.9
+  later, difference vs acc:
+    self    +0.11  (95 % CI -0.67 to +0.92), better in 22/43
+    ciil1   +1.26  (95 % CI +0.51 to +1.97), better in 31/43
+    soft1   +0.88  (95 % CI +0.20 to +1.57), better in 28/43
+    ciil2   +0.93  (95 % CI +0.22 to +1.70), better in 25/43
+    soft2   +0.45  (95 % CI -0.28 to +1.19), better in 27/43
+    ciil30  -8.36  (95 % CI -9.71 to -7.01), better in 0/43
+    soft30  -0.25  (95 % CI -1.03 to +0.57), better in 23/43
+  later, difference vs self:
+    acc     -0.11  (95 % CI -0.92 to +0.67), better in 21/43
+    ciil1   +1.14  (95 % CI +0.68 to +1.64), better in 35/43
+    soft1   +0.76  (95 % CI +0.42 to +1.15), better in 34/43
+    ciil2   +0.81  (95 % CI +0.40 to +1.30), better in 30/43
+    soft2   +0.33  (95 % CI +0.04 to +0.65), better in 28/43
+    ciil30  -8.48  (95 % CI -9.74 to -7.18), better in 1/43
+    soft30  -0.36  (95 % CI -0.98 to +0.27), better in 18/43
+  soft1 - ciil1: -0.38, better in 10/43
+  soft2 - ciil2: -0.48, better in 14/43
+  soft30 - ciil30: +8.12, better in 43/43
