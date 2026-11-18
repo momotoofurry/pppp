@@ -150,8 +150,8 @@ KEY = {'up': 'W', 'down': 'S', 'left': 'A', 'right': 'D'}
 HINT_ZH = {'free': '自由控制：移到某個物體前方附近，系統才會開始幫忙',
            'carry': '夾著物體 {g}：自由移動；移到任一個架子上方，放鬆 1 秒就放下',
            'place': '物體 {g} 在架子上方：按空白鍵放鬆 1 秒放下',
-           'lead': '系統猜是物體 {g}：繼續對準（黃色箭頭是它想去的地方）',
-           'go': '已對準物體 {g}：按住 {k} 伸進去，{o} 退出來，其他鍵重新調整',
+           'lead': '系統猜是物體 {g}：移到它前面停下（空白鍵）就會鎖定',
+           'go': '已鎖定物體 {g}：按 W 接近，S 退出並取消，A／D 取消並往那邊走',
            'grasp': '到了物體 {g}：按空白鍵放鬆 1 秒就夾',
            'lift': '夾到物體 {g}：按 W 抬起來'}
 
@@ -168,6 +168,8 @@ def hint(sa, obj, P, x):
         g = sa.goal
         if np.linalg.norm(obj[g] - x) < 1.5 * A.GRASP_TOL:
             return 'grasp', 'SPACE 1s: grasp', g
+        if sa.mode == 'blend':
+            return 'go', 'W: in / S: cancel', g
         k = KEY.get(sa.lock_cmd, '?')
         o = KEY.get(A.OPPOSITE.get(sa.lock_cmd, ''), '?')
         return 'go', f'{k}: in / {o}: back', g
@@ -307,9 +309,9 @@ def main():
         print('space = relax (stop), h = back to the start (keeps control), q = quit. A key keeps moving until another key. Seen from behind the arm: '
               'object 0 left-low, 1 right-high, 2 middle-low.', flush=True)
         if a.assist == 'blend':
-            print(f'blend mode, level {a.level}: you steer; RViz shows the guess in yellow, then green with a hint '
-                  'when aligned: keep the same key to go in, the opposite key backs out; at the object press space '
-                  'and wait 1 s to grasp; then w lifts.', flush=True)
+            print(f'blend mode, level {a.level}: you steer; stop (space) in front of an object to lock it (green); '
+                  'then W approaches, S backs out and cancels; at the object press space and wait 1 s to grasp; '
+                  'then move freely.', flush=True)
     last_state = None
     last_hint = None
     hist = [X0.copy()] * (S.REACT + 1)
@@ -321,8 +323,10 @@ def main():
             tk = time.time()
             x = kin.fk(q)[:3, 3]
             if a.mode == 'demo':
-                user = S.user_blend if a.assist == 'blend' else S.user_assist
-                want, held = user(sa, OBJECTS, a.target, hist[-1 - S.REACT], held)
+                if a.assist == 'blend':
+                    want, held = S.user_blend(sa, OBJECTS, a.target, hist[-1 - S.REACT], held, dec.est)
+                else:
+                    want, held = S.user_assist(sa, OBJECTS, a.target, hist[-1 - S.REACT], held)
                 cmd = dec(want)
             else:
                 want = cmd = poll()

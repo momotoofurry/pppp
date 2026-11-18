@@ -19,11 +19,12 @@ takeover   before lock: v = V_MAX ((1 - a) u + a d_g), a = A_MAX * clip((P - P_O
            automatically at the object, then any gesture lifts.
 blend      the user's direction always counts: v = V_MAX unit((1 - a) u + a d_g) with a = LEVEL * ramp(P) (LEVEL <= 0.6:
            the user's share is at least 40 %); the depth comes from d_g, so the arm moves forward only while the user
-           pushes toward the goal. The final straight-in approach starts only when the leading goal is sure
-           (P >= P_FINAL) AND the tool is aligned with it in y, z (within ALIGN); then the SAME gesture = go in, the
-           opposite gesture = back out, any other gesture = steer again (and the final approach cannot restart until
-           the tool has left the alignment zone or the user has relaxed). Only the gesture that brought the tool into
-           alignment (pointing at the goal) starts it: a new gesture pressed at an aligned spot just moves that way. The gripper closes only when the user relaxes
+           pushes toward the goal. Lock (35.62, the user's choice: after the target is chosen, W approaches and S
+           cancels, whatever gesture brought the arm there): when the user STOPS (relaxes) within LOCK_ALIGN (y, z) in
+           front of an object, that object is locked ('final'); then up (W) = approach it (the arm corrects y, z on the
+           way and stops at the object), down (S) = back out to the pre-grasp point and cancel the lock, left / right =
+           cancel and steer that way. A cancelled object is not locked again until the tool has moved 1.5 LOCK_ALIGN
+           away from it. The gripper closes only when the user relaxes
            CONFIRM_STEPS steps at the object (the user's confirmation). After the grasp the user moves freely.
            keep=True (continuous use, 35.59): control never ends. The grasped object moves with the tool; relaxing
            CONFIRM_STEPS steps with the object over a shelf (place_ok) opens the gripper and leaves the object there;
@@ -42,6 +43,7 @@ DT = 0.1              # s per decision step
 LAMBDA, BETA = 0.9, 3.0
 P_ON, P_LOCK, A_MAX = 0.5, 0.8, 0.6
 P_FINAL, ALIGN, CONFIRM_STEPS = 0.9, 0.03, 10
+LOCK_ALIGN = 0.05                   # m (y-z): stopping this close in front of an object locks it (blend, 35.62)
 PRE = np.array([-0.10, 0.0, 0.0])   # pre-grasp point: 10 cm in front of the object (approach along +x)
 GRASP_TOL, LIFT = 0.015, 0.10
 CANCEL_STEPS = 5
@@ -140,8 +142,10 @@ class Assist:
             if moving and x[2] - self.lift_from >= LIFT:
                 self.state = 'done'
             return V_MAX * u
-        if not moving:
+        pre = self.obj + PRE
+        if self.final_block is not None and np.linalg.norm((pre[self.final_block] - x)[1:]) > 1.5 * LOCK_ALIGN:
             self.final_block = None
+        if not moving:
             near = np.linalg.norm(self.obj - x, axis=1)
             k = int(np.argmin(near))
             if near[k] < GRASP_TOL and self.armed:
@@ -149,38 +153,33 @@ class Assist:
                 if self.rest_n >= CONFIRM_STEPS:       # the user relaxed at the object: grasp
                     self.goal, self.grip, self.state, self.lift_from = k, 1.0, 'grasped', x[2]
                     self.rest_n, self.armed = 0, False
-            else:
-                self.rest_n = 0
+                return np.zeros(3)
+            self.rest_n = 0
+            if self.state == 'steer' and self.assist:  # stopped in front of an object: lock it (35.62)
+                dyz = np.linalg.norm((pre - x)[:, 1:], axis=1)
+                g = int(np.argmin(dyz))
+                if dyz[g] < LOCK_ALIGN and self.final_block != g:
+                    self.state, self.goal = 'final', g
             return np.zeros(3)
         self.rest_n, self.armed = 0, True
-        pre = self.obj + PRE
         if self.state == 'final':
             g = self.goal
-            if cmd == self.lock_cmd:                   # same gesture: go in (stops at the object)
+            if cmd == 'up':                            # W: approach (corrects y, z on the way, stops at the object)
                 d = self.obj[g] - x
                 return min(V_MAX, np.linalg.norm(d) / DT) * unit(d)
-            if cmd == OPPOSITE.get(self.lock_cmd):     # opposite gesture: back out to the pre-grasp point
+            if cmd == 'down':                          # S: back out to the pre-grasp point, then the lock is cancelled
                 d = pre[g] - x
+                if np.linalg.norm(d) < 0.01 or x[0] <= pre[g][0] + 0.005:   # not past the pre-grasp point: cancel here
+                    self.state, self.goal, self.final_block = 'steer', None, g
+                    return np.zeros(3)
                 return min(V_MAX, np.linalg.norm(d) / DT) * unit(d)
-            self.final_block = self.goal                # any other gesture: the user steers again
+            self.final_block = g                        # A / D: cancel the lock and steer that way
             self.state, self.goal = 'steer', None
         self._score(u, x)
         if not self.assist:
             return V_MAX * u
         P = self.probs()
         g = int(np.argmax(P))
-        if self.final_block is not None and np.linalg.norm((pre[self.final_block] - x)[1:]) > 1.5 * ALIGN:
-            self.final_block = None
-        to_yz = (pre[g] - x)[1:]
-        if np.linalg.norm(to_yz) > ALIGN:              # remember the gesture that is bringing the tool to this goal
-            self.approach = (g, cmd) if u[1:] @ unit(to_yz) > 0.35 else None   # roughly toward it (< ~70 deg)
-        # the final approach starts only for the gesture that brought the tool here: a NEW gesture pressed at an aligned
-        # spot means "move that way", not "go in"
-        if (P[g] >= P_FINAL and np.linalg.norm(to_yz) < ALIGN and self.final_block != g
-                and self.approach == (g, cmd)):
-            self.state, self.goal, self.lock_cmd = 'final', g, cmd
-            d = self.obj[g] - x
-            return min(V_MAX, np.linalg.norm(d) / DT) * unit(d)
         a = self.level * np.clip((P[g] - P_ON) / (P_FINAL - P_ON), 0.0, 1.0) * self.zone(g, x)
         return V_MAX * unit((1 - a) * u + a * unit(pre[g] - x))
 

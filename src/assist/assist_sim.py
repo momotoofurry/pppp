@@ -131,19 +131,24 @@ class Control:
         return (100 * self.agree / self.steer if self.steer else np.nan, 100 * self.sys / self.n if self.n else np.nan)
 
 
-def user_blend(sa, obj, tgt, seen, held):
-    """the simulated user with mode 'blend' -> (wanted class, held)"""
+def user_blend(sa, obj, tgt, seen, held, est=None):
+    """the simulated user with mode 'blend' (35.62): steer in front of the object, stop (lock), W to approach, relax at
+    the object to grasp, then up; a wrong lock is cancelled with S -> (wanted class, held)"""
     if sa.state == 'grasped':
         return 'up', held
     if sa.state == 'final':
         if sa.goal != tgt:
-            d = obj[tgt] - obj[sa.goal]
-            return (axis_cmd(d, (1, 2)) if np.abs(d[1:]).max() > 0.01 else OPP[sa.lock_cmd]), held
+            return 'down', held                        # S: cancel the wrong lock
         if np.linalg.norm(obj[tgt] - seen) < A.GRASP_TOL:
-            return 'rest', held                       # at the object: relax to confirm the grasp
-        return sa.lock_cmd, held
+            return 'rest', held                        # at the object: relax to confirm the grasp
+        return 'up', held                              # W: approach
     d = obj[tgt] + A.PRE - seen
-    want = axis_cmd(d, (1, 2)) if np.linalg.norm(d[1:]) > 0.01 else (held if held != 'rest' else 'up')
+    if np.linalg.norm(d[1:]) < A.LOCK_ALIGN * 0.6:
+        return 'rest', held                            # in front of it: stop to lock
+    i = 1 if abs(d[1]) >= abs(d[2]) else 2
+    want = axis_cmd(d, (i,))
+    if abs(d[i]) < LEAD and np.abs(d[1:]).max() == abs(d[i]):
+        want = 'rest' if est not in (None, 'rest') else want   # let go early (anticipation); stopped short: nudge
     if want in OPP:
         held = want
     return want, held
@@ -207,7 +212,7 @@ def trial(cond, e, rng, log=None):
     held = 'rest'
     for t in range(T_MAX):
         seen = hist[-1 - REACT]
-        want, held = user(sa, obj, tgt, seen, held)
+        want, held = user(sa, obj, tgt, seen, held, dec.est) if blend else user(sa, obj, tgt, seen, held)
         cmd = dec(want)
         if log is not None:
             log.append((t, want, cmd, sa.state, sa.goal, np.round(sa.probs(), 2).tolist(), np.round(x, 3).tolist(), np.round(obj[tgt], 3).tolist()))
