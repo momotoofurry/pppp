@@ -3,11 +3,15 @@
 Runs in WSL after src/pc/sim/gen3_sim.sh is up (ROS 2 Humble, mock hardware). Every 100 ms: the command (simulated
 user through the board-like decoder, or keys) -> assist.step -> tool velocity -> kin.ik_step -> one-point
 JointTrajectory on /joint_trajectory_controller/joint_trajectory; the gripper closes through GripperCommand when the
-assist grasps. Objects are published as markers on /assist_objects (in RViz: Add -> By topic -> /assist_objects
-MarkerArray). A CSV log (t, wanted, command, state, goal, P, tool x y z) goes to --log.
+assist grasps. A CSV log (t, wanted, command, state, goal, P, tool x y z) goes to --log.
+Markers: the 'scene' mode keeps publishing the shelves, the objects (grey) and their numbers on /assist_scene; demo /
+keys publish the objects coloured by the assist on /assist_objects (orange = the demo's target, green = locked goal,
+more opaque = higher P). src/pc/sim/assist.rviz (= kortex_description's view_robot.rviz + these two MarkerArray
+displays) shows both: rviz2 -d src/pc/sim/assist.rviz
 
   python3 src/pc/sim/assist_ros.py demo [--target 0] [--error 0.12] [--seed 1] [--log assist_ros.csv]
   python3 src/pc/sim/assist_ros.py keys            w up, s down, a left, d right, space = rest (relax), q quit
+  python3 src/pc/sim/assist_ros.py scene           shelves + objects + numbers, until Ctrl-C
 """
 import argparse
 import os
@@ -46,6 +50,7 @@ class Demo(Node):
         self.create_subscription(JointState, '/joint_states', lambda m: self.q.update(dict(zip(m.name, m.position))), 10)
         self.traj = self.create_publisher(JointTrajectory, '/joint_trajectory_controller/joint_trajectory', 10)
         self.mk = self.create_publisher(MarkerArray, '/assist_objects', 10)
+        self.sc = self.create_publisher(MarkerArray, '/assist_scene', 10)
         self.grip = ActionClient(self, GripperCommand, '/robotiq_gripper_controller/gripper_cmd')
 
     def joints(self):
@@ -74,13 +79,33 @@ class Demo(Node):
             m.ns, m.id, m.type, m.action = 'objects', i, Marker.CYLINDER, Marker.ADD
             m.pose.position.x, m.pose.position.y, m.pose.position.z = map(float, o)
             m.pose.orientation.w = 1.0
-            m.scale.x = m.scale.y = 0.06
-            m.scale.z = 0.10
+            m.scale.x = m.scale.y = 0.066
+            m.scale.z = 0.106
             locked = goal == i
             m.color.r, m.color.g, m.color.b = (0.1, 0.7, 0.3) if locked else (0.9, 0.5, 0.1) if i == tgt else (0.6, 0.6, 0.6)
             m.color.a = 0.4 + 0.6 * float(P[i])
             arr.markers.append(m)
         self.mk.publish(arr)
+
+
+def scene_markers(obj):
+    arr = MarkerArray()
+
+    def mk(i, kind, pos, scale, rgba, text=''):
+        m = Marker()
+        m.header.frame_id = 'base_link'
+        m.ns, m.id, m.type, m.action = 'scene', i, kind, Marker.ADD
+        m.pose.position.x, m.pose.position.y, m.pose.position.z = map(float, pos)
+        m.pose.orientation.w = 1.0
+        m.scale.x, m.scale.y, m.scale.z = map(float, scale)
+        m.color.r, m.color.g, m.color.b, m.color.a = map(float, rgba)
+        m.text = text
+        arr.markers.append(m)
+    for i, o in enumerate(obj):
+        mk(10 + i, Marker.CUBE, (o[0], o[1], o[2] - 0.06), (0.20, 0.16, 0.02), (0.55, 0.42, 0.30, 1.0))   # shelf
+        mk(20 + i, Marker.CYLINDER, o, (0.06, 0.06, 0.10), (0.75, 0.75, 0.78, 1.0))                     # object
+        mk(30 + i, Marker.TEXT_VIEW_FACING, (o[0], o[1], o[2] + 0.10), (0, 0, 0.05), (1, 1, 1, 1.0), str(i))
+    return arr
 
 
 def keyreader():
@@ -103,7 +128,7 @@ def keyreader():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('mode', choices=['demo', 'keys'])
+    ap.add_argument('mode', choices=['demo', 'keys', 'scene'])
     ap.add_argument('--target', type=int, default=0)
     ap.add_argument('--error', type=float, default=0.12)
     ap.add_argument('--seed', type=int, default=1)
@@ -112,6 +137,18 @@ def main():
     a = ap.parse_args()
     rclpy.init()
     n = Demo()
+    if a.mode == 'scene':
+        print('publishing the scene on /assist_scene (Ctrl-C to stop)')
+        try:
+            while True:
+                n.sc.publish(scene_markers(OBJECTS))
+                t1 = time.time()
+                while time.time() - t1 < 0.5:
+                    rclpy.spin_once(n, timeout_sec=0.05)
+        except KeyboardInterrupt:
+            pass
+        rclpy.shutdown()
+        return
     t0 = time.time()
     while not all(j in n.q for j in JOINTS) and time.time() - t0 < 10:
         rclpy.spin_once(n, timeout_sec=0.1)
