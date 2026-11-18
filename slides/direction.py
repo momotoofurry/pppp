@@ -95,6 +95,16 @@ def load():
     N['bench'] = dict(fit_ms=us['ld_fit'] / 1000, predict_us=us['ld_predict'], add_us=us['ld_add'])
     a = P.csv('arm_ldacal_size.csv').iloc[0]
     N['ldacal_ram'] = int(a.bss + a.data)
+    # goal inferred from decoded commands (35.56)
+    cr = {}
+    txt = rd('grabmyo', 'grabmyo_labels_corr_1-43.txt')
+    for blk in re.split(r'^===== ', txt, flags=re.M)[1:]:
+        s = blk.split(':')[0]
+        cr[(s, 'err')] = float(re.search(r'is wrong in ([\d.]+) %', blk).group(1))
+        part = blk.split('later, difference vs acc:')[1].split('later, difference vs self:')[0]
+        for nm, v, lo, hi, k in re.findall(r'^\s+(.+?)\s+([+-][\d.]+)\s+\(95 % CI ([+-][\d.]+) to ([+-][\d.]+)\), better in (\d+)/', part, re.M):
+            cr[(s, nm.strip())] = (float(v), float(lo), float(hi), int(k))
+    N['corr'] = cr
     return N
 
 
@@ -186,21 +196,24 @@ def build(out):
                                     (f'{DATE}　方向尚待指導老師確認', {'color': '8FD3D0'})], size=16, color='CFE3E6', space=4)
 
     # 2 one page: claims and evidence level
-    s = d.slide('一頁看懂：九個論點和它們的證據', notes='證據等級：公開資料模擬（多人）＞板子實測＞文獻（只讀摘要，要讀全文確認）＞尚無證據。')
+    s = d.slide('一頁看懂：十個論點和它們的證據', notes='證據等級：公開資料模擬（多人）＞板子實測＞文獻（只讀摘要，要讀全文確認）＞尚無證據。')
     l1, l9 = lab[('G9', 'self', 'soft1')], lab[('G9', 'pair', 'soft30')]
+    cr = N['corr']
     rows = [['#', '論點', '關鍵數據', '證據'],
             ['1', '不更新的模型跨天會變差', f'第 8、29 天少 {-g9["d_fixed"][0]:.1f} 點（{43 - g9["d_fixed"][1]}/43 人變差）', '公開資料 43 人'],
             ['2', '跨天累加比每天只做短校正好', f'+{g9["d_acc"][0]:.1f} 點（{g9["d_acc"][1]}/43 人變好）', '公開資料 43 人'],
             ['3', '整個更新可以在 MCU 上做', f'重算 {N["bench"]["fit_ms"]:.1f} ms、模組 RAM {N["ldacal_ram"] / 1024:.1f} KB', '板子實測'],
             ['4', '任務情境標籤比自我訓練好', f'+{l1[0]:.1f} 點（{l1[3]}/43 人）', '公開資料 43 人'],
-            ['5', '情境會猜錯時，硬標籤有害、軟標籤安全', f'30 % 猜錯：軟比硬 +{l9[0]:.1f} 點（{l9[1]}/43 人）', '公開資料 43 人'],
+            ['5', '情境隨機猜錯時，硬標籤有害、軟標籤安全', f'30 % 猜錯：軟比硬 +{l9[0]:.1f} 點（{l9[1]}/43 人）', '公開資料 43 人'],
             ['6', '軟標籤的強度應等於情境的錯誤率', '最佳 ε 落在對角線（3 個手勢集合都是）', '公開資料 43 人'],
+            ['6b', '標籤要有用，目標資訊必須獨立於 EMG', f'只從 EMG 推目標：{cr[("G9", "soft eps = 1 - P, inferred goal")][0]:+.1f} 點（CI 含 0）', '公開資料 43 人'],
             ['7', '4 顆感測器分不好手指動作 → 只用手腕', f'DB2 4 顆：9 類 {N["db2"][(1, "S9")]:.0f} %、5 類 {N["db2"][(1, "S5")]:.0f} %', '公開資料＋文獻'],
             ['8', '目標使用者是上肢受限者，需要輔助', 'JACO 使用者研究、需求調查', '文獻（摘要）'],
             ['9', '延遲約一半是使用者的反應', f'反應 {lat["react"]:.0f} ms、系統 {lat["system"]:.0f} ms', '自己的錄製＋公開資料']]
-    fills = {(i, 3): (TEAL_L if '公開' in rows[i][3] or '板子' in rows[i][3] or '自己' in rows[i][3] else AMBER_L) for i in range(1, 10)}
-    table(s, 0.6, 1.3, 12.1, rows, [0.45, 4.6, 4.75, 2.3], size=13, row_h=0.5, fills=fills)
-    source(s, '數據出處：report 35.51、35.54、35.55（GrabMyo 跨天、延遲、標籤比較），35.10 / 35.23（板子實測），35.46（DB2）。文獻見最後一頁。')
+    fills = {(i, 3): (TEAL_L if '公開' in rows[i][3] or '板子' in rows[i][3] or '自己' in rows[i][3] else AMBER_L) for i in range(1, len(rows))}
+    fills.update({(7, j): CORAL_L for j in range(3)})
+    table(s, 0.6, 1.3, 12.1, rows, [0.5, 4.55, 4.75, 2.3], size=13, row_h=0.47, fills=fills)
+    source(s, '數據出處：report 35.51、35.54、35.55、35.56（GrabMyo 跨天、延遲、標籤比較），35.10 / 35.23（板子實測），35.46（DB2）。文獻見最後一頁。')
 
     # 3 how the direction was chosen
     s = d.slide('怎麼選方向：風險、價值、技術含量', notes='風險＝論文成立是否依賴還沒驗證或不可控的事；價值＝解決的問題是否被文獻承認、別人還沒做；技術＝MCU、即時、定點。')
@@ -289,7 +302,7 @@ def build(out):
     source(s, '9 類，和「只累加、不加標籤」的差（點）。出處：report 35.55（results/grabmyo/grabmyo_labels_1-43.txt）；Campbell 等，2024，JNER（摘要）。')
 
     # 8 claim 5
-    s = d.slide('論點 5：情境會猜錯時，硬標籤有害，軟標籤安全', notes='shared autonomy 的意圖推論一定會猜錯一部分。這頁是把猜錯的比例從 0 拉到 50 %。report 35.55。')
+    s = d.slide('論點 5：情境隨機猜錯時，硬標籤有害，軟標籤安全', notes='shared autonomy 的意圖推論一定會猜錯一部分。這頁是把猜錯的比例從 0 拉到 50 %。report 35.55。')
     tags(s, [('pub', 'GrabMyo 43 人、9 類')])
     rows9 = sw['G9']
     rates = sorted(rows9)
@@ -326,9 +339,9 @@ def build(out):
                                     (f'只猜錯 10 %，硬標籤就變成負的（{rows9[10][0][0]:+.1f}）', {'bullet': True}),
                                     (f'猜錯 30 %：硬標籤 {rows9[30][0][0]:+.1f}，軟標籤約 0', {'bullet': True}),
                                     (f'軟比硬多 {p30[0]:+.1f} 點，{p30[1]}/43 人變好', {'bullet': True}),
-                                    ('軟標籤的價值不是提高上限，而是猜錯時不會拖垮模型', {'bullet': True, 'bold': True})],
+                                    ('前提：猜錯和分類器無關。猜錯和 EMG 同步時，軟硬差不多（論點 6b）', {'bullet': True, 'bold': True, 'color': CORAL})],
          size=15, space=8)
-    source(s, '出處：report 35.55（results/grabmyo/grabmyo_labels_sweep_1-43.txt、grabmyo_labels_1-43.txt）。猜錯的情境是隨機的（見「還沒有證據的地方」）。')
+    source(s, '出處：report 35.55（results/grabmyo/grabmyo_labels_sweep_1-43.txt、grabmyo_labels_1-43.txt）。這裡猜錯是隨機的；和 EMG 同步猜錯見論點 6b。')
 
     # 9 claim 6
     s = d.slide('論點 6：軟標籤的強度，應該等於情境的錯誤率', notes='ε＝先驗分給其他指令的機率。最佳 ε ≈ 猜錯率，和貝氏推論一致。所以 ε = 1 − P(目標)。report 35.55。')
@@ -350,11 +363,31 @@ def build(out):
     box(s, 8.6, 1.75, 4.1, 4.6, fill=TEAL_L)
     text(s, 8.85, 1.95, 3.6, 4.3, [('設計規則', {'size': 18, 'bold': True}),
                                     ('ε = 1 − P(目標)', {'size': 26, 'bold': True, 'color': TEAL}),
-                                    ('P(目標) 來自 shared autonomy 的意圖推論', {'bullet': True}),
-                                    ('有把握 → 接近硬標籤，拿到 CIIL 的好處', {'bullet': True}),
-                                    ('沒把握 → 自動變軟，不會拖垮模型', {'bullet': True}),
-                                    ('同一個機率也決定輔助強度 α', {'bullet': True})], size=15, space=8)
+                                    ('只在猜錯和 EMG 無關時成立（例如隨機的任務錯誤）', {'bullet': True}),
+                                    ('P(目標) 只從 EMG 推論時，ε = 1 − P 沒有額外好處（論點 6b）', {'bullet': True, 'color': CORAL}),
+                                    ('所以標籤的目標要來自 EMG 以外：任務指定、任務完成後確認', {'bullet': True})], size=15, space=8)
     source(s, '出處：report 35.55（results/grabmyo/grabmyo_labels_sweep_1-43.txt）。')
+
+    # 9b claim 6b (35.56)
+    s = d.slide('論點 6b：目標只從 EMG 推論時，使用中的標籤沒有額外好處',
+                notes='最壞情況：目標＝這個 trial 解碼出最多次的指令，沒有物體位置、沒有使用者修正。report 35.56。')
+    tags(s, [('pub', 'GrabMyo 43 人、第 8／29 天')])
+    conds = [('soft, true goal', '真目標：軟標籤'), ('CIIL-like, true goal', '真目標：硬標籤'),
+             ('hard, inferred goal', 'EMG 推目標：硬標籤'), ('soft eps 0.15, inferred goal', 'EMG 推目標：軟 ε 0.15'),
+             ('soft eps = 1 - P, inferred goal', 'EMG 推目標：ε = 1 − P'), ('self-training', '自我訓練')]
+    vals = [cr[('G9', c)][0] for c, _ in conds]
+    bar_chart(s, 0.6, 1.75, 7.4, 4.6, [n for _, n in conds], [('和只累加相比', vals)],
+              [TEAL, TEAL, MUTE, MUTE, MUTE, CORAL], vmin=-2, vmax=3, label_size=14, horiz=True)
+    box(s, 8.4, 1.75, 4.3, 4.6, fill=LIGHT)
+    e9, e5 = cr[('G9', 'err')], cr[('G5', 'err')]
+    ci = cr[('G9', 'soft eps = 1 - P, inferred goal')]
+    text(s, 8.65, 1.95, 3.85, 4.3, [('看到的事', {'size': 18, 'bold': True}),
+                                     (f'EMG 推出的目標錯 {e9:.0f} %（9 類）到 {e5:.0f} %（5 類），而且是和分類器一起錯', {'bullet': True}),
+                                     (f'這時標籤和只累加差不多（ε = 1 − P：{ci[0]:+.1f}，CI {ci[1]:+.1f} 到 {ci[2]:+.1f}）', {'bullet': True}),
+                                     ('真目標的標籤仍有 +1.7 到 +2.2 點', {'bullet': True}),
+                                     ('→ 標籤要用任務指定或任務完成後確認的目標（夾到哪個物體）', {'bullet': True, 'bold': True})],
+         size=14, space=8)
+    source(s, '9 類，和只累加相比（點）。模擬沒有使用者修正：實際上手臂走錯時使用者會改手勢，完成後確認的目標比這裡準。出處：report 35.56。')
 
     # 10 comparison with prior work
     s = d.slide('和現有方法比：我們補的是哪一塊', notes='依各論文摘要整理；要讀全文確認。')
@@ -365,7 +398,7 @@ def build(out):
             ['Vidovic 等（2016）', Y + '（5 天）', Nn, '—', Nn + '（每天短校正）'],
             ['Benini 團隊（TBCAS 2024）', '—', Pp + '（專用多核心 MCU）', '—', Nn],
             ['自我訓練（Yoneda 等，2023／2025）', Y + '（30 天）', Nn, '—', '用自己的預測'],
-            ['本研究', Y + '（29 天，43 人）', Y + '（Cortex-M7）', Y + '（論點 5、6）', Y + '（軟標籤）']]
+            ['本研究', Y + '（29 天，43 人）', Y + '（Cortex-M7）', Pp + '（隨機錯誤時；見論點 6b）', Y + '（軟標籤）']]
     fills = {(5, j): TEAL_L for j in range(5)}
     table(s, 0.6, 1.75, 12.1, rows, [3.2, 2.6, 2.1, 2.2, 2.0], size=13, row_h=0.68, fills=fills)
     source(s, '出處（皆為摘要）：Campbell 等 2024 JNER、2025 VR 研究；Vidovic 等 2016 TNSRE；Benini 團隊 2024 TBCAS；Yoneda 等 2023、2025。')
@@ -422,7 +455,7 @@ def build(out):
     s = d.slide('還沒有證據的地方，以及怎麼補', notes='這頁的每一項都還沒有數據支持，不能當成結論。')
     tags(s, [('none', '以下都還沒有數據')])
     rows = [['尚未證明', '為什麼重要', '怎麼補'],
-            ['意圖推論的錯誤和分類器的錯誤一起發生', '模擬的猜錯是隨機的，真實情況可能更糟', '模擬：意圖由解碼的指令推得（可以先做）'],
+            ['任務完成後確認的目標能取回標籤的好處', '只從 EMG 推目標時沒有好處（論點 6b）', '實驗 2：夾到物體後回頭標記這個 trial'],
             ['自己的資料上也成立', '目前都是公開資料', '11/23 起的 9 手勢自我測試（判準 1–3 已事先登記）'],
             ['橈偏／尺偏的跨天結果', 'GrabMyo 用旋後／旋前代替', '自我測試第 2 天；或找有這兩個動作的跨天資料'],
             ['和 CIIL 原方法比較', '目前是依摘要的簡化版', '讀全文，照原方法實作'],
@@ -432,10 +465,10 @@ def build(out):
 
     # 15 next steps
     s = d.slide('接下來的順序', notes='每一步都是補上一頁的一個缺口。')
-    steps = [('11/19–11/22', '模擬：意圖由解碼指令推得（錯誤相關）', '補論點 5、6 最大的缺口'),
+    steps = [('已完成', '模擬：目標只從 EMG 推論（錯誤和分類器同步）', '結果：標籤沒有額外好處 → 改用任務完成後確認的目標'),
              ('11/23 起', '自我測試 9 手勢，第 1、2 天', '判準 1–3；自己的資料上驗證論點 2、4'),
              ('之後', '帶結果和指導教授討論方向', '確定 shared autonomy、只用手腕'),
-             ('實驗 2', 'RViz → Kinova，條件 A／B／C', '驗證輔助與 ε = 1 − P(目標)')]
+             ('實驗 2', 'RViz → Kinova，條件 A／B／C', '驗證輔助，以及用任務完成後確認的目標當標籤')]
     for i, (when, what, why) in enumerate(steps):
         y = 1.6 + i * 1.25
         P.circle_num(s, 0.6, y + 0.1, i + 1)

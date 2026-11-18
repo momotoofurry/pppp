@@ -1,0 +1,55 @@
+GrabMyo 4ch, 43 participants; balanced accuracy %, day 1 / day 8 / day 29; later = mean of days 8, 29
+
+===== G9: goal inferred from decoded commands is wrong in 15.9 % of labelled trials
+  later, difference vs acc:
+    self-training                    -1.21  (95 % CI -2.09 to -0.33), better in 14/43
+    CIIL-like, true goal             +2.15  (95 % CI +1.32 to +3.02), better in 32/43
+    soft, true goal                  +1.70  (95 % CI +0.89 to +2.57), better in 30/43
+    hard, inferred goal              -0.80  (95 % CI -1.72 to +0.12), better in 16/43
+    soft eps 0.15, inferred goal     -0.56  (95 % CI -1.40 to +0.31), better in 18/43
+    soft eps = 1 - P, inferred goal  -0.57  (95 % CI -1.43 to +0.37), better in 19/43
+  later, difference vs self:
+    CIIL-like, true goal             +3.36  (95 % CI +2.76 to +4.00), better in 43/43
+    soft, true goal                  +2.91  (95 % CI +2.44 to +3.43), better in 43/43
+    hard, inferred goal              +0.42  (95 % CI -0.34 to +1.10), better in 28/43
+    soft eps 0.15, inferred goal     +0.65  (95 % CI +0.26 to +1.05), better in 30/43
+    soft eps = 1 - P, inferred goal  +0.64  (95 % CI +0.32 to +0.96), better in 32/43
+  soft eps = 1 - P, inferred goal - hard, inferred goal: +0.23, better in 26/43
+  soft eps = 1 - P, inferred goal - soft eps 0.15, inferred goal: -0.00, better in 24/43
+  soft eps 0.15, inferred goal - hard, inferred goal: +0.23, better in 24/43
+
+===== G7: goal inferred from decoded commands is wrong in 8.5 % of labelled trials
+  later, difference vs acc:
+    self-training                    -0.58  (95 % CI -1.37 to +0.23), better in 16/43
+    CIIL-like, true goal             +1.39  (95 % CI +0.70 to +2.08), better in 30/43
+    soft, true goal                  +0.95  (95 % CI +0.28 to +1.62), better in 26/43
+    hard, inferred goal              -0.18  (95 % CI -0.99 to +0.61), better in 19/43
+    soft eps 0.15, inferred goal     -0.13  (95 % CI -0.95 to +0.68), better in 20/43
+    soft eps = 1 - P, inferred goal  -0.18  (95 % CI -0.97 to +0.60), better in 19/43
+  later, difference vs self:
+    CIIL-like, true goal             +1.97  (95 % CI +1.48 to +2.48), better in 37/43
+    soft, true goal                  +1.53  (95 % CI +1.12 to +1.98), better in 39/43
+    hard, inferred goal              +0.40  (95 % CI +0.07 to +0.69), better in 28/43
+    soft eps 0.15, inferred goal     +0.45  (95 % CI +0.20 to +0.68), better in 29/43
+    soft eps = 1 - P, inferred goal  +0.40  (95 % CI +0.17 to +0.61), better in 30/43
+  soft eps = 1 - P, inferred goal - hard, inferred goal: +0.00, better in 21/43
+  soft eps = 1 - P, inferred goal - soft eps 0.15, inferred goal: -0.05, better in 15/43
+  soft eps 0.15, inferred goal - hard, inferred goal: +0.05, better in 20/43
+
+===== G5: goal inferred from decoded commands is wrong in 5.3 % of labelled trials
+  later, difference vs acc:
+    self-training                    +0.11  (95 % CI -0.67 to +0.92), better in 22/43
+    CIIL-like, true goal             +1.26  (95 % CI +0.51 to +1.97), better in 31/43
+    soft, true goal                  +0.88  (95 % CI +0.20 to +1.57), better in 28/43
+    hard, inferred goal              +0.23  (95 % CI -0.58 to +1.02), better in 26/43
+    soft eps 0.15, inferred goal     +0.33  (95 % CI -0.36 to +1.08), better in 23/43
+    soft eps = 1 - P, inferred goal  +0.32  (95 % CI -0.39 to +1.08), better in 23/43
+  later, difference vs self:
+    CIIL-like, true goal             +1.14  (95 % CI +0.68 to +1.64), better in 35/43
+    soft, true goal                  +0.76  (95 % CI +0.42 to +1.15), better in 34/43
+    hard, inferred goal              +0.12  (95 % CI -0.32 to +0.51), better in 21/43
+    soft eps 0.15, inferred goal     +0.22  (95 % CI +0.01 to +0.42), better in 28/43
+    soft eps = 1 - P, inferred goal  +0.20  (95 % CI -0.00 to +0.42), better in 26/43
+  soft eps = 1 - P, inferred goal - hard, inferred goal: +0.08, better in 24/43
+  soft eps = 1 - P, inferred goal - soft eps 0.15, inferred goal: -0.02, better in 21/43
+  soft eps 0.15, inferred goal - hard, inferred goal: +0.10, better in 24/43
