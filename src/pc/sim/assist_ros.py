@@ -16,6 +16,7 @@ displays) shows both: rviz2 -d src/pc/sim/assist.rviz
   keep the SAME key to go in, the opposite key backs out, another key steers again; at the object press space and
   wait 1 s to grasp; then move freely (w lifts). takeover (35.57): after a short push the system drives.
   python3 src/pc/sim/assist_ros.py scene           shelves + objects + numbers, until Ctrl-C
+  python3 src/pc/sim/assist_ros.py home            back to the start pose, gripper open
 """
 import argparse
 import os
@@ -142,7 +143,7 @@ def keyreader():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('mode', choices=['demo', 'keys', 'scene'])
+    ap.add_argument('mode', choices=['demo', 'keys', 'scene', 'home'])
     ap.add_argument('--target', type=int, default=0)
     ap.add_argument('--error', type=float, default=0.12)
     ap.add_argument('--seed', type=int, default=1)
@@ -177,6 +178,10 @@ def main():
     t1 = time.time()
     while time.time() - t1 < 4.5:
         rclpy.spin_once(n, timeout_sec=0.05)
+    if a.mode == 'home':
+        print('at the start pose, tool', np.round(kin.fk(n.joints())[:3, 3], 3).tolist(), ', gripper open')
+        rclpy.shutdown()
+        return
     sa = A.Assist(OBJECTS, mode=a.assist, level=a.level)
     rng = np.random.default_rng(a.seed)
     dec = S.Decoder(S.SET5, a.error, rng)
