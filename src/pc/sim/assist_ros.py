@@ -202,7 +202,8 @@ def scene_markers(obj):
 
 def keyreader():
     """raw key bytes from the terminal (os.read on the file descriptor: no Python text buffering). A key sets the
-    command and it stays until another key: w a s d = direction (held), space = relax (stop), q = quit"""
+    command and it stays until another key: w a s d = direction (held), space = relax (stop), h = back to the start
+    pose without quitting (returns 'home' once), q = quit"""
     fd = sys.stdin.fileno()
     if not os.isatty(fd):
         raise SystemExit('keys mode needs an interactive terminal (stdin is not a TTY)')
@@ -221,10 +222,13 @@ def keyreader():
                 c = data[i:i + 1]
                 if c in (b'q', b'Q'):
                     raise KeyboardInterrupt
+                if c in (b'h', b'H'):
+                    state['home'], state['cmd'] = True, 'rest'
+                    continue
                 if c in keys and keys[c] != state['cmd']:
                     state['cmd'] = keys[c]
                     print(f'\r  command: {state["cmd"]:6s}', flush=True)
-        return state['cmd']
+        return 'home' if state.pop('home', False) else state['cmd']
     return poll, lambda: termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
@@ -300,7 +304,7 @@ def main():
         a.limit = 300.0 if a.mode == 'keys' else 60.0
     if a.mode == 'keys':
         print('ready. Click this terminal first (not the RViz window), then: w up, s down, a left, d right,')
-        print('space = relax (stop), q = quit. A key keeps moving until another key. Seen from behind the arm: '
+        print('space = relax (stop), h = back to the start (keeps control), q = quit. A key keeps moving until another key. Seen from behind the arm: '
               'object 0 left-low, 1 right-high, 2 middle-low.', flush=True)
         if a.assist == 'blend':
             print(f'blend mode, level {a.level}: you steer; RViz shows the guess in yellow, then green with a hint '
@@ -322,6 +326,19 @@ def main():
                 cmd = dec(want)
             else:
                 want = cmd = poll()
+            if cmd == 'home':                           # h: back to the start pose, control continues
+                print('  >> 回到起點（3 秒），之後繼續控制' + ('；物體還夾著' if sa.state == 'grasped' else ''), flush=True)
+                n.send(q_rest, 3.0)
+                t2 = time.time()
+                while time.time() - t2 < 3.2:
+                    rclpy.spin_once(n, timeout_sec=0.05)
+                q = q_rest.copy()
+                if sa.state == 'final':
+                    sa.state, sa.goal = 'steer', None
+                sa.s[:] = 0.0
+                sa.final_block, sa.approach, sa.rest_n = None, None, 0
+                hist = [kin.fk(q)[:3, 3]] * (S.REACT + 1)
+                continue
             v = sa.step(cmd if cmd != 'rest' else None, x)
             if bool(sa.grip) != gripped:
                 n.gripper(float(sa.grip))
