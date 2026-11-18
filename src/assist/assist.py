@@ -22,8 +22,12 @@ blend      the user's direction always counts: v = V_MAX unit((1 - a) u + a d_g)
            pushes toward the goal. The final straight-in approach starts only when the leading goal is sure
            (P >= P_FINAL) AND the tool is aligned with it in y, z (within ALIGN); then the SAME gesture = go in, the
            opposite gesture = back out, any other gesture = steer again (and the final approach cannot restart until
-           the tool has left the alignment zone or the user has relaxed). The gripper closes only when the user relaxes
+           the tool has left the alignment zone or the user has relaxed). Only the gesture that brought the tool into
+           alignment (pointing at the goal) starts it: a new gesture pressed at an aligned spot just moves that way. The gripper closes only when the user relaxes
            CONFIRM_STEPS steps at the object (the user's confirmation). After the grasp the user moves freely.
+           keep=True (continuous use, 35.59): control never ends. The grasped object moves with the tool; relaxing
+           CONFIRM_STEPS steps with the object over a shelf (place_ok) opens the gripper and leaves the object there;
+           then the user steers again and can pick it or another one up. Relaxing anywhere else only stops the arm.
 Rest / relaxed: v = 0 in every state (the user can always stop).
 
 Parameter values are first guesses, tuned in simulation (assist_sim.py) and RViz; not validated with people.
@@ -50,13 +54,24 @@ def unit(v):
 
 
 class Assist:
-    def __init__(self, objects, assist=True, mode='takeover', level=A_MAX):
-        """objects: (n, 3) object positions (grasp points) in the base frame"""
-        self.obj = np.asarray(objects, float)
+    def __init__(self, objects, assist=True, mode='takeover', level=A_MAX, keep=False, shelves=None):
+        """objects: (n, 3) object positions (grasp points) in the base frame; shelves: (m, 3) centres of the shelf
+        tops where an object can be put down (keep=True)"""
+        self.obj = np.array(objects, float)
         self.assist = assist
         self.mode = mode
         self.level = level
+        self.keep = keep
+        self.shelves = np.zeros((0, 3)) if shelves is None else np.asarray(shelves, float)
         self.reset()
+
+    def place_ok(self, x):
+        """the shelf under the held object (its centre at the tool), or None: within 5 cm sideways and the object's
+        bottom (centre - 5 cm) at most 2 cm above the shelf top"""
+        for sh in self.shelves:
+            if np.linalg.norm(x[:2] - sh[:2]) < 0.05 and 0.04 <= x[2] - sh[2] <= 0.07:
+                return sh
+        return None
 
     def reset(self):
         self.s = np.zeros(len(self.obj))
@@ -64,6 +79,8 @@ class Assist:
         self.lock_cmd = None          # takeover: gesture at lock time; blend: gesture that started the final approach
         self.cancel = 0
         self.rest_n = 0
+        self.approach = None          # blend: (goal, gesture) the user was pushing toward that goal with, before alignment
+        self.armed = True             # blend: a relax counts only after the user moved since the last grasp / put-down
         self.final_block = None       # blend: goal whose final approach the user just left
         self.state = 'steer'          # takeover: steer | approach | grasped | done; blend: steer | final | grasped | done
         self.grip = 0.0               # 0 open .. 1 closed
@@ -92,6 +109,22 @@ class Assist:
         if self.state == 'done':
             return np.zeros(3)
         if self.state == 'grasped':
+            if self.keep:
+                self.obj[self.goal] = x                    # the object moves with the gripper
+                if not moving:
+                    sh = self.place_ok(x) if self.armed else None
+                    if sh is not None:
+                        self.rest_n += 1
+                        if self.rest_n >= CONFIRM_STEPS:   # relaxed over a shelf: put it down (it settles on the top)
+                            self.obj[self.goal] = [x[0], x[1], sh[2] + 0.05]
+                            self.grip, self.state, self.final_block = 0.0, 'steer', self.goal
+                            self.goal, self.rest_n, self.armed = None, 0, False
+                            self.s[:] = 0.0
+                    else:
+                        self.rest_n = 0
+                    return np.zeros(3)
+                self.rest_n, self.armed = 0, True
+                return V_MAX * u
             if moving and x[2] - self.lift_from >= LIFT:
                 self.state = 'done'
             return V_MAX * u
@@ -99,14 +132,15 @@ class Assist:
             self.final_block = None
             near = np.linalg.norm(self.obj - x, axis=1)
             k = int(np.argmin(near))
-            if near[k] < GRASP_TOL:
+            if near[k] < GRASP_TOL and self.armed:
                 self.rest_n += 1
                 if self.rest_n >= CONFIRM_STEPS:       # the user relaxed at the object: grasp
                     self.goal, self.grip, self.state, self.lift_from = k, 1.0, 'grasped', x[2]
+                    self.rest_n, self.armed = 0, False
             else:
                 self.rest_n = 0
             return np.zeros(3)
-        self.rest_n = 0
+        self.rest_n, self.armed = 0, True
         pre = self.obj + PRE
         if self.state == 'final':
             g = self.goal
@@ -125,7 +159,13 @@ class Assist:
         g = int(np.argmax(P))
         if self.final_block is not None and np.linalg.norm((pre[self.final_block] - x)[1:]) > 1.5 * ALIGN:
             self.final_block = None
-        if P[g] >= P_FINAL and np.linalg.norm((pre[g] - x)[1:]) < ALIGN and self.final_block != g:
+        to_yz = (pre[g] - x)[1:]
+        if np.linalg.norm(to_yz) > ALIGN:              # remember the gesture that is bringing the tool to this goal
+            self.approach = (g, cmd) if u[1:] @ unit(to_yz) > 0.35 else None   # roughly toward it (< ~70 deg)
+        # the final approach starts only for the gesture that brought the tool here: a NEW gesture pressed at an aligned
+        # spot means "move that way", not "go in"
+        if (P[g] >= P_FINAL and np.linalg.norm(to_yz) < ALIGN and self.final_block != g
+                and self.approach == (g, cmd)):
             self.state, self.goal, self.lock_cmd = 'final', g, cmd
             d = self.obj[g] - x
             return min(V_MAX, np.linalg.norm(d) / DT) * unit(d)
