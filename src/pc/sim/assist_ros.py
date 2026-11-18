@@ -109,19 +109,29 @@ def scene_markers(obj):
 
 
 def keyreader():
+    """raw key bytes from the terminal (os.read on the file descriptor: no Python text buffering). A key sets the
+    command and it stays until another key: w a s d = direction (held), space = relax (stop), q = quit"""
     fd = sys.stdin.fileno()
+    if not os.isatty(fd):
+        raise SystemExit('keys mode needs an interactive terminal (stdin is not a TTY)')
     old = termios.tcgetattr(fd)
     tty.setcbreak(fd)
     state = {'cmd': 'rest'}
-    keys = {'w': 'up', 's': 'down', 'a': 'left', 'd': 'right', ' ': 'rest'}
+    keys = {b'w': 'up', b's': 'down', b'a': 'left', b'd': 'right', b' ': 'rest',
+            b'W': 'up', b'S': 'down', b'A': 'left', b'D': 'right'}
 
     def poll():
-        while select.select([sys.stdin], [], [], 0)[0]:
-            c = sys.stdin.read(1)
-            if c == 'q':
-                termios.tcsetattr(fd, termios.TCSADRAIN, old)
-                raise KeyboardInterrupt
-            state['cmd'] = keys.get(c, state['cmd'])
+        while select.select([fd], [], [], 0)[0]:
+            data = os.read(fd, 64)
+            if not data:
+                break
+            for i in range(len(data)):
+                c = data[i:i + 1]
+                if c in (b'q', b'Q'):
+                    raise KeyboardInterrupt
+                if c in keys and keys[c] != state['cmd']:
+                    state['cmd'] = keys[c]
+                    print(f'\r  command: {state["cmd"]:6s}', flush=True)
         return state['cmd']
     return poll, lambda: termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
@@ -133,7 +143,7 @@ def main():
     ap.add_argument('--error', type=float, default=0.12)
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--log', default='assist_ros.csv')
-    ap.add_argument('--limit', type=float, default=60.0)
+    ap.add_argument('--limit', type=float, default=None, help='s (default: demo 60, keys 300)')
     a = ap.parse_args()
     rclpy.init()
     n = Demo()
@@ -165,6 +175,13 @@ def main():
     rng = np.random.default_rng(a.seed)
     dec = S.Decoder(S.SET5, a.error, rng)
     poll, restore = keyreader() if a.mode == 'keys' else (None, None)
+    if a.limit is None:
+        a.limit = 300.0 if a.mode == 'keys' else 60.0
+    if a.mode == 'keys':
+        print('ready. Click this terminal first (not the RViz window), then: w up, s down, a left, d right,')
+        print('space = relax (stop), q = quit. A key keeps moving until another key. Seen from behind the arm: '
+              'object 0 left-low, 1 right-high, 2 middle-low.', flush=True)
+    last_state = None
     hist = [S.X0.copy()] * (S.REACT + 1)
     held, gripped = 'rest', False
     log = open(a.log, 'w', encoding='utf-8')
@@ -189,8 +206,11 @@ def main():
             hist.append(kin.fk(q)[:3, 3])
             log.write(f'{k * A.DT:.1f},{want},{cmd},{sa.state},{sa.goal},{P[0]:.3f},{P[1]:.3f},{P[2]:.3f},'
                       f'{x[0]:.4f},{x[1]:.4f},{x[2]:.4f}\n')
+            if a.mode == 'keys' and (sa.state, sa.goal) != last_state:
+                last_state = (sa.state, sa.goal)
+                print(f'\r  assist: {sa.state}' + (f', goal object {sa.goal}' if sa.goal is not None else ''), flush=True)
             if sa.state == 'done':
-                print(f'done at {k * A.DT:.1f} s: grasped object {sa.goal} (target {a.target})')
+                print(f'done at {k * A.DT:.1f} s: grasped object {sa.goal}' + (f' (target {a.target})' if a.mode == 'demo' else ''))
                 break
             while time.time() - tk < A.DT:
                 rclpy.spin_once(n, timeout_sec=0.01)
