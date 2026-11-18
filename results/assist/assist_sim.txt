@@ -1,0 +1,17 @@
+window error from GrabMyo 4ch acc_soft, days 8 + 29: 9 classes 0.237, 5 classes 0.123
+300 trials per row, 3 objects, limit 60 s
+condition                         e      success  wrong  timeout   time median (quartiles), s
+A  direct, 9 classes             0.237    99.7 %   0.0 %    0.3 %    23.4 (16.8-31.2)
+C  assist, 5 classes             0.123   100.0 %   0.0 %    0.0 %     6.7 (6.2-7.4)
+A  direct, same e as C           0.123   100.0 %   0.0 %    0.0 %    15.1 (12.8-18.9)
+C  assist, same e as A           0.237   100.0 %   0.0 %    0.0 %     6.8 (6.3-7.5)
+A  direct, no errors             0.000   100.0 %   0.0 %    0.0 %    11.7 (10.8-12.4)
+C  assist, no errors             0.000   100.0 %   0.0 %    0.0 %     6.4 (6.0-7.2)
+
+sweep of the window error (both conditions at the same e):
+  e      direct success / time      assist success / time
+  0.0   100.0 % /  11.4 s      100.0 % /   6.6 s
+  0.1   100.0 % /  14.4 s      100.0 % /   6.6 s
+  0.2    99.7 % /  19.2 s      100.0 % /   6.8 s
+  0.3    94.7 % /  28.6 s      100.0 % /   7.0 s
+  0.4    62.3 % /  34.9 s      100.0 % /   7.3 s
