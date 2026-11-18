@@ -1,0 +1,79 @@
+===== Part 1: T00_d1_A, 80 task trials, sample rate 2000 Hz
+cue -> command (TaskScreen):        median  1138 ms (quartiles  973-1759, n 78)
+cue -> EMG onset (reaction):        median   524 ms (quartiles  322- 697, n 76)
+EMG onset -> command (system):      median   550 ms (quartiles  295-1493, n 76)
+  wrong commands: reaction median   535 ms (quartiles  409- 723, n 51); system median   531 ms (quartiles  291-1362, n 51)
+trials without a clear onset: 2, timeouts: 2
+===== Part 2: Ozdemir 2022, 40 participants, 208 settings per set
+gesture trials without a clear onset: 80 of 720; reaction (cue -> onset) median 489 ms
+S7 margin (top - second LDA score) percentiles 10/25/50/75/90, 200/100 ms: [1.28, 3.08, 7.0, 12.84, 21.58]
+S5 margin (top - second LDA score) percentiles 10/25/50/75/90, 200/100 ms: [2.56, 6.4, 14.03, 21.84, 30.18]
+
+===== S7: median over participants
+board now (200 ms / 100 ms, k 3, m 0): first_ok 78.4 %, miss 0.0 %, start 480 ms, stop 1159 ms, wrong/trial 1.00, false/min 7.95
+Pareto front (faster start vs right first command):
+  win  step  k    m   hi | first_ok  miss  start_ms  stop_ms  wrong/tr  false/min
+  100    50  1  0.0    - |     33.3   0.0        21      203     11.38     127.48
+  100   100  1  0.0    - |     36.4   0.0        58      317      7.74      81.35
+  100    50  2  0.0    2 |     41.7   0.0        81      347      6.44      67.97
+  100    50  1  2.0    - |     43.6   0.0       107      400      5.00      55.14
+  100    50  2  0.0    - |     45.5   0.0       143      448      4.21      43.23
+  100   100  2  0.0    2 |     47.7   0.0       147      474      4.12      39.59
+  100    50  2  0.5    - |     50.0   0.0       161      478      3.26      34.23
+  100    50  3  0.0    4 |     54.5   0.0       168      601      2.90      29.23
+  100   100  2  0.0    6 |     56.4   0.0       237      694      2.12      19.22
+  100    50  3  0.0    - |     61.0   0.0       266      753      1.83      15.23
+  100    50  2  2.0    - |     65.2   0.0       275      909      1.67      16.77
+  100   100  3  0.0    6 |     66.7   0.0       315      887      1.18      10.52
+  100   100  2  1.0    - |     72.7   0.0       342      875      1.25      10.45
+  150   100  2  2.0    - |     73.9   0.0       385     1021      0.92       9.24
+  100    50  4  0.5    - |     75.0   0.0       407     1042      0.83       5.64
+  100   100  3  0.0    - |     78.4   0.0       455     1054      0.92       6.46
+  100    50  5  0.0    - |     81.8   0.0       456     1326      0.67       4.38
+  100   100  3  0.5    - |     83.3   0.0       479     1292      0.58       4.71
+  100   100  3  2.0    - |     90.9   4.2       555     1968      0.33       2.39
+  150   100  4  0.0    - |     91.3   0.0       591     1622      0.48       3.53
+  150   100  4  1.0    - |     91.7   0.0       629     1863      0.33       2.10
+  150   100  5  1.0    - |     95.8   0.0       769     2321      0.17       1.71
+  200   100  5  2.0    - |    100.0   0.0       798     2198      0.17       1.47
+fastest settings within 1 point of the board now (78.4 %):
+  100   100  3  0.0    - |     78.4   0.0       455     1054      0.92       6.46
+  100    50  5  0.0    - |     81.8   0.0       456     1326      0.67       4.38
+  100   100  3  0.5    - |     83.3   0.0       479     1292      0.58       4.71
+  200   100  3  0.0    - |     78.4   0.0       480     1159      1.00       7.95
+  200    50  5  1.0    - |     81.8   0.0       485     1291      0.75       5.46
+  100    50  4  2.0    - |     81.8   0.0       488     1591      0.50       2.76
+  100   100  3  1.0    - |     83.3   0.0       493     1558      0.42       3.61
+  200   100  3  0.5    - |     81.8   0.0       493     1350      0.79       6.77
+effect of k alone (200 ms / 100 ms, m 0):
+  k 1: first_ok  34.8  start   109 ms  stop   405 ms  wrong/tr 5.17  false/min 53.63
+  k 2: first_ok  56.4  start   331 ms  stop   711 ms  wrong/tr 2.17  false/min 19.24
+  k 3: first_ok  78.4  start   480 ms  stop  1159 ms  wrong/tr 1.00  false/min  7.95
+  k 4: first_ok  83.3  start   615 ms  stop  1490 ms  wrong/tr 0.58  false/min  4.51
+  k 5: first_ok  91.7  start   720 ms  stop  1911 ms  wrong/tr 0.25  false/min  3.00
+
+===== S5: median over participants
+board now (200 ms / 100 ms, k 3, m 0): first_ok 93.8 %, miss 0.0 %, start 434 ms, stop 513 ms, wrong/trial 0.38, false/min 3.30
+Pareto front (faster start vs right first command):
+  win  step  k    m   hi | first_ok  miss  start_ms  stop_ms  wrong/tr  false/min
+  100    50  1  0.0    - |     62.5   0.0        94      171      3.88      58.47
+  100    50  2  0.0    2 |     75.0   0.0       123      246      2.33      36.02
+  100   100  3  0.0    6 |     80.4   0.0       231      440      0.62       6.94
+  100    50  3  0.5    - |     87.5   0.0       258      352      0.62       5.55
+  100    50  4  1.0    - |     93.8   0.0       332      451      0.38       2.12
+  100    50  4  2.0    - |    100.0   0.0       350      623      0.25       1.37
+fastest settings within 1 point of the board now (93.8 %):
+  100    50  4  1.0    - |     93.8   0.0       332      451      0.38       2.12
+  100    50  4  2.0    - |    100.0   0.0       350      623      0.25       1.37
+  100    50  5  0.0    - |    100.0   0.0       375      491      0.25       2.10
+  100    50  5  0.5    - |    100.0   0.0       381      520      0.25       1.79
+  150    50  5  0.0    - |     93.8   0.0       389      496      0.31       2.73
+  100    50  5  1.0    - |    100.0   0.0       393      520      0.25       1.45
+  150    50  5  0.5    - |    100.0   0.0       400      542      0.25       2.39
+  150    50  5  1.0    - |    100.0   0.0       401      560      0.25       2.08
+effect of k alone (200 ms / 100 ms, m 0):
+  k 1: first_ok  62.5  start   176 ms  stop   244 ms  wrong/tr 1.81  false/min 27.22
+  k 2: first_ok  75.0  start   296 ms  stop   401 ms  wrong/tr 0.88  false/min 11.06
+  k 3: first_ok  93.8  start   434 ms  stop   513 ms  wrong/tr 0.38  false/min  3.30
+  k 4: first_ok 100.0  start   539 ms  stop   592 ms  wrong/tr 0.19  false/min  2.33
+  k 5: first_ok 100.0  start   646 ms  stop   684 ms  wrong/tr 0.12  false/min  1.46
