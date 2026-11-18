@@ -102,7 +102,10 @@ def ik_step(q, v, Rd, dt, k_rot=2.0, damp=0.02, qdot_max=1.0, posture=False, q_r
     Jp = J.T @ np.linalg.inv(J @ J.T + damp ** 2 * np.eye(6))
     qd = Jp @ x
     if posture:
-        qd = qd + (np.eye(7) - Jp @ J) @ posture_rate(q, q_rest)
+        # exact null-space projector (undamped pseudo-inverse): the posture task must not move the tool. With the damped
+        # Jp the projector leaked: about 11 mm of tool drift in 10 s standing still (35.63, drift_check.py)
+        N = np.eye(7) - np.linalg.pinv(J, rcond=1e-4) @ J
+        qd = qd + N @ posture_rate(q, q_rest)
     s = np.abs(qd).max() / qdot_max
     if s > 1:
         qd = qd / s

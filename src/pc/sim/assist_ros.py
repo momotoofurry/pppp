@@ -10,7 +10,10 @@ more opaque = higher P). src/pc/sim/assist.rviz (= kortex_description's view_rob
 displays) shows both: rviz2 -d src/pc/sim/assist.rviz
 
   python3 src/pc/sim/assist_ros.py demo [--target 0] [--error 0.12] [--seed 1] [--log assist_ros.csv]
-  python3 src/pc/sim/assist_ros.py keys [--assist blend|takeover] [--level 0.6]
+  python3 src/pc/sim/assist_ros.py keys [--modes 1] [--assist blend|takeover] [--level 0.6]
+      --modes 1 (default, 35.63): mode 1 = free (W/S/A/D up/down/left/right in the plane in front of the shelves),
+      mode 2 = W in / S out; switches by itself (stop in front of an object / a shelf -> 2, back at the plane -> 1),
+      E switches by hand, H (mode 1 only) back to the start. --modes 0: the 35.62 behaviour.
                                                    w up, s down, a left, d right, space = rest (relax), q quit
   blend (default, 35.58): you steer all the time; the arm adds depth toward the likely object; once aligned and sure,
   keep the SAME key to go in, the opposite key backs out, another key steers again; at the object press space and
@@ -45,6 +48,7 @@ sys.path.insert(0, os.path.join(HERE, '..', '..', 'assist'))
 import assist as A  # noqa: E402
 import assist_sim as S  # noqa: E402
 import kin  # noqa: E402
+import modes as M  # noqa: E402
 
 JOINTS = [f'joint_{i}' for i in range(1, 8)]
 RD = np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]], float)      # tool z forward (+x), horizontal approach
@@ -107,7 +111,7 @@ class Demo(Node):
             m.pose.orientation.w = 1.0
             m.scale.x = m.scale.y = 0.066
             m.scale.z = 0.106
-            if goal == i and code in ('go', 'grasp', 'lift', 'carry', 'place'):
+            if goal == i and code in ('go', 'grasp', 'lift', 'carry', 'place', 'pick', 'place_in', 'out', 'lower'):
                 rgba = (0.1, 0.9, 0.2, 1.0)                       # chosen: bright green
             elif goal == i and code == 'lead':
                 rgba = (1.0, 0.85, 0.1, 0.5 + 0.5 * float(P[i]))   # the system's current guess: yellow
@@ -128,13 +132,13 @@ class Demo(Node):
             a_.action = t_.action = Marker.DELETE
         else:
             a_.action = t_.action = Marker.ADD
-            end = obj[goal] if code in ('go', 'grasp') else (obj[goal] + A.PRE if code == 'lead' else x)
+            end = obj[goal] if code in ('go', 'grasp', 'pick') else (obj[goal] + A.PRE if code == 'lead' else x)
             a_.points = [Point(x=float(x[0]), y=float(x[1]), z=float(x[2])),
                          Point(x=float(end[0]), y=float(end[1]), z=float(end[2]))]
             a_.scale.x, a_.scale.y, a_.scale.z = 0.008, 0.02, 0.03
-            col = (0.1, 0.9, 0.2) if code in ('go', 'grasp', 'lift') else (1.0, 0.85, 0.1)
+            col = (0.1, 0.9, 0.2) if code in ('go', 'grasp', 'lift', 'pick') else (1.0, 0.85, 0.1)
             a_.color.r, a_.color.g, a_.color.b, a_.color.a = map(float, col + (0.9,))
-            if code in ('lift', 'carry', 'place'):
+            if code not in ('go', 'grasp', 'pick', 'lead'):
                 a_.action = Marker.DELETE
             t_.pose.position.x, t_.pose.position.y, t_.pose.position.z = map(float, obj[goal] + [0, 0, 0.16])
             t_.pose.orientation.w = 1.0
@@ -148,8 +152,11 @@ class Demo(Node):
 
 KEY = {'up': 'W', 'down': 'S', 'left': 'A', 'right': 'D'}
 HINT_ZH = {'free': '自由控制：移到某個物體前方附近，系統才會開始幫忙',
-           'carry': '夾著物體 {g}：自由移動；移到任一個架子上方，放鬆 1 秒就放下',
-           'place': '物體 {g} 在架子上方：按空白鍵放鬆 1 秒放下',
+           'carry': '夾著物體 {g}：自由移動；移到空架子前方停下就會鎖定放置位置',
+           'inside_carry': '夾著物體 {g}，還在架子裡：先按 S 退出（W 可稍微抬高）',
+           'inside': '在架子裡：先按 S 退出',
+           'place_lock': '已鎖定放置位置：按 W 放進去，S 退出並取消',
+           'place': '到了：按空白鍵放鬆 1 秒放下物體 {g}，之後按 S 退出',
            'lead': '系統猜是物體 {g}：移到它前面停下（空白鍵）就會鎖定',
            'go': '已鎖定物體 {g}：按 W 接近，S 退出並取消，A／D 取消並往那邊走',
            'grasp': '到了物體 {g}：按空白鍵放鬆 1 秒就夾',
@@ -158,12 +165,22 @@ HINT_ZH = {'free': '自由控制：移到某個物體前方附近，系統才會
 
 def hint(sa, obj, P, x):
     """-> (code, English text for RViz, goal index) for the current assist phase"""
+    if isinstance(sa, M.ModeAssist):
+        code, en, zh, g = sa.describe(x)
+        sa.hint_zh = zh
+        return code, en, g
+    if sa.state == 'place':
+        if sa.place_ok(x):
+            return 'place', 'SPACE 1s: put down', sa.goal
+        return 'place_lock', 'W: in / S: cancel', sa.goal
     if sa.state == 'grasped':
         if sa.keep:
-            if sa.armed and sa.place_ok(x) is not None:
-                return 'place', 'SPACE 1s: put down', sa.goal
+            if sa.inside(x):
+                return 'inside_carry', 'S: back out', sa.goal
             return 'carry', 'carry', sa.goal
         return 'lift', 'W: lift', sa.goal
+    if sa.state == 'steer' and sa.inside(x):
+        return 'inside', 'S: back out', None
     if sa.state in ('final', 'approach'):
         g = sa.goal
         if np.linalg.norm(obj[g] - x) < 1.5 * A.GRASP_TOL:
@@ -227,9 +244,14 @@ def keyreader():
                 if c in (b'h', b'H'):
                     state['home'], state['cmd'] = True, 'rest'
                     continue
+                if c in (b'e', b'E'):
+                    state['toggle'], state['cmd'] = True, 'rest'
+                    continue
                 if c in keys and keys[c] != state['cmd']:
                     state['cmd'] = keys[c]
                     print(f'\r  command: {state["cmd"]:6s}', flush=True)
+        if state.pop('toggle', False):
+            return 'toggle'
         return 'home' if state.pop('home', False) else state['cmd']
     return poll, lambda: termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
@@ -242,6 +264,7 @@ def main():
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--assist', choices=['blend', 'takeover'], default='blend')
     ap.add_argument('--level', type=float, default=0.6)
+    ap.add_argument('--modes', type=int, default=1, help='keys: 1 = two-mode control (35.63), 0 = 35.62')
     ap.add_argument('--zone', type=float, default=0.12, help='m; assist only this close (y-z) to an object; 0 = off')
     ap.add_argument('--log', default='assist_ros.csv')
     ap.add_argument('--limit', type=float, default=None, help='s (default: demo 60, keys 300)')
@@ -297,8 +320,11 @@ def main():
         print('at the start pose, tool', np.round(kin.fk(n.joints())[:3, 3], 3).tolist(), ', gripper open')
         rclpy.shutdown()
         return
-    sa = A.Assist(OBJECTS, mode=a.assist, level=a.level, keep=(a.mode == 'keys'), shelves=SHELVES,
-                  zone=(a.zone if a.zone > 0 else None))
+    if a.mode == 'keys' and a.modes:
+        sa = M.ModeAssist(OBJECTS, SHELVES, level=a.level, zone=(a.zone if a.zone > 0 else None))
+    else:
+        sa = A.Assist(OBJECTS, mode=a.assist, level=a.level, keep=(a.mode == 'keys'), shelves=SHELVES,
+                      zone=(a.zone if a.zone > 0 else None))
     rng = np.random.default_rng(a.seed)
     dec = S.Decoder(S.SET5, a.error, rng)
     poll, restore = keyreader() if a.mode == 'keys' else (None, None)
@@ -308,7 +334,12 @@ def main():
         print('ready. Click this terminal first (not the RViz window), then: w up, s down, a left, d right,')
         print('space = relax (stop), h = back to the start (keeps control), q = quit. A key keeps moving until another key. Seen from behind the arm: '
               'object 0 left-low, 1 right-high, 2 middle-low.', flush=True)
-        if a.assist == 'blend':
+        if isinstance(sa, M.ModeAssist):
+            print('two modes: MODE 1 = free (W/S/A/D up/down/left/right in front of the shelves); stop in front of an '
+                  'object or a shelf -> MODE 2 = W in / S out (A/D do nothing inside a shelf); back out with S -> MODE 1. '
+                  'At an object / a spot on a shelf: space 1 s = grasp / put down. E = switch mode by hand, '
+                  'H = back to the start (mode 1 only).', flush=True)
+        elif a.assist == 'blend':
             print(f'blend mode, level {a.level}: you steer; stop (space) in front of an object to lock it (green); '
                   'then W approaches, S backs out and cancels; at the object press space and wait 1 s to grasp; '
                   'then move freely.', flush=True)
@@ -330,17 +361,27 @@ def main():
                 cmd = dec(want)
             else:
                 want = cmd = poll()
+            if cmd == 'toggle':                         # e: switch the mode by hand
+                print('  >> ' + sa.toggle(x), flush=True)
+                continue
+            if cmd == 'home' and isinstance(sa, M.ModeAssist) and sa.m != 1:
+                print('  >> H 只能在模式 1 用：先按 S 退回前方平面', flush=True)
+                continue
             if cmd == 'home':                           # h: back to the start pose, control continues
-                print('  >> 回到起點（3 秒），之後繼續控制' + ('；物體還夾著' if sa.state == 'grasped' else ''), flush=True)
+                print('  >> 回到起點（3 秒），之後繼續控制' + ('；物體還夾著' if sa.grip else ''), flush=True)
                 n.send(q_rest, 3.0)
                 t2 = time.time()
                 while time.time() - t2 < 3.2:
                     rclpy.spin_once(n, timeout_sec=0.05)
                 q = q_rest.copy()
-                if sa.state == 'final':
-                    sa.state, sa.goal = 'steer', None
-                sa.s[:] = 0.0
-                sa.final_block, sa.approach, sa.rest_n = None, None, 0
+                if isinstance(sa, M.ModeAssist):
+                    sa.base.s[:] = 0.0
+                    sa.rest_n = 0
+                else:
+                    if sa.state == 'final':
+                        sa.state, sa.goal = 'steer', None
+                    sa.s[:] = 0.0
+                    sa.final_block, sa.approach, sa.rest_n = None, None, 0
                 hist = [kin.fk(q)[:3, 3]] * (S.REACT + 1)
                 continue
             v = sa.step(cmd if cmd != 'rest' else None, x)
@@ -355,7 +396,11 @@ def main():
             log.write(f'{k * A.DT:.1f},{want},{cmd},{sa.state},{sa.goal},{P[0]:.3f},{P[1]:.3f},{P[2]:.3f},'
                       f'{x[0]:.4f},{x[1]:.4f},{x[2]:.4f}\n')
             log.flush()
-            if a.mode == 'keys' and (code, hg) != last_hint:
+            if a.mode == 'keys' and isinstance(sa, M.ModeAssist):
+                if (code, hg, sa.hint_zh) != last_hint:
+                    last_hint = (code, hg, sa.hint_zh)
+                    print('  >> ' + sa.hint_zh, flush=True)
+            elif a.mode == 'keys' and (code, hg) != last_hint:
                 last_hint = (code, hg)
                 if code in HINT_ZH:
                     k = KEY.get(sa.lock_cmd, '?')

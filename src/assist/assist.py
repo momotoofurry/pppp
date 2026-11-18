@@ -29,6 +29,9 @@ blend      the user's direction always counts: v = V_MAX unit((1 - a) u + a d_g)
            keep=True (continuous use, 35.59): control never ends. The grasped object moves with the tool; relaxing
            CONFIRM_STEPS steps with the object over a shelf (place_ok) opens the gripper and leaves the object there;
            then the user steers again and can pick it or another one up. Relaxing anywhere else only stops the arm.
+           35.63 (no sweeping through shelves): while the tool is inside a shelf (deeper than its front edge) only S
+           backs out (and W lifts the held object at most 2 cm). Putting down works like picking up: stop in front of
+           a free shelf to lock it, W puts the object in, relax 1 s puts it down, S backs out.
            zone=r (35.60): the assist acts only near an object: its share a is multiplied by a ramp of the y-z distance
            from the tool to that object's pre-grasp point, 0 beyond r and 1 within ZONE_FULL. Outside every zone the
            user has plain direct control (no bending, no added depth); the guess is shown only inside a zone.
@@ -79,13 +82,30 @@ class Assist:
         d = np.linalg.norm((self.obj[g] + PRE - np.asarray(x, float))[1:])
         return float(np.clip((self.zone_r - d) / (self.zone_r - ZONE_FULL), 0.0, 1.0))
 
-    def place_ok(self, x):
-        """the shelf under the held object (its centre at the tool), or None: within 5 cm sideways and the object's
-        bottom (centre - 5 cm) at most 2 cm above the shelf top"""
+    def place_pt(self, k):
+        """where an object stands on shelf k (its centre, 5 cm above the top)"""
+        return self.shelves[k] + np.array([0.0, 0.0, 0.05])
+
+    def slot_free(self, k):
+        held = self.goal if self.state in ('grasped', 'place') else None
+        p = self.place_pt(k)
+        return all(i == held or np.linalg.norm(o - p) > 0.06 for i, o in enumerate(self.obj))
+
+    def inside(self, x):
+        """the tool is deeper than the front edge of a shelf it is in line with (keep mode only): moving sideways
+        there would sweep through the shelf and the objects on it (35.63)"""
+        if not self.keep:
+            return False
         for sh in self.shelves:
-            if np.linalg.norm(x[:2] - sh[:2]) < 0.05 and 0.04 <= x[2] - sh[2] <= 0.07:
-                return sh
-        return None
+            if (abs(x[1] - sh[1]) < 0.12 and sh[2] - 0.03 < x[2] < sh[2] + 0.17
+                    and x[0] > sh[0] + PRE[0] + 0.01):
+                return True
+        return False
+
+    def place_ok(self, x):
+        """kept for the RViz hints: the locked slot's place point is reached"""
+        return (self.state == 'place' and self.slot is not None
+                and np.linalg.norm(self.place_pt(self.slot) - np.asarray(x, float)) < GRASP_TOL)
 
     def reset(self):
         self.s = np.zeros(len(self.obj))
@@ -99,6 +119,7 @@ class Assist:
         self.state = 'steer'          # takeover: steer | approach | grasped | done; blend: steer | final | grasped | done
         self.grip = 0.0               # 0 open .. 1 closed
         self.lift_from = None
+        self.slot = None              # blend keep: locked shelf to put the held object on
 
     def probs(self):
         e = np.exp(BETA * (self.s - self.s.max()))
@@ -122,26 +143,15 @@ class Assist:
         moving = np.linalg.norm(u) > 0
         if self.state == 'done':
             return np.zeros(3)
+        if self.state in ('grasped', 'place') and self.keep:
+            return self._step_carry(cmd, x, u, moving)
         if self.state == 'grasped':
-            if self.keep:
-                self.obj[self.goal] = x                    # the object moves with the gripper
-                if not moving:
-                    sh = self.place_ok(x) if self.armed else None
-                    if sh is not None:
-                        self.rest_n += 1
-                        if self.rest_n >= CONFIRM_STEPS:   # relaxed over a shelf: put it down (it settles on the top)
-                            self.obj[self.goal] = [x[0], x[1], sh[2] + 0.05]
-                            self.grip, self.state, self.final_block = 0.0, 'steer', self.goal
-                            self.goal, self.rest_n, self.armed = None, 0, False
-                            self.s[:] = 0.0
-                    else:
-                        self.rest_n = 0
-                    return np.zeros(3)
-                self.rest_n, self.armed = 0, True
-                return V_MAX * u
             if moving and x[2] - self.lift_from >= LIFT:
                 self.state = 'done'
             return V_MAX * u
+        if self.keep and moving and self.state == 'steer' and self.inside(x):
+            self.rest_n, self.armed = 0, True
+            return V_MAX * np.array([-1.0, 0, 0]) if cmd == 'down' else np.zeros(3)   # in a shelf: only S backs out
         pre = self.obj + PRE
         if self.final_block is not None and np.linalg.norm((pre[self.final_block] - x)[1:]) > 1.5 * LOCK_ALIGN:
             self.final_block = None
@@ -182,6 +192,55 @@ class Assist:
         g = int(np.argmax(P))
         a = self.level * np.clip((P[g] - P_ON) / (P_FINAL - P_ON), 0.0, 1.0) * self.zone(g, x)
         return V_MAX * unit((1 - a) * u + a * unit(pre[g] - x))
+
+    def _step_carry(self, cmd, x, u, moving):
+        """keep mode with an object in the gripper (35.63): lift a little / back out of the shelf with S first; then
+        move freely; stop in front of a free shelf to lock it ('place'); W puts it in, relax 1 s puts it down, S backs
+        out / cancels, A / D cancel"""
+        self.obj[self.goal] = x                        # the object moves with the gripper
+        if self.state == 'place':
+            k = self.slot
+            pt = self.place_pt(k)
+            if not moving:
+                if self.armed and np.linalg.norm(pt - x) < GRASP_TOL:
+                    self.rest_n += 1
+                    if self.rest_n >= CONFIRM_STEPS:   # relaxed at the slot: put it down
+                        self.obj[self.goal] = pt
+                        self.grip, self.state, self.final_block = 0.0, 'steer', self.goal
+                        self.goal, self.slot, self.rest_n, self.armed = None, None, 0, False
+                        self.s[:] = 0.0
+                else:
+                    self.rest_n = 0
+                return np.zeros(3)
+            self.rest_n, self.armed = 0, True
+            if cmd == 'up':                            # W: put it in (stops at the slot)
+                d = pt - x
+                return min(V_MAX, np.linalg.norm(d) / DT) * unit(d)
+            if cmd == 'down':                          # S: back out to the front of the slot, then cancel
+                d = pt + PRE - x
+                if np.linalg.norm(d) < 0.01 or x[0] <= pt[0] + PRE[0] + 0.005:
+                    self.state, self.slot = 'grasped', None
+                    return np.zeros(3)
+                return min(V_MAX, np.linalg.norm(d) / DT) * unit(d)
+            self.state, self.slot = 'grasped', None     # A / D: cancel (and the inside rule below applies)
+        if not moving:
+            self.rest_n = 0
+            if self.armed and not self.inside(x):       # stopped in front of a free shelf: lock it
+                for k in range(len(self.shelves)):
+                    pre = self.place_pt(k) + PRE
+                    if (np.linalg.norm((pre - x)[1:]) < LOCK_ALIGN and x[0] <= pre[0] + 0.01
+                            and self.slot_free(k)):
+                        self.state, self.slot = 'place', k
+                        break
+            return np.zeros(3)
+        self.rest_n, self.armed = 0, True
+        if self.inside(x):                              # still in the shelf: S backs out, W lifts at most 2 cm
+            if cmd == 'down':
+                return V_MAX * np.array([-1.0, 0, 0])
+            if cmd == 'up' and x[2] - self.lift_from < 0.02:
+                return V_MAX * u
+            return np.zeros(3)
+        return V_MAX * u
 
     # ------------------------------------------------------------------ takeover (35.57)
     def _step_takeover(self, cmd, x):
