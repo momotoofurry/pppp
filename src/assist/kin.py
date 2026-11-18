@@ -1,7 +1,10 @@
 """Kinova Gen3 7-DoF kinematics from the URDF that ros2_kortex ships (kortex_description/robots/gen3_2f85.urdf;
 joint origins copied below), for the assist demo in RViz (report 35.57).
 FK: base_link -> end_effector_link -> tool point TOOL m further along the end effector's z (between the Robotiq 2F-85
-fingertips). IK: one damped-least-squares velocity step for position + orientation.
+fingertips). IK: one damped-least-squares velocity step for position + orientation; with posture=True a secondary
+task in the null space (the 7th degree of freedom: moves the elbow without moving the tool) pushes the limited joints
+(2, 4, 6) away from their limits and pulls the arm toward a rest posture (35.61: the start pose had the elbow 0.5 deg
+from its limit and the wrist twisted by about 200 deg, which looked wrong in RViz).
 """
 import numpy as np
 
@@ -70,14 +73,36 @@ def jacobian(q, eps=1e-6):
     return J
 
 
-def ik_step(q, v, Rd, dt, k_rot=2.0, damp=0.02, qdot_max=1.0):
+LIMIT_ZONE, K_LIMIT, K_REST = 0.6, 2.0, 0.5      # rad, 1/s, 1/s (null-space posture task)
+
+
+def wrap(a):
+    return (np.asarray(a) + np.pi) % (2 * np.pi) - np.pi
+
+
+def posture_rate(q, q_rest=None):
+    """desired joint rates of the posture task: away from limits (within LIMIT_ZONE) + toward q_rest"""
+    z = np.zeros(7)
+    for i, lim in LIMITS.items():
+        m = lim - abs(q[i])
+        if m < LIMIT_ZONE:
+            z[i] -= np.sign(q[i]) * K_LIMIT * (LIMIT_ZONE - m)
+    if q_rest is not None:
+        z += K_REST * wrap(np.asarray(q_rest) - q)
+    return z
+
+
+def ik_step(q, v, Rd, dt, k_rot=2.0, damp=0.02, qdot_max=1.0, posture=False, q_rest=None):
     """one velocity step: tool linear velocity v (m/s) and orientation pulled toward Rd -> new joint angles"""
     q = np.asarray(q, float)
     T = fk(q)
     w = k_rot * rot_err(T[:3, :3], Rd)
     J = jacobian(q)
     x = np.concatenate([v, w])
-    qd = J.T @ np.linalg.solve(J @ J.T + damp ** 2 * np.eye(6), x)
+    Jp = J.T @ np.linalg.inv(J @ J.T + damp ** 2 * np.eye(6))
+    qd = Jp @ x
+    if posture:
+        qd = qd + (np.eye(7) - Jp @ J) @ posture_rate(q, q_rest)
     s = np.abs(qd).max() / qdot_max
     if s > 1:
         qd = qd / s
@@ -87,10 +112,15 @@ def ik_step(q, v, Rd, dt, k_rot=2.0, damp=0.02, qdot_max=1.0):
     return qn
 
 
-def solve(q0, p, Rd, iters=300):
+def solve(q0, p, Rd, iters=300, posture=False):
     """position + orientation IK by repeated velocity steps (for the start pose)"""
     q = np.asarray(q0, float)
     for _ in range(iters):
         e = p - fk(q)[:3, 3]
-        q = ik_step(q, 5.0 * e, Rd, 0.05)
+        q = ik_step(q, 5.0 * e, Rd, 0.05, posture=posture)
     return q
+
+
+def margin(q):
+    """smallest distance of the limited joints to their limits, rad"""
+    return min(lim - abs(q[i]) for i, lim in LIMITS.items())

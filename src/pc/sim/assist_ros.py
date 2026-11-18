@@ -48,7 +48,11 @@ RD = np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]], float)      # tool z forward (
 OBJECTS = np.array([[0.75, 0.25, 0.10], [0.70, -0.25, 0.30], [0.77, 0.0, 0.10]])
 # shelf tops (centre): one under each object + two empty ones to put things down (35.59)
 SHELVES = np.vstack([OBJECTS - [0, 0, 0.05], [[0.72, -0.25, 0.05], [0.72, 0.25, 0.25]]])
-SEEDS = ([0, 15, 180, 230, 0, 55, 90], [0, 30, 0, 110, 0, 40, 90], [0, 40, 180, 250, 0, -60, 90])
+SEEDS = ([0, 15, 180, 230, 0, 55, 90], [0, 30, 0, 110, 0, 40, 90], [0, 40, 180, 250, 0, -60, 90],
+         [30, 70, 280, 120, 0, -100, 70])
+# start point of the demo (35.61): at (0.50, 0, 0.30) the horizontal tool needs the elbow 0.5 deg from its limit; here the
+# best posture keeps every limited joint >= 17 deg from its limit
+X0 = np.array([0.58, 0.0, 0.35])
 
 
 class Demo(Node):
@@ -241,7 +245,7 @@ def main():
         t1 = time.time()
         while time.time() - t1 < 1.0:
             rclpy.spin_once(n, timeout_sec=0.05)
-        n.markers(OBJECTS, idle.probs() * 0, idle, -1, S.X0)   # objects + numbers at the start positions, once
+        n.markers(OBJECTS, idle.probs() * 0, idle, -1, X0)   # objects + numbers at the start positions, once
         try:
             while True:
                 n.sc.publish(scene_markers(OBJECTS))
@@ -255,10 +259,13 @@ def main():
     t0 = time.time()
     while not all(j in n.q for j in JOINTS) and time.time() - t0 < 10:
         rclpy.spin_once(n, timeout_sec=0.1)
-    sols = [kin.solve(np.radians(s), S.X0, RD, iters=1200) for s in SEEDS]
-    q = min(sols, key=lambda qq: np.linalg.norm(kin.fk(qq)[:3, 3] - S.X0))
-    err0 = np.linalg.norm(kin.fk(q)[:3, 3] - S.X0)
-    print(f'start pose solved: tool error {1000 * err0:.1f} mm; moving there (4 s)')
+    sols = [kin.solve(np.radians(s), X0, RD, iters=1500, posture=True) for s in SEEDS]
+    good = [qq for qq in sols if np.linalg.norm(kin.fk(qq)[:3, 3] - X0) < 0.002]
+    q = max(good, key=kin.margin) if good else min(sols, key=lambda qq: np.linalg.norm(kin.fk(qq)[:3, 3] - X0))
+    q_rest = q.copy()                                   # the posture task pulls back toward the start posture
+    err0 = np.linalg.norm(kin.fk(q)[:3, 3] - X0)
+    print(f'start pose solved: tool error {1000 * err0:.1f} mm, joints >= {np.degrees(kin.margin(q)):.0f} deg from their '
+          f'limits; moving there (4 s)')
     n.gripper(0.0)
     n.send(q, 4.0)
     t1 = time.time()
@@ -285,7 +292,7 @@ def main():
                   'and wait 1 s to grasp; then w lifts.', flush=True)
     last_state = None
     last_hint = None
-    hist = [S.X0.copy()] * (S.REACT + 1)
+    hist = [X0.copy()] * (S.REACT + 1)
     held, gripped = 'rest', False
     log = open(a.log, 'w', encoding='utf-8')
     log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z\n')
@@ -303,7 +310,7 @@ def main():
             if bool(sa.grip) != gripped:
                 n.gripper(float(sa.grip))
                 gripped = bool(sa.grip)
-            q = kin.ik_step(q, v, RD, A.DT)
+            q = kin.ik_step(q, v, RD, A.DT, posture=True, q_rest=q_rest)
             n.send(q, A.DT * 1.5)
             P = sa.probs()
             code, hg = n.markers(sa.obj, P, sa, a.target if a.mode == 'demo' else -1, kin.fk(q)[:3, 3])
