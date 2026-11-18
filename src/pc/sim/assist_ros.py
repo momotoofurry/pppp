@@ -16,7 +16,10 @@ displays) shows both: rviz2 -d src/pc/sim/assist.rviz
   keep the SAME key to go in, the opposite key backs out, another key steers again; at the object press space and
   wait 1 s to grasp; then move freely (w lifts). takeover (35.57): after a short push the system drives.
   python3 src/pc/sim/assist_ros.py scene           shelves + objects + numbers, until Ctrl-C
-  python3 src/pc/sim/assist_ros.py home            back to the start pose, gripper open
+  python3 src/pc/sim/assist_ros.py home            the arm folded back to Kinova's home pose (poses_sim.json 'home'),
+                                                   gripper open
+  python3 src/pc/sim/assist_ros.py start           to the task start pose in front of the shelves, gripper open
+                                                   (keys / demo go there by themselves first)
 """
 import argparse
 import os
@@ -227,7 +230,7 @@ def keyreader():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('mode', choices=['demo', 'keys', 'scene', 'home'])
+    ap.add_argument('mode', choices=['demo', 'keys', 'scene', 'home', 'start'])
     ap.add_argument('--target', type=int, default=0)
     ap.add_argument('--error', type=float, default=0.12)
     ap.add_argument('--seed', type=int, default=1)
@@ -259,6 +262,19 @@ def main():
     t0 = time.time()
     while not all(j in n.q for j in JOINTS) and time.time() - t0 < 10:
         rclpy.spin_once(n, timeout_sec=0.1)
+    if a.mode == 'home':
+        import json
+        home = np.radians(json.load(open(os.path.join(HERE, 'poses_sim.json'), encoding='utf-8'))['home'])
+        print('moving to the home pose', np.round(np.degrees(home)).tolist(), 'deg (4 s)')
+        n.gripper(0.0)
+        n.send(home, 4.0)
+        t1 = time.time()
+        while time.time() - t1 < 4.5:
+            rclpy.spin_once(n, timeout_sec=0.05)
+        print('at home, joints', np.round(np.degrees(n.joints()), 1).tolist(), 'deg; tool',
+              np.round(kin.fk(n.joints())[:3, 3], 3).tolist(), ', gripper open')
+        rclpy.shutdown()
+        return
     sols = [kin.solve(np.radians(s), X0, RD, iters=1500, posture=True) for s in SEEDS]
     good = [qq for qq in sols if np.linalg.norm(kin.fk(qq)[:3, 3] - X0) < 0.002]
     q = max(good, key=kin.margin) if good else min(sols, key=lambda qq: np.linalg.norm(kin.fk(qq)[:3, 3] - X0))
@@ -271,7 +287,7 @@ def main():
     t1 = time.time()
     while time.time() - t1 < 4.5:
         rclpy.spin_once(n, timeout_sec=0.05)
-    if a.mode == 'home':
+    if a.mode == 'start':
         print('at the start pose, tool', np.round(kin.fk(n.joints())[:3, 3], 3).tolist(), ', gripper open')
         rclpy.shutdown()
         return
