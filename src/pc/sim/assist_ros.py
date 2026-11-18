@@ -131,7 +131,7 @@ class Demo(Node):
                 a_.action = Marker.DELETE
             t_.pose.position.x, t_.pose.position.y, t_.pose.position.z = map(float, obj[goal] + [0, 0, 0.16])
             t_.pose.orientation.w = 1.0
-            t_.scale.z = 0.035
+            t_.scale.z = 0.06
             t_.color.r = t_.color.g = t_.color.b = t_.color.a = 1.0
             t_.text = txt
         arr.markers += [a_, t_]
@@ -140,7 +140,8 @@ class Demo(Node):
 
 
 KEY = {'up': 'W', 'down': 'S', 'left': 'A', 'right': 'D'}
-HINT_ZH = {'carry': '夾著物體 {g}：自由移動；移到任一個架子上方，放鬆 1 秒就放下',
+HINT_ZH = {'free': '自由控制：移到某個物體前方附近，系統才會開始幫忙',
+           'carry': '夾著物體 {g}：自由移動；移到任一個架子上方，放鬆 1 秒就放下',
            'place': '物體 {g} 在架子上方：按空白鍵放鬆 1 秒放下',
            'lead': '系統猜是物體 {g}：繼續對準（黃色箭頭是它想去的地方）',
            'go': '已對準物體 {g}：按住 {k} 伸進去，{o} 退出來，其他鍵重新調整',
@@ -153,20 +154,20 @@ def hint(sa, obj, P, x):
     if sa.state == 'grasped':
         if sa.keep:
             if sa.armed and sa.place_ok(x) is not None:
-                return 'place', 'SPACE 1 s = put down', sa.goal
-            return 'carry', 'over a shelf: SPACE 1 s = put down', sa.goal
-        return 'lift', 'W = lift', sa.goal
+                return 'place', 'SPACE 1s: put down', sa.goal
+            return 'carry', 'carry', sa.goal
+        return 'lift', 'W: lift', sa.goal
     if sa.state in ('final', 'approach'):
         g = sa.goal
         if np.linalg.norm(obj[g] - x) < 1.5 * A.GRASP_TOL:
-            return 'grasp', 'SPACE 1 s = grasp', g
+            return 'grasp', 'SPACE 1s: grasp', g
         k = KEY.get(sa.lock_cmd, '?')
         o = KEY.get(A.OPPOSITE.get(sa.lock_cmd, ''), '?')
-        return 'go', f'hold {k} = go in   {o} = back', g
+        return 'go', f'{k}: in / {o}: back', g
     g = int(np.argmax(P))
-    if P[g] >= A.P_ON and sa.state == 'steer':
-        return 'lead', f'object {g}? keep aligning', g
-    return 'none', '', None
+    if P[g] >= A.P_ON and sa.state == 'steer' and sa.zone(g, x) > 0:
+        return 'lead', f'{g}?', g
+    return ('free', '', None) if sa.state == 'steer' else ('none', '', None)
 
 
 def scene_markers(obj):
@@ -228,6 +229,7 @@ def main():
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--assist', choices=['blend', 'takeover'], default='blend')
     ap.add_argument('--level', type=float, default=0.6)
+    ap.add_argument('--zone', type=float, default=0.12, help='m; assist only this close (y-z) to an object; 0 = off')
     ap.add_argument('--log', default='assist_ros.csv')
     ap.add_argument('--limit', type=float, default=None, help='s (default: demo 60, keys 300)')
     a = ap.parse_args()
@@ -266,7 +268,8 @@ def main():
         print('at the start pose, tool', np.round(kin.fk(n.joints())[:3, 3], 3).tolist(), ', gripper open')
         rclpy.shutdown()
         return
-    sa = A.Assist(OBJECTS, mode=a.assist, level=a.level, keep=(a.mode == 'keys'), shelves=SHELVES)
+    sa = A.Assist(OBJECTS, mode=a.assist, level=a.level, keep=(a.mode == 'keys'), shelves=SHELVES,
+                  zone=(a.zone if a.zone > 0 else None))
     rng = np.random.default_rng(a.seed)
     dec = S.Decoder(S.SET5, a.error, rng)
     poll, restore = keyreader() if a.mode == 'keys' else (None, None)

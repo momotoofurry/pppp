@@ -28,6 +28,9 @@ blend      the user's direction always counts: v = V_MAX unit((1 - a) u + a d_g)
            keep=True (continuous use, 35.59): control never ends. The grasped object moves with the tool; relaxing
            CONFIRM_STEPS steps with the object over a shelf (place_ok) opens the gripper and leaves the object there;
            then the user steers again and can pick it or another one up. Relaxing anywhere else only stops the arm.
+           zone=r (35.60): the assist acts only near an object: its share a is multiplied by a ramp of the y-z distance
+           from the tool to that object's pre-grasp point, 0 beyond r and 1 within ZONE_FULL. Outside every zone the
+           user has plain direct control (no bending, no added depth); the guess is shown only inside a zone.
 Rest / relaxed: v = 0 in every state (the user can always stop).
 
 Parameter values are first guesses, tuned in simulation (assist_sim.py) and RViz; not validated with people.
@@ -42,6 +45,7 @@ P_FINAL, ALIGN, CONFIRM_STEPS = 0.9, 0.03, 10
 PRE = np.array([-0.10, 0.0, 0.0])   # pre-grasp point: 10 cm in front of the object (approach along +x)
 GRASP_TOL, LIFT = 0.015, 0.10
 CANCEL_STEPS = 5
+ZONE_FULL = 0.04                    # m: full assist this close (y-z) to a pre-grasp point (zone mode)
 
 DIRS = {'up': (0, 0, 1), 'down': (0, 0, -1), 'left': (0, 1, 0), 'right': (0, -1, 0),
         'forward': (1, 0, 0), 'back': (-1, 0, 0)}
@@ -54,7 +58,7 @@ def unit(v):
 
 
 class Assist:
-    def __init__(self, objects, assist=True, mode='takeover', level=A_MAX, keep=False, shelves=None):
+    def __init__(self, objects, assist=True, mode='takeover', level=A_MAX, keep=False, shelves=None, zone=None):
         """objects: (n, 3) object positions (grasp points) in the base frame; shelves: (m, 3) centres of the shelf
         tops where an object can be put down (keep=True)"""
         self.obj = np.array(objects, float)
@@ -62,8 +66,16 @@ class Assist:
         self.mode = mode
         self.level = level
         self.keep = keep
+        self.zone_r = zone
         self.shelves = np.zeros((0, 3)) if shelves is None else np.asarray(shelves, float)
         self.reset()
+
+    def zone(self, g, x):
+        """0..1: how much the assist may act for goal g at tool position x (1 everywhere without zone mode)"""
+        if self.zone_r is None:
+            return 1.0
+        d = np.linalg.norm((self.obj[g] + PRE - np.asarray(x, float))[1:])
+        return float(np.clip((self.zone_r - d) / (self.zone_r - ZONE_FULL), 0.0, 1.0))
 
     def place_ok(self, x):
         """the shelf under the held object (its centre at the tool), or None: within 5 cm sideways and the object's
@@ -169,7 +181,7 @@ class Assist:
             self.state, self.goal, self.lock_cmd = 'final', g, cmd
             d = self.obj[g] - x
             return min(V_MAX, np.linalg.norm(d) / DT) * unit(d)
-        a = self.level * np.clip((P[g] - P_ON) / (P_FINAL - P_ON), 0.0, 1.0)
+        a = self.level * np.clip((P[g] - P_ON) / (P_FINAL - P_ON), 0.0, 1.0) * self.zone(g, x)
         return V_MAX * unit((1 - a) * u + a * unit(pre[g] - x))
 
     # ------------------------------------------------------------------ takeover (35.57)

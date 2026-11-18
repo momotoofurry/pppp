@@ -198,8 +198,10 @@ def trial(cond, e, rng, log=None):
         return 'timeout', T_MAX * A.DT, ctl.result()
     dec = Decoder(SET5, e, rng)
     blend = cond.startswith('blend')
+    parts = cond.split(':')
     sa = A.Assist(obj, assist=True, mode='blend' if blend else 'takeover',
-                  level=float(cond.split(':')[1]) if blend else A.A_MAX)
+                  level=float(parts[1]) if blend else A.A_MAX,
+                  zone=float(parts[2]) if blend and len(parts) > 2 else None)
     user = user_blend if blend else user_assist
     ctl = Control()
     held = 'rest'
@@ -252,18 +254,20 @@ def main():
       'arm follows user / system-driven, % of moving steps')
     rows = [('A  direct, 9 classes', 'direct', E['G9']), ('C  takeover, 5 classes', 'takeover', E['G5']),
             ('B6 blend 0.6, 5 classes', 'blend:0.6', E['G5']), ('B3 blend 0.3, 5 classes', 'blend:0.3', E['G5']),
+            ('Z  blend 0.6 + zone 12 cm', 'blend:0.6:0.12', E['G5']), ('Z8 blend 0.6 + zone 8 cm', 'blend:0.6:0.08', E['G5']),
             ('A  direct, same e as 5 classes', 'direct', E['G5']),
             ('A  direct, no errors', 'direct', 0.0), ('C  takeover, no errors', 'takeover', 0.0),
-            ('B6 blend 0.6, no errors', 'blend:0.6', 0.0), ('B3 blend 0.3, no errors', 'blend:0.3', 0.0)]
+            ('B6 blend 0.6, no errors', 'blend:0.6', 0.0), ('B3 blend 0.3, no errors', 'blend:0.3', 0.0),
+            ('Z  blend 0.6 + zone 12 cm, no errors', 'blend:0.6:0.12', 0.0)]
     for i, (name, cond, e) in enumerate(rows):
         r = run(cond, e, a.trials, 1000 + i)
-        p(f'{name:32s} {e:5.3f}  {r["success"]:6.1f} % {r["wrong"]:5.1f} % {r["timeout"]:6.1f} %   '
+        p(f'{name:38s} {e:5.3f}  {r["success"]:6.1f} % {r["wrong"]:5.1f} % {r["timeout"]:6.1f} %   '
           f'{r["t_med"]:5.1f} ({r["t_q"][0]:.1f}-{r["t_q"][1]:.1f})          {r["agree"]:5.1f} / {r["sysd"]:5.1f}')
     p('\nsweep of the window error (all at the same e): success % / median time s / arm follows user %')
-    p('  e      direct                 takeover               blend 0.6              blend 0.3')
+    p('  e      direct                 takeover               blend 0.6              blend 0.3              blend 0.6 + zone 12 cm')
     for j, e in enumerate((0.0, 0.1, 0.2, 0.3, 0.4)):
         cells = []
-        for k, c in enumerate(('direct', 'takeover', 'blend:0.6', 'blend:0.3')):
+        for k, c in enumerate(('direct', 'takeover', 'blend:0.6', 'blend:0.3', 'blend:0.6:0.12')):
             r = run(c, e, a.trials, 2000 + 10 * j + k)
             cells.append(f'{r["success"]:5.1f} / {r["t_med"]:5.1f} / {r["agree"]:5.1f}')
         p(f'  {e:.1f}   ' + '   '.join(cells))
