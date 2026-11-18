@@ -10,7 +10,11 @@ more opaque = higher P). src/pc/sim/assist.rviz (= kortex_description's view_rob
 displays) shows both: rviz2 -d src/pc/sim/assist.rviz
 
   python3 src/pc/sim/assist_ros.py demo [--target 0] [--error 0.12] [--seed 1] [--log assist_ros.csv]
-  python3 src/pc/sim/assist_ros.py keys            w up, s down, a left, d right, space = rest (relax), q quit
+  python3 src/pc/sim/assist_ros.py keys [--assist blend|takeover] [--level 0.6]
+                                                   w up, s down, a left, d right, space = rest (relax), q quit
+  blend (default, 35.58): you steer all the time; the arm adds depth toward the likely object; once aligned and sure,
+  keep the SAME key to go in, the opposite key backs out, another key steers again; at the object press space and
+  wait 1 s to grasp; then move freely (w lifts). takeover (35.57): after a short push the system drives.
   python3 src/pc/sim/assist_ros.py scene           shelves + objects + numbers, until Ctrl-C
 """
 import argparse
@@ -142,6 +146,8 @@ def main():
     ap.add_argument('--target', type=int, default=0)
     ap.add_argument('--error', type=float, default=0.12)
     ap.add_argument('--seed', type=int, default=1)
+    ap.add_argument('--assist', choices=['blend', 'takeover'], default='blend')
+    ap.add_argument('--level', type=float, default=0.6)
     ap.add_argument('--log', default='assist_ros.csv')
     ap.add_argument('--limit', type=float, default=None, help='s (default: demo 60, keys 300)')
     a = ap.parse_args()
@@ -171,7 +177,7 @@ def main():
     t1 = time.time()
     while time.time() - t1 < 4.5:
         rclpy.spin_once(n, timeout_sec=0.05)
-    sa = A.Assist(OBJECTS)
+    sa = A.Assist(OBJECTS, mode=a.assist, level=a.level)
     rng = np.random.default_rng(a.seed)
     dec = S.Decoder(S.SET5, a.error, rng)
     poll, restore = keyreader() if a.mode == 'keys' else (None, None)
@@ -181,6 +187,9 @@ def main():
         print('ready. Click this terminal first (not the RViz window), then: w up, s down, a left, d right,')
         print('space = relax (stop), q = quit. A key keeps moving until another key. Seen from behind the arm: '
               'object 0 left-low, 1 right-high, 2 middle-low.', flush=True)
+        if a.assist == 'blend':
+            print(f'blend mode, level {a.level}: you steer; once "final" shows, keep the same key to go in, the '
+                  'opposite key backs out; at the object press space and wait 1 s to grasp; then w lifts.', flush=True)
     last_state = None
     hist = [S.X0.copy()] * (S.REACT + 1)
     held, gripped = 'rest', False
@@ -191,7 +200,8 @@ def main():
             tk = time.time()
             x = kin.fk(q)[:3, 3]
             if a.mode == 'demo':
-                want, held = S.user_assist(sa, OBJECTS, a.target, hist[-1 - S.REACT], held)
+                user = S.user_blend if a.assist == 'blend' else S.user_assist
+                want, held = user(sa, OBJECTS, a.target, hist[-1 - S.REACT], held)
                 cmd = dec(want)
             else:
                 want = cmd = poll()
