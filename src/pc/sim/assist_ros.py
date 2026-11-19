@@ -51,6 +51,7 @@ import assist as A  # noqa: E402
 import assist_sim as S  # noqa: E402
 import kin  # noqa: E402
 import modes as M
+import natural_start as NS
 import labeler as LB  # noqa: E402
 
 JOINTS = [f'joint_{i}' for i in range(1, 8)]
@@ -58,7 +59,8 @@ RD = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]], float)      # tool z forward 
 OBJECTS = np.array([[0.75, 0.25, 0.10], [0.70, -0.25, 0.30], [0.77, 0.0, 0.10]])
 # shelf tops (centre): one under each object + two empty ones to put things down (35.59)
 SHELVES = np.vstack([OBJECTS - [0, 0, 0.05], [[0.72, -0.25, 0.05], [0.72, 0.25, 0.25]]])
-SEEDS = ([0, 15, 180, 230, 0, 55, 90], [0, 30, 0, 110, 0, 40, 90], [0, 40, 180, 250, 0, -60, 90],
+# 35.72: the natural posture first (natural_start.py: arm in line from the base to the tool, elbow up, joint 1 ~ 0)
+SEEDS = ([-3, 29, -2, 137, -5, -75, 92], [0, 15, 180, 230, 0, 55, 90], [0, 30, 0, 110, 0, 40, 90], [0, 40, 180, 250, 0, -60, 90],
          [30, 70, 280, 120, 0, -100, 70], [30, 70, 280, 120, 0, -100, 160], [0, 40, 180, 250, 0, -60, 180])
 # start point of the demo (35.61): at (0.50, 0, 0.30) the horizontal tool needs the elbow 0.5 deg from its limit; here the
 # best posture keeps every limited joint >= 17 deg from its limit
@@ -342,13 +344,18 @@ def main():
               np.round(kin.fk(n.joints())[:3, 3], 3).tolist(), ', gripper open')
         rclpy.shutdown()
         return
-    sols = [kin.solve(np.radians(s), X0, RD, iters=1500, posture=True) for s in SEEDS]
+    sols = [kin.solve(np.radians(s), X0, RD, iters=1500, posture=pp) for s in SEEDS for pp in (True, False)]   # 35.72: also without the posture pull (it moves the natural seed off its posture)
     good = [qq for qq in sols if np.linalg.norm(kin.fk(qq)[:3, 3] - X0) < 0.002]
-    q = max(good, key=kin.margin) if good else min(sols, key=lambda qq: np.linalg.norm(kin.fk(qq)[:3, 3] - X0))
+    safe = [qq for qq in good if kin.margin(qq) >= np.radians(15)]
+    if safe:                                            # 35.72: the most natural of the safe ones
+        q = min(safe, key=NS.lateral)
+    else:
+        q = max(good, key=kin.margin) if good else min(sols, key=lambda qq: np.linalg.norm(kin.fk(qq)[:3, 3] - X0))
     q_rest = q.copy()                                   # the posture task pulls back toward the start posture
     err0 = np.linalg.norm(kin.fk(q)[:3, 3] - X0)
     print(f'start pose solved: tool error {1000 * err0:.1f} mm, joints >= {np.degrees(kin.margin(q)):.0f} deg from their '
-          f'limits; moving there (4 s)')
+          f'limits, elbow + wrist {100 * NS.lateral(q):.1f} cm off the base-tool plane, joints '
+          f'{np.round(np.degrees([kin.wrap(v) for v in q])).astype(int).tolist()} deg; moving there (4 s)')
     n.gripper(0.0)
     n.send(q, 4.0)
     t1 = time.time()

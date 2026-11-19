@@ -1,0 +1,9 @@
+300 of 300 seeds reach the start pose
+173 with every limited joint >= 15 deg from its limit
+  candidate                                   lateral  elbow-up  margin | path: worst margin  max lateral  end err
+  old start (largest margin)   [48, 66, 271, 135, -15, -84, 162]       29.6 cm  +10.4 cm   17.5 |         13.0 deg     49.1 cm    1.6 mm
+  natural #1                   [-174, -29, -1, -137, -175, -75, 89]     0.2 cm  +30.6 cm   15.7 |         14.1 deg     19.7 cm    1.8 mm
+  natural #2                   [-180, -29, 179, 136, 0, -75, 90]        0.5 cm  +30.6 cm   15.9 |         14.3 deg     19.2 cm    1.5 mm
+  natural #3                   [-3, 29, -176, -137, -179, -75, 88]      0.5 cm  +30.6 cm   15.8 |         14.2 deg     19.3 cm    1.2 mm
+  natural #4                   [-3, 29, -2, 137, -5, -75, 92]           0.6 cm  +30.6 cm   15.8 |         14.1 deg     19.0 cm    1.6 mm
+  natural #5                   [-4, 29, -174, -137, 1, 75, -93]         1.0 cm  +30.6 cm   15.8 |         14.2 deg     20.1 cm    1.2 mm
