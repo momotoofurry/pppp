@@ -35,7 +35,7 @@ def axis_toward(d):
 
 
 def user(ma, seen, t_obj, t_shelf, est):
-    if ma.lowering is not None:
+    if ma.lowering is not None or ma.wait_release:     # 35.68: relax once after a switch made while W / S was held
         return 'rest'
     if ma.m == 2:
         if ma.phase == 'pick':

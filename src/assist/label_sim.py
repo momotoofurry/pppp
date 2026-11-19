@@ -59,7 +59,7 @@ class RawDecoder(S.Decoder):
 
 def user_any(ma, seen, t_obj, t_shelf, est, order):
     """modes_sim.user, but in mode 1 one axis first (order 1 = y, 2 = z), then the other"""
-    if ma.m == 2 or ma.lowering is not None:
+    if ma.m == 2 or ma.lowering is not None or ma.wait_release:
         return MS.user(ma, seen, t_obj, t_shelf, est)
     if ma.held is None:
         tgt, tol = ma.obj[t_obj], M.LOCK_ALIGN * 0.6

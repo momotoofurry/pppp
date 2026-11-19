@@ -76,6 +76,7 @@ class ModeAssist:
         self.a_last, self.dir_last = 0.0, np.zeros(3)   # last assist share / direction (hints, tests)
         self.n_off = 0                              # how often the assist was switched off (tests)
         self.switches = 0                           # mode changes (1 <-> 2), for the experiment log
+        self.wait_release = False                   # after a switch made while W / S was held: no motion until a relax
         self.obj = self.base.obj                    # shared array: positions update in place
         self.shelves = np.asarray(shelves, float)
         self.m = 1
@@ -86,6 +87,8 @@ class ModeAssist:
         self.rest_n = 0
         self.armed = True
         self.block = None                           # object not to re-lock until the tool moved away
+        self.block_shelf = None                     # (shelf, y, z) not to re-lock until the tool moved away (35.68)
+        self.last_put = None                        # object put down in this 'out' phase (blocked on return, 35.68)
         self.lowering = None                        # (shelf top + half height) while putting down
         self.released = None                        # object just put down (the open gripper is still around it)
         self.msg = ''                               # last refusal / reason (for the hints)
@@ -148,12 +151,21 @@ class ModeAssist:
             return f'切到模式 2（{self.phase}）'
         if not self.at_travel(x):
             return '不在前方平面上，不能切回模式 1：先按 S 退回'
-        self._to_mode1()
+        self._to_mode1(x)
         return '切到模式 1'
 
-    def _to_mode1(self):
+    def _to_mode1(self, x=None):
         if self.phase == 'pick':
             self.block = self.goal
+        # 35.68: after backing out, the user must relax once (wait_release); relaxing right there must not lock the
+        # shelf just left, or the object just put down, again (it looped: lock, S, relax, lock...)
+        if x is not None and self.phase in ('out', 'place'):
+            k = self.shelf if self.phase == 'place' else self.shelf_of(x)
+            if k is not None:
+                self.block_shelf = (k, x[1], x[2])
+            if self.last_put is not None:
+                self.block = self.last_put
+            self.last_put = None
         self.m, self.phase, self.goal, self.shelf = 1, None, None, None
 
     def _lock(self, x, manual=False):
@@ -167,6 +179,8 @@ class ModeAssist:
                     return
         else:
             k = self.shelf_of(x)
+            if k is not None and self.block_shelf is not None and k == self.block_shelf[0]:
+                return
             if k is not None and self.at_travel(x):
                 bottom = x[2] - OBJ_H / 2 - self.shelves[k][2]
                 if abs(x[1] - self.shelves[k][1]) <= SHELF_HY - EDGE and -0.02 <= bottom <= 0.10:
@@ -186,11 +200,20 @@ class ModeAssist:
         if self.m != m0:
             self.switches += 1
             self.assist_off, self.mis_n = False, 0
+            # 35.68 (user): S backs out, the mode switches to 1 at the travel plane, and the same held S would now mean
+            # DOWN and drop the arm at once. W / S change meaning between the modes, so after a switch made while W / S
+            # is held the arm waits until the user relaxes once (A / D at the plane mean the same in both: no wait)
+            if cmd in ('up', 'down'):
+                self.wait_release = True
         return v
 
     def _step(self, cmd, x):
         x = np.asarray(x, float)
-        u = np.array(A.DIRS[cmd], float) if cmd in A.DIRS else np.zeros(3)
+        if self.wait_release:
+            if cmd in A.DIRS:
+                return np.zeros(3)                      # hold still until a relax
+            self.wait_release = False
+        u =np.array(A.DIRS[cmd], float) if cmd in A.DIRS else np.zeros(3)
         moving = np.linalg.norm(u) > 0
         slow = SLOW if (self.near_shelf(x) or self.inside(x)) else 1.0
         if self.held is not None:
@@ -199,12 +222,14 @@ class ModeAssist:
             self.released = None
         if self.block is not None and np.linalg.norm((self.obj[self.block] + PRE - x)[1:]) > 1.5 * LOCK_ALIGN:
             self.block = None
+        if self.block_shelf is not None and np.linalg.norm(np.array(self.block_shelf[1:]) - x[1:]) > LOCK_ALIGN:
+            self.block_shelf = None
         # automatic lowering after a valid put-down
         if self.lowering is not None:
             if x[2] - self.lowering > 0.002:
                 return np.array([0, 0, -min(V_MAX * 0.5, (x[2] - self.lowering) / DT)])
             self.obj[self.held] = [x[0], x[1], self.lowering]
-            self.released = self.held
+            self.released = self.last_put = self.held
             self.held, self.lowering, self.phase, self.armed = None, None, 'out', False
             return np.zeros(3)
         if not moving:
@@ -224,7 +249,7 @@ class ModeAssist:
             if not self.at_travel(x):
                 self.msg = ('在架子裡：A／D 不能動，先按 S 退出' if ins else '先按 S 退回前方平面，A／D 才能動')
                 return np.zeros(3)
-            self._to_mode1()
+            self._to_mode1(x)
             return self._step(cmd, x)
         fwd = cmd == 'up'
         if self.phase == 'pick':
@@ -239,7 +264,7 @@ class ModeAssist:
                     d = np.array([0.0, d[1], d[2]])       # line up first: no sideways move inside the shelf
                 return min(V_MAX * slow, np.linalg.norm(d) / DT) * unit(d)
             if self.at_travel(x):
-                self._to_mode1()
+                self._to_mode1(x)
                 return np.zeros(3)
             return np.array([-min(V_MAX * slow, (x[0] - self.x_travel) / DT), 0, 0])
         if self.phase == 'place':
@@ -257,7 +282,7 @@ class ModeAssist:
                         lim = min(lim, o[0] - (2 * OBJ_R + GAP))      # an object in the lane: stop before it
                 return np.array([min(V_MAX * slow, max(lim - x[0], 0) / DT), 0, 0])
             if self.at_travel(x):
-                self._to_mode1()
+                self._to_mode1(x)
                 return np.zeros(3)
             return np.array([-min(V_MAX * slow, (x[0] - self.x_travel) / DT), 0, 0])
         if self.phase == 'out':
@@ -266,7 +291,7 @@ class ModeAssist:
                     return np.array([0, 0, V_MAX * slow])
                 return np.zeros(3)
             if self.at_travel(x):
-                self._to_mode1()
+                self._to_mode1(x)
                 return np.zeros(3)
             return np.array([-min(V_MAX * slow, (x[0] - self.x_travel) / DT), 0, 0])
         # 'free': forward stops at the front of a shelf in line (going in is for pick / place only)
@@ -323,7 +348,11 @@ class ModeAssist:
     def _rest(self, x):
         if self.m == 1:
             self.assist_off, self.mis_n = False, 0      # relaxing gives the assist back
-            self.rest_n = 0
+            self.rest_n += 1
+            if self.rest_n >= CONFIRM_STEPS and (self.block is not None or self.block_shelf is not None):
+                # 35.68: staying stopped 1 s in front of the object / shelf just left is a deliberate choice: lock it
+                # again (a short relax after backing out does not; modes_sim: users stuck after an accidental S)
+                self.block, self.block_shelf, self.armed = None, None, True
             if self.armed:
                 self._lock(x)
             return np.zeros(3)
@@ -362,6 +391,9 @@ class ModeAssist:
     def describe(self, x):
         """(code, short English text for RViz, Chinese hint, object index for the marker) of the current state"""
         x = np.asarray(x, float)
+        if self.wait_release:
+            return ('wait', 'RELAX first', f'已切到模式 {self.m}：先放鬆（空白鍵），再重新出力',
+                    self.held if self.held is not None else self.goal)
         if self.msg:
             return 'msg', 'X', self.msg, self.held if self.held is not None else self.goal
         if self.lowering is not None:
