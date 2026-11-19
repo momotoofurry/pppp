@@ -45,10 +45,10 @@ CONDS = ['cue', 'acc', 'self', 'soft1', 'pw_self', 'pw_true'] + [f'{r}_{u}_{k}' 
 ABLATE = ['cue', 'acc', 'soft1', 'pw_true', 'pw_true_nr', 'pw_true_dec_nr', 'agree_any-order_s', 'agree_any-order_s_nr']
 
 
-def load_mats(path):
+def load_mats(path, rules=None):
     raw = json.load(open(path, encoding='utf-8'))
     out = {}
-    for r, u in RULES:
+    for r, u in (rules or RULES):
         m = raw[f'{r}|{u}|{E_KEY}']
         P = np.zeros((5, 6))                         # true x (5 labels + none)
         for i, t in enumerate(NAMES):
@@ -167,9 +167,15 @@ def main():
     ap.add_argument('--mats', default='results/assist/label_sim_confusion.json')
     ap.add_argument('--out')
     ap.add_argument('--ablate', action='store_true')
+    ap.add_argument('--rules', help='35.70: comma-separated rule|user keys of the --mats file (e.g. agree2_t4|hesitant)')
+    ap.add_argument('--tag', default='', help='suffix of the output file')
     a = ap.parse_args()
-    CONDS = ABLATE if a.ablate else globals()['CONDS']
-    mats = load_mats(a.mats)
+    rules = [tuple(x.split('|')) for x in a.rules.split(',')] if a.rules else None
+    if rules:
+        CONDS = ['cue', 'acc', 'pw_true'] + [f'{r}_{u}_{k}' for r, u in rules for k in 'hs']
+    else:
+        CONDS = ABLATE if a.ablate else globals()['CONDS']
+    mats = load_mats(a.mats, rules)
     lo, hi = (a.subjects.split('-') + [None])[:2]
     subs = list(range(int(lo), int(hi or lo) + 1))
     res = Parallel(n_jobs=a.jobs)(delayed(subject)(a.dir, s, a.ring_offset, mats, CONDS) for s in subs)
@@ -202,7 +208,7 @@ def main():
             p(f'    {c:24s} {d.mean():+5.2f}  (95 % CI {lo_:+5.2f} to {hi_:+5.2f}), better in {int((d > 0).sum())}/{len(d)}')
     if a.out:
         os.makedirs(a.out, exist_ok=True)
-        with open(os.path.join(a.out, f'grabmyo_simlabels{"_ablate" if a.ablate else ""}_{a.subjects}.txt'), 'w', encoding='utf-8') as f:
+        with open(os.path.join(a.out, f'grabmyo_simlabels{"_ablate" if a.ablate else ""}{a.tag}_{a.subjects}.txt'), 'w', encoding='utf-8') as f:
             f.write('\n'.join(lines) + '\n')
 
 
