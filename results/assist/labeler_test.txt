@@ -1,0 +1,13 @@
+  ok   dominant    buffer None   online == offline in 100/100 trials; online labels 23977, error 0.68 %
+  ok   any-order   buffer None   online == offline in 100/100 trials; online labels 25963, error 0.78 %
+  ok   overshoot   buffer None   online == offline in 100/100 trials; online labels 25796, error 0.65 %
+  ok   detour      buffer None   online == offline in 100/100 trials; online labels 25475, error 0.91 %
+  ok   hesitant    buffer None   online == offline in 100/100 trials; online labels 23534, error 3.17 %
+  ok   mind-change buffer None   online == offline in 100/100 trials; online labels 26657, error 0.80 %
+  ok   dominant    buffer 200    online == offline in 100/100 trials; online labels 23619, error 0.69 %
+  ok   any-order   buffer 200    online == offline in 100/100 trials; online labels 24920, error 0.81 %
+  ok   overshoot   buffer 200    online == offline in 100/100 trials; online labels 24092, error 0.65 %
+  ok   detour      buffer 200    online == offline in 100/100 trials; online labels 24458, error 0.89 %
+  ok   hesitant    buffer 200    online == offline in 100/100 trials; online labels 22046, error 3.22 %
+  ok   mind-change buffer 200    online == offline in 100/100 trials; online labels 25253, error 0.72 %
+ALL OK

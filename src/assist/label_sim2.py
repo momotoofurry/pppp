@@ -19,7 +19,8 @@ mix steering):
              e.g. after an overshoot). Rest: the established Rest at the lock / grasp / put-down point, the
              'relax first' prompt after a mode switch (a cue), and the automatic lowering.
     agree2   geometry and cmd give the same class
-  trial-level checks (both new rules): a put-down within 3 cm of where the object was picked up counts as an undo:
+  trial-level checks (both new rules): a put-down within 3 cm (3-D; 35.71 fixed a 2-D check that took a shelf right
+    above the pick-up spot for an undo) of where the object was picked up counts as an undo:
     the trial gives no labels (the simulated users never do this; the rule is for the experiment)
   MCU buffer: labels need the windows since the last confirmation; with a buffer of BUF windows before each grasp /
     put-down the older windows are lost: reported as labelled windows with the buffer.
@@ -164,7 +165,8 @@ def _events(rec):
 def undo(rec):
     tg, tp, *_ = _events(rec)
     p0 = rec[tg].get('pick_pos')
-    return p0 is not None and np.linalg.norm(rec[tp]['x'][:2] - p0[:2]) < 0.03
+    # 3-D: a shelf directly above / below the pick-up spot is not an undo (35.71: shelf 4 is above shelf 0)
+    return p0 is not None and np.linalg.norm(rec[tp]['x'] - p0) < 0.03
 
 
 def hindsight_cmd(rec, ma, tail_n=None):

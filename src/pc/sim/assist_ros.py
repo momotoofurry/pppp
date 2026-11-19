@@ -50,7 +50,8 @@ sys.path.insert(0, os.path.join(HERE, '..', '..', 'assist'))
 import assist as A  # noqa: E402
 import assist_sim as S  # noqa: E402
 import kin  # noqa: E402
-import modes as M  # noqa: E402
+import modes as M
+import labeler as LB  # noqa: E402
 
 JOINTS = [f'joint_{i}' for i in range(1, 8)]
 RD = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]], float)      # tool z forward (+x); tool x (the 2F-85 finger axis) horizontal, so the fingers close sideways on an upright object (35.64)
@@ -296,6 +297,8 @@ def main():
     ap.add_argument('--assist', choices=['blend', 'takeover'], default='blend')
     ap.add_argument('--level', type=float, default=0.6)
     ap.add_argument('--modes', type=int, default=1, help='keys: 1 = two-mode control (35.63), 0 = 35.62')
+    ap.add_argument('--labels', default='/tmp/assist_labels.csv',
+                    help='keys / demo: hindsight task labels (35.71, rule agree2_t6) written here')
     ap.add_argument('--seg', type=float, default=1.0, help='trajectory segment length in control steps (35.69; 1.5 before)')
     ap.add_argument('--vel', type=int, default=1, help='1: segment end point carries the step joint velocity (35.69; 0 before)')
     ap.add_argument('--rule', default='mix', choices=['mix', 'lead'],
@@ -384,6 +387,12 @@ def main():
     hist = [X0.copy()] * (S.REACT + 1)
     held, gripped = 'rest', False
     log = open(a.log, 'w', encoding='utf-8')
+    lab = LB.Labeler(sa) if isinstance(sa, M.ModeAssist) else None
+    labf = None
+    if lab is not None and a.labels:
+        labf = open(a.labels, 'w', encoding='utf-8')
+        labf.write('step,t,label,x,y,z\n')
+    lab_x = {}
     log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z\n')
     try:
         for k in range(int(a.limit / A.DT)):
@@ -420,7 +429,27 @@ def main():
                     sa.final_block, sa.approach, sa.rest_n = None, None, 0
                 hist = [kin.fk(q)[:3, 3]] * (S.REACT + 1)
                 continue
+            if lab is not None:
+                lab.before(cmd if cmd != 'rest' else 'rest', x)
+                lab_x[lab.k] = (k * A.DT, x.copy())
             v = sa.step(cmd if cmd != 'rest' else None, x)
+            if lab is not None:
+                new = lab.after()
+                for st, lb in new:
+                    t_, xx = lab_x.pop(st, (np.nan, np.full(3, np.nan)))
+                    if labf:
+                        labf.write(f'{st},{t_:.1f},{lb},{xx[0]:.4f},{xx[1]:.4f},{xx[2]:.4f}\n')
+                if labf:
+                    labf.flush()
+                if new and a.mode == 'keys':
+                    c = {q_: sum(1 for _, l_ in new if l_ == q_) for q_ in ('up', 'down', 'left', 'right', 'rest')}
+                    print('  [標籤] ' + f'這次確認 {len(new)} 個視窗：' + '、'.join(f'{q_} {n_}' for q_, n_ in c.items() if n_),
+                          flush=True)
+                elif lab.last and lab.last.get('why') and a.mode == 'keys':
+                    print(f'  [標籤] 這次不標：{lab.last["why"]}', flush=True)
+                    lab.last = None
+                for st in [s_ for s_ in lab_x if s_ < lab.k - LB.BUF - 50]:
+                    lab_x.pop(st)
             if bool(sa.grip) != gripped:
                 n.gripper(float(sa.grip))
                 gripped = bool(sa.grip)
@@ -465,6 +494,8 @@ def main():
         if restore:
             restore()
         log.close()
+        if labf:
+            labf.close()
     t2 = time.time()
     while time.time() - t2 < 1.0:
         rclpy.spin_once(n, timeout_sec=0.05)

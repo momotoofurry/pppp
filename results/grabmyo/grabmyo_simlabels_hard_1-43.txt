@@ -8,25 +8,25 @@ per-window labels drawn from label_sim.py confusion at e = 0.123 (soft eps per r
   geometry_hesitant_s        88.4 /  91.2 /  90.5    92.4 %          19.10 %
   agree_hesitant_h           89.9 /  92.1 /  91.2    64.1 %           2.12 %
   agree_hesitant_s           89.8 /  92.2 /  91.2    64.1 %           2.20 %
-  agree2_t4_hesitant_h       89.9 /  92.3 /  91.2    53.9 %           1.20 %
-  agree2_t4_hesitant_s       89.5 /  92.2 /  91.2    53.9 %           1.24 %
-  agree2_t6_hesitant_h       89.9 /  92.3 /  91.2    50.6 %           0.74 %
-  agree2_t6_hesitant_s       89.5 /  92.1 /  91.3    50.7 %           0.71 %
-  agree2_t6_overshoot_h      90.3 /  92.3 /  91.5    56.0 %           0.21 %
-  agree2_t6_overshoot_s      89.9 /  92.2 /  91.4    56.1 %           0.20 %
-  agree2_t6_any-order_h      90.3 /  92.4 /  91.6    62.2 %           0.18 %
-  agree2_t6_any-order_s      89.9 /  92.2 /  91.6    62.0 %           0.19 %
+  agree2_t4_hesitant_h       90.0 /  92.2 /  91.3    62.4 %           1.25 %
+  agree2_t4_hesitant_s       89.7 /  92.1 /  91.2    62.3 %           1.23 %
+  agree2_t6_hesitant_h       90.2 /  92.3 /  91.3    58.5 %           0.77 %
+  agree2_t6_hesitant_s       89.8 /  92.2 /  91.3    58.5 %           0.75 %
+  agree2_t6_overshoot_h      90.5 /  92.5 /  91.5    66.9 %           0.20 %
+  agree2_t6_overshoot_s      90.0 /  92.2 /  91.6    67.0 %           0.20 %
+  agree2_t6_any-order_h      90.5 /  92.5 /  91.7    70.3 %           0.17 %
+  agree2_t6_any-order_s      90.0 /  92.3 /  91.7    70.2 %           0.18 %
   later, difference vs acc:
     pw_true                  +5.50  (95 % CI +4.46 to +6.62), better in 42/43
     geometry_hesitant_h      +4.02  (95 % CI +2.94 to +5.12), better in 39/43
     geometry_hesitant_s      +4.12  (95 % CI +3.25 to +5.05), better in 41/43
     agree_hesitant_h         +4.89  (95 % CI +3.87 to +5.94), better in 41/43
     agree_hesitant_s         +4.96  (95 % CI +3.98 to +5.98), better in 42/43
-    agree2_t4_hesitant_h     +4.97  (95 % CI +3.97 to +5.99), better in 42/43
-    agree2_t4_hesitant_s     +4.92  (95 % CI +3.96 to +5.92), better in 42/43
-    agree2_t6_hesitant_h     +4.95  (95 % CI +3.93 to +6.00), better in 42/43
-    agree2_t6_hesitant_s     +4.94  (95 % CI +4.01 to +5.91), better in 42/43
-    agree2_t6_overshoot_h    +5.14  (95 % CI +4.15 to +6.21), better in 42/43
-    agree2_t6_overshoot_s    +5.07  (95 % CI +4.09 to +6.13), better in 42/43
-    agree2_t6_any-order_h    +5.26  (95 % CI +4.24 to +6.37), better in 42/43
-    agree2_t6_any-order_s    +5.17  (95 % CI +4.22 to +6.19), better in 42/43
+    agree2_t4_hesitant_h     +5.00  (95 % CI +3.96 to +6.05), better in 42/43
+    agree2_t4_hesitant_s     +4.91  (95 % CI +3.94 to +5.90), better in 42/43
+    agree2_t6_hesitant_h     +5.03  (95 % CI +4.00 to +6.12), better in 42/43
+    agree2_t6_hesitant_s     +4.97  (95 % CI +4.03 to +5.95), better in 42/43
+    agree2_t6_overshoot_h    +5.23  (95 % CI +4.22 to +6.32), better in 42/43
+    agree2_t6_overshoot_s    +5.14  (95 % CI +4.16 to +6.19), better in 42/43
+    agree2_t6_any-order_h    +5.30  (95 % CI +4.28 to +6.40), better in 42/43
+    agree2_t6_any-order_s    +5.22  (95 % CI +4.25 to +6.25), better in 42/43
