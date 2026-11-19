@@ -14,6 +14,8 @@ displays) shows both: rviz2 -d src/pc/sim/assist.rviz
       --modes 1 (default, 35.63): mode 1 = free (W/S/A/D up/down/left/right in the plane in front of the shelves),
       mode 2 = W in / S out; switches by itself (stop in front of an object / a shelf -> 2, back at the plane -> 1),
       E switches by hand, H (mode 1 only) back to the start. --modes 0: the 35.62 behaviour.
+      35.67: --rule mix (default) / lead; the mode shows as a coloured badge and gripper ball in RViz (blue = mode 1,
+      orange = mode 2, grey = assist off) and every mode change rings the terminal bell.
                                                    w up, s down, a left, d right, space = rest (relax), q quit
   blend (default, 35.58): you steer all the time; the arm adds depth toward the likely object; once aligned and sure,
   keep the SAME key to go in, the opposite key backs out, another key steers again; at the object press space and
@@ -146,8 +148,36 @@ class Demo(Node):
             t_.color.r = t_.color.g = t_.color.b = t_.color.a = 1.0
             t_.text = txt
         arr.markers += [a_, t_]
+        if isinstance(sa, M.ModeAssist):
+            arr.markers += mode_markers(sa, code, x)
         self.mk.publish(arr)
         return code, goal
+
+
+# mode colours (35.67): the user must always see which mode is active (JACO users forget it: Herlant et al. 2016)
+MODE_RGB = {1: (0.15, 0.55, 1.0), 2: (1.0, 0.55, 0.1), 'off': (0.6, 0.6, 0.6)}
+MODE_NAME = {1: 'MODE 1  up / down / left / right', 2: 'MODE 2  W in / S out'}
+
+
+def mode_markers(sa, code, x):
+    """a badge above the scene and a ball on the gripper, coloured by the mode (grey while the assist is off)"""
+    col = MODE_RGB['off'] if code == 'off' else MODE_RGB[sa.m]
+    b = Marker()
+    b.header.frame_id = 'base_link'
+    b.ns, b.id, b.type, b.action = 'mode', 0, Marker.TEXT_VIEW_FACING, Marker.ADD
+    b.pose.position.x, b.pose.position.y, b.pose.position.z = 0.55, 0.0, 0.62
+    b.pose.orientation.w = 1.0
+    b.scale.z = 0.07
+    b.color.r, b.color.g, b.color.b, b.color.a = map(float, col + (1.0,))
+    b.text = MODE_NAME[sa.m] + ('  (assist off)' if code == 'off' else '')
+    g = Marker()
+    g.header.frame_id = 'base_link'
+    g.ns, g.id, g.type, g.action = 'mode', 1, Marker.SPHERE, Marker.ADD
+    g.pose.position.x, g.pose.position.y, g.pose.position.z = map(float, x)
+    g.pose.orientation.w = 1.0
+    g.scale.x = g.scale.y = g.scale.z = 0.035
+    g.color.r, g.color.g, g.color.b, g.color.a = map(float, col + (0.8,))
+    return [b, g]
 
 
 KEY = {'up': 'W', 'down': 'S', 'left': 'A', 'right': 'D'}
@@ -265,6 +295,8 @@ def main():
     ap.add_argument('--assist', choices=['blend', 'takeover'], default='blend')
     ap.add_argument('--level', type=float, default=0.6)
     ap.add_argument('--modes', type=int, default=1, help='keys: 1 = two-mode control (35.63), 0 = 35.62')
+    ap.add_argument('--rule', default='mix', choices=['mix', 'lead'],
+                    help='mode-1 steering: mix (35.67, weighted over the candidates, exits on mismatch) or lead (35.63)')
     ap.add_argument('--zone', type=float, default=0.12, help='m; assist only this close (y-z) to an object; 0 = off')
     ap.add_argument('--log', default='assist_ros.csv')
     ap.add_argument('--limit', type=float, default=None, help='s (default: demo 60, keys 300)')
@@ -321,7 +353,7 @@ def main():
         rclpy.shutdown()
         return
     if a.mode == 'keys' and a.modes:
-        sa = M.ModeAssist(OBJECTS, SHELVES, level=a.level, zone=(a.zone if a.zone > 0 else None))
+        sa = M.ModeAssist(OBJECTS, SHELVES, level=a.level, zone=(a.zone if a.zone > 0 else None), rule=a.rule)
     else:
         sa = A.Assist(OBJECTS, mode=a.assist, level=a.level, keep=(a.mode == 'keys'), shelves=SHELVES,
                       zone=(a.zone if a.zone > 0 else None))
@@ -345,6 +377,7 @@ def main():
                   'then move freely.', flush=True)
     last_state = None
     last_hint = None
+    last_mode = 1
     hist = [X0.copy()] * (S.REACT + 1)
     held, gripped = 'rest', False
     log = open(a.log, 'w', encoding='utf-8')
@@ -406,6 +439,10 @@ def main():
                     k = KEY.get(sa.lock_cmd, '?')
                     o = KEY.get(A.OPPOSITE.get(sa.lock_cmd, ''), '?')
                     print('  >> ' + HINT_ZH[code].format(g=hg, k=k, o=o), flush=True)
+            if a.mode == 'keys' and isinstance(sa, M.ModeAssist) and sa.m != last_mode:
+                last_mode = sa.m
+                print('\a' + ('  ===== 模式 2：W 前進、S 後退 =====' if sa.m == 2 else '  ===== 模式 1：上下左右 ====='),
+                      flush=True)
             if a.mode == 'keys' and (sa.state, sa.goal) != last_state:
                 last_state = (sa.state, sa.goal)
                 print(f'\r  assist: {sa.state}' + (f', goal object {sa.goal}' if sa.goal is not None else ''), flush=True)

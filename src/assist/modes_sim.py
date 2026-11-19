@@ -68,8 +68,8 @@ def user(ma, seen, t_obj, t_shelf, est):
     return want
 
 
-def trial(e, rng):
-    ma = M.ModeAssist(OBJ, SHELVES)
+def trial(e, rng, rule='mix'):
+    ma = M.ModeAssist(OBJ, SHELVES, rule=rule)
     col = M.Collisions(ma)
     t_obj = int(rng.integers(3))
     free = [k for k in range(len(SHELVES))
@@ -106,14 +106,15 @@ def trial(e, rng):
               and abs(ma.obj[t_obj][0] - SHELVES[t_shelf][0]) <= M.SHELF_HX - M.EDGE + 1e-6
               and abs(ma.obj[t_obj][1] - SHELVES[t_shelf][1]) <= M.SHELF_HY - M.EDGE + 1e-6)
         if on and ma.m == 1:
-            return True, (t + 1) * M.DT, col, refused, wrong_lock, bad_spot
-    return False, T_MAX * M.DT, col, refused, wrong_lock, bad_spot
+            return True, (t + 1) * M.DT, col, refused, wrong_lock, bad_spot, ma
+    return False, T_MAX * M.DT, col, refused, wrong_lock, bad_spot, ma
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--trials', type=int, default=300)
     ap.add_argument('--out')
+    ap.add_argument('--rule', default='mix', choices=['mix', 'lead'])
     a = ap.parse_args()
     E = S.window_errors()
     lines = []
@@ -122,13 +123,13 @@ def main():
         print(s, flush=True)
         lines.append(s)
 
-    p(f'two-mode pick-and-place (modes.py), {a.trials} trials per row, limit {T_MAX * M.DT:.0f} s')
+    p(f'two-mode pick-and-place (modes.py, mode-1 rule {a.rule}), {a.trials} trials per row, limit {T_MAX * M.DT:.0f} s')
     p('  e      success   time median (quartiles) s   collision steps (trials with any)   refused A/D per trial   '
-      'refused put-downs   wrong locks per trial')
+      'refused put-downs   wrong locks per trial   assist off per trial   mode switches per trial')
     kinds_all = {}
     for j, e in enumerate((0.0, 0.1, E['G5'], 0.2, E['G9'], 0.3)):
         rng = np.random.default_rng(5000 + j)
-        res = [trial(e, rng) for _ in range(a.trials)]
+        res = [trial(e, rng, a.rule) for _ in range(a.trials)]
         okk = np.array([r[0] for r in res])
         tm = np.array([r[1] for r in res if r[0]])
         cols = np.array([r[2].n for r in res])
@@ -138,11 +139,12 @@ def main():
         p(f'  {e:5.3f}  {100 * okk.mean():5.1f} %   {np.median(tm):5.1f} ({np.percentile(tm, 25):.1f}-{np.percentile(tm, 75):.1f})'
           f'              {cols.sum():5d} ({int((cols > 0).sum())})'
           f'                     {np.mean([r[3] for r in res]):5.2f}                 {np.mean([r[5] for r in res]):5.2f}'
-          f'             {np.mean([r[4] for r in res]):5.2f}')
+          f'             {np.mean([r[4] for r in res]):5.2f}'
+          f'                  {np.mean([r[6].n_off for r in res]):5.2f}                 {np.mean([r[6].switches for r in res]):5.2f}')
     p('collision steps by kind: ' + (str(kinds_all) if kinds_all else 'none'))
     if a.out:
         os.makedirs(a.out, exist_ok=True)
-        with open(os.path.join(a.out, 'modes_sim.txt'), 'w', encoding='utf-8') as f:
+        with open(os.path.join(a.out, f'modes_sim_{a.rule}.txt'), 'w', encoding='utf-8') as f:
             f.write('\n'.join(lines) + '\n')
 
 

@@ -1,0 +1,19 @@
+rule mix
+  ok   1 one object up-left: bends toward it (y > 0)  [0.0, 0.01, 0.079]
+  ok   2 two objects up-left / up-right: straight up, no sideways  [0.0, 0.0, 0.08]
+  ok   3 two objects straight up / down, user goes left: no help (a = 0)  a 0.000, v [0.0, 0.08, 0.0]
+  ok   4 going up past an object: the assist switches off while still in its zone  (max share 0.60; off after 17 steps, 9.0 cm from it)
+  ok   4 the hint says so  模式 1：輔助暫停（你的方向和系統猜的不同），放鬆一下就恢復
+  ok   4 after that the arm goes straight up  
+  ok   4 a relax brings it back  
+  ok   5 at the pre-grasp point, W moves up steadily  z 0.308 -> 0.380
+rule lead (35.63, for comparison: not required to pass)
+  (yes)  1 one object up-left: bends toward it (y > 0)  [0.0, 0.016, 0.078]
+       2 (lead) two objects up-left / up-right: v = [0.0, 0.0, 0.08]
+       3 (lead) objects up / down, user goes left: a = 0.000
+  (no)   4 going up past an object: the assist switches off while still in its zone  (max share 0.60)
+  (no)   4 the hint says so  
+  (no)   4 after that the arm goes straight up  
+  (yes)  4 a relax brings it back  
+  (no)   5 at the pre-grasp point, W moves up steadily  z 0.308 -> 0.300
+ALL OK

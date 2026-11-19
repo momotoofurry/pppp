@@ -1,0 +1,28 @@
+  3.2 s  ok   down to the low row                                  mode 1 None   held None x=[0.58, 0.0, 0.094]  
+  3.4 s  ok   stopped in front of object 2 -> mode 2 pick 2        mode 2 pick   held None x=[0.58, 0.0, 0.094]  
+  3.5 s  ok   A in front (not inside) -> back to mode 1            mode 1 None   held None x=[0.58, 0.008, 0.094]  
+  6.5 s  ok   left to object 0                                     mode 1 None   held None x=[0.58, 0.247, 0.1]  
+  6.7 s  ok   stopped -> mode 2 pick 0                             mode 2 pick   held None x=[0.58, 0.247, 0.1]  
+ 10.6 s  ok   W: to object 0                                       mode 2 pick   held None x=[0.748, 0.249, 0.1]  
+ 11.6 s  ok   relax 1 s: grasped, mode 2 out                       mode 2 out    held 0 x=[0.748, 0.249, 0.1]  
+ 12.6 s  ok   D inside the shelf: no move, reason shown            mode 2 out    held 0 x=[0.748, 0.249, 0.1]  在架子裡：A／D 不能動，先按 S 退出
+ 12.6 s  ok   E inside the shelf: refused                          mode 2 out    held 0 x=[0.748, 0.249, 0.1]  在架子裡：A／D 不能動，先按 S 退出
+ 13.6 s  ok   W: lifts at most 2 cm                                mode 2 out    held 0 x=[0.748, 0.249, 0.12]  
+ 17.6 s  ok   S: backs out -> mode 1 by itself                     mode 1 None   held 0 x=[0.584, 0.249, 0.12]  
+ 25.3 s  ok   carry right to the empty right-low shelf lane        mode 1 None   held 0 x=[0.58, -0.251, 0.12]  
+ 26.1 s  ok   down a bit too far: bottom 1 cm below the top        mode 1 None   held 0 x=[0.58, -0.251, 0.088]  
+ 26.3 s  ok   stopped in front -> mode 2 place shelf 3             mode 2 place  held 0 x=[0.58, -0.251, 0.088]  
+ 29.5 s  ok   relax at the front edge: refused (too close to the edge) mode 2 place  held 0 x=[0.636, -0.251, 0.11]  太靠架子邊緣
+ 33.5 s  ok   W further in (stops 3 cm before the back edge)       mode 2 place  held 0 x=[0.79, -0.251, 0.11]  
+ 33.5 s  ok   W stopped before the back edge                       mode 2 place  held 0 x=[0.79, -0.251, 0.11]  
+ 35.6 s  ok   relax 1 s: lowered onto the shelf and released       mode 2 out    held None x=[0.758, -0.251, 0.102]  
+ 35.6 s  ok   object 0 stands on shelf 3 at [0.758, -0.251, 0.1]   mode 2 out    held None x=[0.758, -0.251, 0.102]  
+ 40.1 s  ok   S: back out -> mode 1                                mode 1 None   held None x=[0.582, -0.251, 0.102]  
+ 46.4 s  ok   up into open space                                   mode 1 None   held None x=[0.58, -0.25, 0.354]  
+ 46.4 s  ok   E in open space -> mode 2 free                       mode 2 free   held None x=[0.58, -0.25, 0.354]  
+ 46.9 s  ok   W in free mode 2 moves forward                       mode 2 free   held None x=[0.595, -0.25, 0.354]  
+ 46.9 s  ok   E off the travel plane: refused                      mode 2 free   held None x=[0.595, -0.25, 0.354]  
+ 47.2 s  ok   S back to the travel plane                           mode 2 free   held None x=[0.583, -0.25, 0.354]  
+ 47.2 s  ok   E -> mode 1                                          mode 1 None   held None x=[0.583, -0.25, 0.354]  
+collisions: 0 {}
+ALL OK

@@ -43,6 +43,21 @@ SHELF_HX, SHELF_HY = 0.10, 0.08    # shelf board half sizes in x / y (board 20 x
 EDGE, GAP = 0.03, 0.02             # put-down: centre this far from the edges; this much free space to other objects
 SLOW_ZONE, SLOW = 0.05, 0.5
 LIFT_IN = 0.02                     # max lift of a held object while still inside a shelf
+# mode-1 steering (35.67, from the literature):
+#   rule 'mix'  - the assist heads along the probability- and zone-weighted mean of the directions to the candidate
+#                 objects, m = sum_g P(g) zone_g unit(pre_g - x) (y, z); its share a = LEVEL * ramp(|m|, MIX_ON, MIX_FULL).
+#                 One likely object: as before. Two likely objects in a similar direction: help along what they share.
+#                 Two in opposite directions: m cancels, no help (cf. hindsight optimization, Javdani et al. 2018;
+#                 confidence-scaled blending, Dragan & Srinivasa 2013).
+#   rule 'lead' - 35.63: blend toward the single most likely object.
+#   Exit (both rules): if for MISMATCH_STEPS steps in a row the command fits none of the candidate objects (cos below
+#   MISMATCH_COS to each) or opposes the assist direction, the assist switches off until the user relaxes (cf. the
+#   confidence-aware shared autonomy of Zurek et al. 2021: input matching no known goal).
+#   'mix' never pushes against the command (the opposing part of its direction is dropped), and each object's pull
+#   fades out within ARRIVE of its pre-grasp point (modes_test.py: at an object, W was cancelled by the pull back).
+MIX_ON, MIX_FULL = 0.3, 0.8
+ARRIVE = 0.02
+MISMATCH_STEPS, MISMATCH_COS = 10, -0.2
 
 
 def unit(v):
@@ -51,9 +66,16 @@ def unit(v):
 
 
 class ModeAssist:
-    def __init__(self, objects, shelves, level=0.6, zone=0.12):
-        """objects: (n, 3) object centres; shelves: (m, 3) centres of the shelf tops"""
+    def __init__(self, objects, shelves, level=0.6, zone=0.12, rule='mix'):
+        """objects: (n, 3) object centres; shelves: (m, 3) centres of the shelf tops; rule: 'mix' | 'lead' (mode-1
+        steering, see MIX_ON)"""
         self.base = A.Assist(objects, mode='blend', level=level, zone=zone)   # steering assist (mode 1, empty hand)
+        self.rule, self.level = rule, level
+        self.assist_off = False                     # switched off by mismatching input until the next relax
+        self.mis_n = 0
+        self.a_last, self.dir_last = 0.0, np.zeros(3)   # last assist share / direction (hints, tests)
+        self.n_off = 0                              # how often the assist was switched off (tests)
+        self.switches = 0                           # mode changes (1 <-> 2), for the experiment log
         self.obj = self.base.obj                    # shared array: positions update in place
         self.shelves = np.asarray(shelves, float)
         self.m = 1
@@ -90,6 +112,16 @@ class ModeAssist:
     def near_shelf(self, x):
         k = self.shelf_of(x)
         return k is not None and x[0] > self.front(k) - SLOW_ZONE
+
+    def z_max_in(self, k):
+        """highest centre of a held object going into shelf k: its top 1 cm under the board (2 cm thick) of any
+        shelf above k in the same lane (modes_sim, 35.67: a stop high in the place band hit the board above)"""
+        sh = self.shelves[k]
+        z = np.inf
+        for j, o in enumerate(self.shelves):
+            if j != k and o[2] > sh[2] and abs(o[1] - sh[1]) < 2 * SHELF_HY and abs(o[0] - sh[0]) < 2 * SHELF_HX:
+                z = min(z, o[2] - 0.02 - OBJ_H / 2 - 0.01)
+        return z
 
     def spot_ok(self, x, k):
         """(ok, reason) for putting the held object down with its centre at x on shelf k"""
@@ -149,6 +181,14 @@ class ModeAssist:
 
     # ------------------------------------------------------------------ step
     def step(self, cmd, x):
+        m0 = self.m
+        v = self._step(cmd, x)
+        if self.m != m0:
+            self.switches += 1
+            self.assist_off, self.mis_n = False, 0
+        return v
+
+    def _step(self, cmd, x):
         x = np.asarray(x, float)
         u = np.array(A.DIRS[cmd], float) if cmd in A.DIRS else np.zeros(3)
         moving = np.linalg.norm(u) > 0
@@ -173,10 +213,7 @@ class ModeAssist:
         self.msg = ''
         if self.m == 1:
             if self.held is None:
-                v = self.base.step(cmd, x)              # blend + zone steering toward objects (y, z part only)
-                self.base.state = 'steer'
-                vyz = np.array([0.0, v[1], v[2]])
-                v = np.linalg.norm(v) * unit(vyz)
+                v = self._steer(cmd, u, x)
             else:
                 v = V_MAX * u
             v[0] = (self.x_travel - x[0]) / DT if abs(self.x_travel - x[0]) > 1e-4 else 0.0   # stay in the plane
@@ -188,7 +225,7 @@ class ModeAssist:
                 self.msg = ('在架子裡：A／D 不能動，先按 S 退出' if ins else '先按 S 退回前方平面，A／D 才能動')
                 return np.zeros(3)
             self._to_mode1()
-            return self.step(cmd, x)
+            return self._step(cmd, x)
         fwd = cmd == 'up'
         if self.phase == 'pick':
             g = self.goal
@@ -211,6 +248,9 @@ class ModeAssist:
                 z_min = self.shelves[k][2] + OBJ_H / 2 + 0.01      # object bottom 1 cm above the top
                 if x[2] < z_min - 0.001:
                     return np.array([0, 0, min(V_MAX * slow, (z_min - x[2]) / DT)])   # lift first (before going in)
+                z_max = self.z_max_in(k)                           # object top 1 cm under a board above (35.67)
+                if x[2] > z_max + 0.001:
+                    return np.array([0, 0, -min(V_MAX * slow, (x[2] - z_max) / DT)])  # lower first
                 lim = self.shelves[k][0] + SHELF_HX - EDGE
                 for i, o in enumerate(self.obj):
                     if i != self.held and abs(o[2] - x[2]) < OBJ_H and abs(o[1] - x[1]) < 2 * OBJ_R + GAP and o[0] > x[0]:
@@ -236,8 +276,53 @@ class ModeAssist:
             return np.array([min(V_MAX * slow, max(lim - x[0], 0) / DT), 0, 0])
         return np.array([-V_MAX * slow, 0, 0])
 
+    def _steer(self, cmd, u, x):
+        """mode 1, empty hand: the user's direction blended with the assist's (y, z only; depth stays in the plane)"""
+        pre = self.obj + PRE
+        P = self.base.probs()
+        zones = np.array([self.base.zone(g, x) for g in range(len(self.obj))])
+        D = pre - x
+        D[:, 0] = 0.0
+        # pull per object: unit direction, fading out within ARRIVE of its pre-grasp point (no jitter on arrival)
+        D = np.array([d / max(np.linalg.norm(d), ARRIVE) for d in D])
+        if self.rule == 'lead':
+            v = self.base.step(cmd, x)                  # 35.63: blend + zone toward the most likely object
+            self.base.state = 'steer'
+            g = int(np.argmax(P))
+            a = self.level * np.clip((P[g] - A.P_ON) / (A.P_FINAL - A.P_ON), 0, 1) * zones[g]
+            dirn = D[g]
+        else:
+            self.base._score(u, x)
+            P = self.base.probs()
+            w = P * zones
+            m = (w[:, None] * D).sum(0)
+            a = self.level * float(np.clip((np.linalg.norm(m) - MIX_ON) / (MIX_FULL - MIX_ON), 0, 1))
+            dirn = unit(m)
+        # exit: the command fits none of the candidates, or opposes where the assist is heading
+        w_cand = P * zones
+        cand = [g for g in range(len(self.obj)) if w_cand[g] > 0.05]
+        if cand:
+            fits = any(u @ D[g] > MISMATCH_COS for g in cand)
+            against = a > 0 and u @ dirn < -0.5
+            self.mis_n = self.mis_n + 1 if (not fits or against) else 0
+            if self.mis_n >= MISMATCH_STEPS and not self.assist_off:
+                self.assist_off = True
+                self.n_off += 1
+        else:
+            self.mis_n = 0
+        if self.assist_off:
+            a = 0.0
+        if self.rule == 'mix' and u @ dirn < 0:
+            dirn = dirn - (u @ dirn) * u                # never push against the user's command: keep only the sideways part
+        self.a_last, self.dir_last = a, dirn
+        if self.rule == 'lead' and not self.assist_off:
+            vyz = np.array([0.0, v[1], v[2]])
+            return np.linalg.norm(v) * unit(vyz)
+        return V_MAX * unit((1 - a) * u + a * dirn)
+
     def _rest(self, x):
         if self.m == 1:
+            self.assist_off, self.mis_n = False, 0      # relaxing gives the assist back
             self.rest_n = 0
             if self.armed:
                 self._lock(x)
@@ -284,6 +369,8 @@ class ModeAssist:
         if self.m == 1:
             if self.held is not None:
                 return 'carry', 'MODE 1', f'模式 1：夾著物體 {self.held}，自由移動；在架子前方停下就切到模式 2 放置', self.held
+            if self.assist_off:
+                return 'off', 'MODE 1  assist off', '模式 1：輔助暫停（你的方向和系統猜的不同），放鬆一下就恢復', None
             P = self.base.probs()
             g = int(np.argmax(P))
             if P[g] >= A.P_ON and self.base.zone(g, x) > 0:
