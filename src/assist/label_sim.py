@@ -226,13 +226,15 @@ def main():
     p('  rule      user       e      success  labelled windows  task-label error  self-training error   '
       'task-label error by true class (up / down / left / right / rest)')
     detail = {}
+    mats = {}                           # rule|user|e -> counts[true class][label or none] (grabmyo_labels.py --simlab)
     def agree(rec, ma):                 # label only where the two rules give the same class
         return [g if g == m else None for g, m in zip(hindsight(rec, ma), hindsight_motion(rec, ma))]
     rules = (('geometry', hindsight), ('motion', hindsight_motion), ('agree', agree))
     for kind in ('dominant', 'any-order'):
         for j, e in enumerate((0.0, 0.1, E['G5'], 0.2, E['G9'], 0.3)):
             rng = np.random.default_rng(7000 + j + (100 if kind != 'dominant' else 0))
-            st = {rn: dict(n_lab=0, n_wrong=0, byc={c: [0, 0] for c in CLASSES}, conf={}) for rn, _ in rules}
+            st = {rn: dict(n_lab=0, n_wrong=0, byc={c: [0, 0] for c in CLASSES}, conf={},
+                           mat={c: {l: 0 for l in CLASSES + ['none']} for c in CLASSES}) for rn, _ in rules}
             n_all = n_self = succ = 0
             for _ in range(a.trials):
                 ok, rec, ma = trial(e, rng, kind)
@@ -244,6 +246,7 @@ def main():
                 for rn, fn in rules:
                     s = st[rn]
                     for r, lab in zip(rec, fn(rec, ma)):
+                        s['mat'][r['want']][lab if lab is not None else 'none'] += 1
                         if lab is None:
                             continue
                         s['n_lab'] += 1
@@ -259,6 +262,7 @@ def main():
                   f'          {100 * s["n_wrong"] / max(s["n_lab"], 1):5.2f} %          {100 * n_self / n_all:5.2f} %'
                   f'             {per}')
                 detail[(rn, kind, round(e, 3))] = sorted(s['conf'].items(), key=lambda kv: -kv[1])[:4]
+                mats[f'{rn}|{kind}|{e:.3f}'] = s['mat']
     p('most common task-label mistakes (true -> label: windows):')
     for k, v in detail.items():
         p(f'  {k[0]:8s} {k[1]:9s} e {k[2]:5.3f}: ' +', '.join(f'{t}->{l}: {n}' for (t, l), n in v))
@@ -266,6 +270,9 @@ def main():
         os.makedirs(a.out, exist_ok=True)
         with open(os.path.join(a.out, 'label_sim.txt'), 'w', encoding='utf-8') as f:
             f.write('\n'.join(lines) + '\n')
+        import json
+        with open(os.path.join(a.out, 'label_sim_confusion.json'), 'w', encoding='utf-8') as f:
+            json.dump(mats, f, indent=1)
 
 
 if __name__ == '__main__':

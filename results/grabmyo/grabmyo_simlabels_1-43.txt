@@ -1,0 +1,56 @@
+GrabMyo 4ch G5, 43 participants; balanced accuracy %, day 1 / day 8 / day 29; later = mean of days 8, 29
+per-window labels drawn from label_sim.py confusion at e = 0.123 (soft eps per rule: agree_dominant 0.030, agree_any-order 0.030, motion_any-order 0.030, geometry_any-order 0.124)
+  condition                 day1 / day8 / day29    windows labelled   label error
+  cue                        82.3 /  83.8 /  83.0
+  acc                        82.3 /  86.8 /  86.7
+  self                       83.0 /  87.3 /  86.5
+  soft1                      83.6 /  88.2 /  87.1
+  pw_self                    84.3 /  87.6 /  87.0   100.0 %          13.50 %
+  pw_true                    90.8 /  92.7 /  91.8   100.0 %           0.00 %
+  agree_dominant_h           90.3 /  92.5 /  91.5    66.0 %           1.19 %
+  agree_dominant_s           89.8 /  92.3 /  91.6    66.1 %           1.22 %
+  agree_any-order_h          90.4 /  92.4 /  91.5    70.8 %           1.63 %
+  agree_any-order_s          90.0 /  92.3 /  91.6    70.9 %           1.64 %
+  motion_any-order_h         90.4 /  92.6 /  91.5    85.1 %           2.92 %
+  motion_any-order_s         90.3 /  92.4 /  91.6    85.2 %           2.80 %
+  geometry_any-order_h       89.7 /  92.4 /  91.4    91.3 %          12.36 %
+  geometry_any-order_s       89.4 /  92.0 /  91.3    91.3 %          12.48 %
+  later, difference vs acc:
+    self                     +0.11  (95 % CI -0.67 to +0.92), better in 22/43
+    soft1                    +0.88  (95 % CI +0.20 to +1.57), better in 28/43
+    pw_self                  +0.52  (95 % CI -0.38 to +1.43), better in 25/43
+    pw_true                  +5.50  (95 % CI +4.46 to +6.62), better in 42/43
+    agree_dominant_h         +5.20  (95 % CI +4.16 to +6.31), better in 42/43
+    agree_dominant_s         +5.17  (95 % CI +4.17 to +6.24), better in 42/43
+    agree_any-order_h        +5.21  (95 % CI +4.21 to +6.28), better in 42/43
+    agree_any-order_s        +5.22  (95 % CI +4.22 to +6.29), better in 42/43
+    motion_any-order_h       +5.32  (95 % CI +4.28 to +6.42), better in 42/43
+    motion_any-order_s       +5.25  (95 % CI +4.25 to +6.31), better in 42/43
+    geometry_any-order_h     +5.09  (95 % CI +4.01 to +6.27), better in 41/43
+    geometry_any-order_s     +4.88  (95 % CI +3.92 to +5.92), better in 41/43
+  later, difference vs self:
+    acc                      -0.11  (95 % CI -0.92 to +0.67), better in 21/43
+    soft1                    +0.76  (95 % CI +0.42 to +1.15), better in 34/43
+    pw_self                  +0.40  (95 % CI -0.36 to +1.21), better in 24/43
+    pw_true                  +5.39  (95 % CI +4.32 to +6.43), better in 42/43
+    agree_dominant_h         +5.09  (95 % CI +4.06 to +6.14), better in 42/43
+    agree_dominant_s         +5.05  (95 % CI +4.07 to +6.05), better in 42/43
+    agree_any-order_h        +5.10  (95 % CI +4.06 to +6.11), better in 42/43
+    agree_any-order_s        +5.10  (95 % CI +4.12 to +6.09), better in 42/43
+    motion_any-order_h       +5.21  (95 % CI +4.18 to +6.25), better in 42/43
+    motion_any-order_s       +5.13  (95 % CI +4.15 to +6.13), better in 42/43
+    geometry_any-order_h     +4.98  (95 % CI +3.89 to +6.07), better in 42/43
+    geometry_any-order_s     +4.77  (95 % CI +3.83 to +5.75), better in 42/43
+  later, difference vs soft1:
+    acc                      -0.88  (95 % CI -1.57 to -0.20), better in 15/43
+    self                     -0.76  (95 % CI -1.15 to -0.42), better in 8/43
+    pw_self                  -0.36  (95 % CI -1.11 to +0.40), better in 18/43
+    pw_true                  +4.63  (95 % CI +3.72 to +5.57), better in 42/43
+    agree_dominant_h         +4.32  (95 % CI +3.46 to +5.25), better in 42/43
+    agree_dominant_s         +4.29  (95 % CI +3.47 to +5.13), better in 42/43
+    agree_any-order_h        +4.33  (95 % CI +3.45 to +5.24), better in 42/43
+    agree_any-order_s        +4.34  (95 % CI +3.52 to +5.21), better in 42/43
+    motion_any-order_h       +4.44  (95 % CI +3.56 to +5.37), better in 42/43
+    motion_any-order_s       +4.37  (95 % CI +3.56 to +5.24), better in 42/43
+    geometry_any-order_h     +4.22  (95 % CI +3.26 to +5.19), better in 42/43
+    geometry_any-order_s     +4.01  (95 % CI +3.23 to +4.83), better in 42/43

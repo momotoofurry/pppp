@@ -1,0 +1,25 @@
+GrabMyo 4ch G5, 43 participants; balanced accuracy %, day 1 / day 8 / day 29; later = mean of days 8, 29
+per-window labels drawn from label_sim.py confusion at e = 0.123 (soft eps per rule: agree_dominant 0.030, agree_any-order 0.030, motion_any-order 0.030, geometry_any-order 0.124)
+  condition                 day1 / day8 / day29    windows labelled   label error
+  cue                        82.3 /  83.8 /  83.0
+  acc                        82.3 /  86.8 /  86.7
+  soft1                      83.6 /  88.2 /  87.1
+  pw_true                    90.8 /  92.7 /  91.8   100.0 %           0.00 %
+  pw_true_nr                 86.8 /  91.2 /  89.7   100.0 %           0.00 %
+  pw_true_dec_nr             84.5 /  88.7 /  87.3   100.0 %           0.00 %
+  agree_any-order_s          90.1 /  92.3 /  91.6    70.7 %           1.58 %
+  agree_any-order_s_nr       86.4 /  91.0 /  89.7    71.6 %           0.26 %
+  later, difference vs acc:
+    soft1                    +0.88  (95 % CI +0.20 to +1.57), better in 28/43
+    pw_true                  +5.50  (95 % CI +4.46 to +6.62), better in 42/43
+    pw_true_nr               +3.69  (95 % CI +2.75 to +4.55), better in 39/43
+    pw_true_dec_nr           +1.26  (95 % CI +0.51 to +1.97), better in 31/43
+    agree_any-order_s        +5.19  (95 % CI +4.19 to +6.25), better in 42/43
+    agree_any-order_s_nr     +3.60  (95 % CI +2.73 to +4.41), better in 40/43
+  later, difference vs soft1:
+    acc                      -0.88  (95 % CI -1.57 to -0.20), better in 15/43
+    pw_true                  +4.63  (95 % CI +3.72 to +5.57), better in 42/43
+    pw_true_nr               +2.81  (95 % CI +2.15 to +3.43), better in 41/43
+    pw_true_dec_nr           +0.38  (95 % CI +0.16 to +0.62), better in 31/43
+    agree_any-order_s        +4.32  (95 % CI +3.51 to +5.18), better in 42/43
+    agree_any-order_s_nr     +2.72  (95 % CI +2.11 to +3.32), better in 42/43
