@@ -1,0 +1,1 @@
+options []: key -> tool moving  median 83 ms (n 10, range 67-165); relax -> tool still  median 46 ms (n 10, range 36-217); speed variation while moving (std / mean of 50 ms tool speed) median 0.24

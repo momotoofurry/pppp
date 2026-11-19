@@ -77,10 +77,11 @@ class Demo(Node):
     def joints(self):
         return np.array([self.q[j] for j in JOINTS])
 
-    def send(self, q, dur):
+    def send(self, q, dur, qd=None):
         m = JointTrajectory()
         m.joint_names = JOINTS
-        p = JointTrajectoryPoint(positions=[float(v) for v in q], velocities=[0.0] * 7)
+        p = JointTrajectoryPoint(positions=[float(v) for v in q],
+                                 velocities=[0.0] * 7 if qd is None else [float(v) for v in qd])
         p.time_from_start = Duration(sec=int(dur), nanosec=int((dur % 1) * 1e9))
         m.points = [p]
         self.traj.publish(m)
@@ -295,6 +296,8 @@ def main():
     ap.add_argument('--assist', choices=['blend', 'takeover'], default='blend')
     ap.add_argument('--level', type=float, default=0.6)
     ap.add_argument('--modes', type=int, default=1, help='keys: 1 = two-mode control (35.63), 0 = 35.62')
+    ap.add_argument('--seg', type=float, default=1.0, help='trajectory segment length in control steps (35.69; 1.5 before)')
+    ap.add_argument('--vel', type=int, default=1, help='1: segment end point carries the step joint velocity (35.69; 0 before)')
     ap.add_argument('--rule', default='mix', choices=['mix', 'lead'],
                     help='mode-1 steering: mix (35.67, weighted over the candidates, exits on mismatch) or lead (35.63)')
     ap.add_argument('--zone', type=float, default=0.12, help='m; assist only this close (y-z) to an object; 0 = off')
@@ -421,8 +424,11 @@ def main():
             if bool(sa.grip) != gripped:
                 n.gripper(float(sa.grip))
                 gripped = bool(sa.grip)
+            q_prev = q.copy()
             q = kin.ik_step(q, v, RD, A.DT, posture=True, q_rest=q_rest)
-            n.send(q, A.DT * 1.5)
+            qd = (q - q_prev) / A.DT if a.vel else None
+            n.send(q, A.DT * a.seg, qd)
+            q_prev = q.copy()
             P = sa.probs()
             code, hg = n.markers(sa.obj, P, sa, a.target if a.mode == 'demo' else -1, kin.fk(q)[:3, 3])
             hist.append(kin.fk(q)[:3, 3])
