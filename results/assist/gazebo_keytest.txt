@@ -1,0 +1,66 @@
+Gazebo key test (report 35.64): 5 fresh headless worlds, gz_test.sh / gz_repeat, simulated grasp on
+=== run 1
+== at start
+object_0: x 0.750 y 0.250 z 0.100  tilt 0.0 deg  (ok)
+object_1: x 0.700 y -0.250 z 0.300  tilt 0.0 deg  (ok)
+object_2: x 0.770 y -0.000 z 0.100  tilt 0.0 deg  (ok)
+commanded vs simulator joints, max diff deg: 0.0
+steps ok: [True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True]
+== objects after the full keys test
+object_0: x 0.715 y -0.253 z 0.099  tilt 0.0 deg  (ok)
+object_1: x 0.700 y -0.250 z 0.299  tilt 0.0 deg  (ok)
+object_2: x 0.770 y -0.000 z 0.099  tilt 0.0 deg  (ok)
+attached object_0 (centre 8 mm from the tool)
+released object_0 at [0.715, -0.253, 0.1]
+=== run 2
+== at start
+object_0: x 0.750 y 0.250 z 0.100  tilt 0.0 deg  (ok)
+object_1: x 0.700 y -0.250 z 0.300  tilt 0.0 deg  (ok)
+object_2: x 0.770 y -0.000 z 0.100  tilt 0.0 deg  (ok)
+commanded vs simulator joints, max diff deg: 0.0
+steps ok: [True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True]
+== objects after the full keys test
+object_0: x 0.719 y -0.258 z 0.099  tilt 0.0 deg  (ok)
+object_1: x 0.700 y -0.250 z 0.299  tilt 0.0 deg  (ok)
+object_2: x 0.770 y -0.000 z 0.099  tilt 0.0 deg  (ok)
+attached object_0 (centre 8 mm from the tool)
+released object_0 at [0.719, -0.258, 0.103]
+=== run 3
+== at start
+object_0: x 0.750 y 0.250 z 0.100  tilt 0.0 deg  (ok)
+object_1: x 0.700 y -0.250 z 0.300  tilt 0.0 deg  (ok)
+object_2: x 0.770 y -0.000 z 0.100  tilt 0.0 deg  (ok)
+commanded vs simulator joints, max diff deg: 0.0
+steps ok: [True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True]
+== objects after the full keys test
+object_0: x 0.723 y -0.256 z 0.099  tilt 0.0 deg  (ok)
+object_1: x 0.700 y -0.250 z 0.299  tilt 0.0 deg  (ok)
+object_2: x 0.770 y -0.000 z 0.099  tilt 0.0 deg  (ok)
+attached object_0 (centre 12 mm from the tool)
+released object_0 at [0.723, -0.256, 0.099]
+=== run 4
+== at start
+object_0: x 0.750 y 0.250 z 0.100  tilt 0.0 deg  (ok)
+object_1: x 0.700 y -0.250 z 0.300  tilt 0.0 deg  (ok)
+object_2: x 0.770 y -0.000 z 0.100  tilt 0.0 deg  (ok)
+commanded vs simulator joints, max diff deg: 0.0
+steps ok: [True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True]
+== objects after the full keys test
+object_0: x 0.719 y -0.255 z 0.099  tilt 0.0 deg  (ok)
+object_1: x 0.700 y -0.250 z 0.299  tilt 0.0 deg  (ok)
+object_2: x 0.770 y -0.000 z 0.099  tilt 0.0 deg  (ok)
+attached object_0 (centre 8 mm from the tool)
+released object_0 at [0.719, -0.255, 0.099]
+=== run 5
+== at start
+object_0: x 0.750 y 0.250 z 0.100  tilt 0.0 deg  (ok)
+object_1: x 0.700 y -0.250 z 0.300  tilt 0.0 deg  (ok)
+object_2: x 0.770 y -0.000 z 0.100  tilt 0.0 deg  (ok)
+commanded vs simulator joints, max diff deg: 0.0
+steps ok: [True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True]
+== objects after the full keys test
+object_0: x 0.715 y -0.256 z 0.099  tilt 0.0 deg  (ok)
+object_1: x 0.700 y -0.250 z 0.299  tilt 0.0 deg  (ok)
+object_2: x 0.770 y -0.000 z 0.099  tilt 0.0 deg  (ok)
+attached object_0 (centre 8 mm from the tool)
+released object_0 at [0.715, -0.256, 0.098]

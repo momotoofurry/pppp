@@ -4627,3 +4627,101 @@ PC 上，探索性。要回答口試或審稿常問的問題：為什麼用 LDA�
 | 程式 | `src/run_upstream.py`、`make_baseline.py`、`compare_paper.py`、`model_stats.py`、`rf_size.py`、`pipeline.py`、`compression_sweep.py`、`selfcal_sweep.py`、`plot_sweep.py`、`export_c.py`、`check_c.py`、`build_arm.py`、`ram_estimate.py`、`verify_platform.py`、`compare_features.py`、`compare_selfcal_platform.py`、`analyze_pseudo.py`、`analyze_leaf_buffer.py`、`tsne_cost.py`、`analyze_tsne_iter.py`、`analyze_tsne_px.py`、`c_tsne.py`、`c_train.py`、`check_tsne_c.py`、`check_selfcal_c.py`、`check_features_c.py`、`build_arm_selfcal.py`、`analyze_c_impl.py`、`check_oneshot_c.py`、`diag_oneshot.py`、`eval_decision.py`、`check_rt.py`、`aug_sweep.py`、`pool_sweep.py`、`decision_v2.py`、`filt_sweep.py`、`pca_baseline.py`、`causal_check.py`、`check_align_rt.py`、`stress_check.py`、`verify_check.py`、`check_load_rt.py`、`power_calc.py`、`external_check.py`、`external_channels.py`、`external_posthoc.py`、`align_margin.py`、`bench.c`、`board_hal.c`、`export_stm32.py`、`check_bench.py`、`board_replay.py`、`app_rt.c`、`src/pc/*`（含 `serial_replay.ps1`）、`src/c/*`（`tsne.c`、`kmeans.c`、`rf_train.c`、`selfcal.c`、`features.c`、`oneshot.c`、`decision.c`、`protocol.c`、`rt.c`、`board.h`、`board_stub.c`、`main_selfcal.c`、`main_rt.c`、`stm32h743_axi.ld`） |
 | 環境 | `docker/Dockerfile`、`docker/requirements.txt`、`docker/run.sh`、`docker/run_all.sh` |
 | 結果 | `results/baseline*.csv`、`paper_comparison.csv`、`model_stats*.csv`、`sweep_*.csv`、`selfcal_sweep*.csv`（`_validation_linux` 是 Docker 的結果）、`c_check.csv`、`arm_size.csv`、`ram_estimate.csv`、`ram_scenarios.csv`、`ram_scenarios_pseudo.csv`、`pseudo_label_summary.csv`、`leaf_buffer_summary.csv`、`tsne_cost.csv`、`tsne_cost_iter.csv`、`tsne_iter_summary.csv`、`tsne_cost_px.csv`、`tsne_px_summary.csv`、`tsne_c_check.csv`、`selfcal_c_check*.csv`、`features_c_check.csv`、`arm_selfcal_size.csv`、`arm_selfcal_modules.csv`、`c_impl_summary.csv`、`c_impl_demo.csv`、`oneshot_*.csv`、`decision_*.csv`、`rt_*.csv`、`causal_check*.csv`、`align_rt_check.csv`、`stress_check*.csv`、`verify_check*.csv`、`load_rt_check.csv`、`power_calc.csv`、`external_check*.csv`、`external_verify*.csv`、`external_posthoc.csv`、`align_margin.csv`、`pc_tools_test.csv`、`firmware_report.md`、`*.png`、`stage*_summary.md`、`platform_check.md`、`advisor_summary.md`、`logs/`（`logs/linux/` 是 Docker 的紀錄） |
+
+### 35.64 在 Gazebo 驗證兩種模式的控制：夾爪方向修正、模擬夾取（2026-11-19）
+
+**為什麼**：
+- 35.63 的測試只有幾何規則和 RViz 顯示，沒有物理：不知道手臂和夾爪會不會把物體撞倒，放下的物體站不站得住。
+- 使用者要求「弄到 Gazebo 上驗證」。
+
+**環境**（`src/pc/sim/gen3_gazebo.launch.py`、`gen3_gazebo.sh`、`make_world.py`、`gz_attach.py`）：
+- Gazebo Classic 11 + gazebo_ros2_control。Kortex 官方的模擬啟動檔一定會啟動 Ignition 的 ros_gz_bridge（沒安裝），所以自己寫了啟動檔。
+- Kortex 描述檔在 sim_gazebo 模式下，夾爪仍然用真機的 robotiq_driver 外掛，Gazebo 不接受。啟動檔把夾爪的 ros2_control 區塊換成 GazeboSystem，並宣告 5 個連動關節（mimic）。
+- 場景：和 `assist_ros.py` 一樣的 5 個架子（固定的板子 20 × 16 × 2 cm）和 3 個物體（圓柱，半徑 3 cm、高 10 cm、0.1 kg）。
+- 控制程式不變：`assist_ros.py keys` 直接控制 Gazebo 裡的手臂（同樣的 joint_trajectory_controller 介面）。
+
+**發現的問題 1：夾爪方向錯了**
+- 原本的工具姿態只規定「夾爪朝前（+x）」，夾爪的兩指是**上下**張開。
+- 在 Gazebo 裡，接近物體時下面那根手指會撞到架子和物體，物體被撞飛（例如物體 0 飛到 (3.18, 3.10) m，倒下 90°）。RViz 沒有物理，看不出來。
+- 改成兩指**左右**張開（工具 x 軸水平），夾直立的物體才對（`assist_ros.py` 的 `RD`）。
+- 重新檢查（`rd_check.py`）：起點關節離極限 17.5°；整個任務路徑最差 13.1°，位置誤差最大 1.7 mm。
+- 修正後，接近物體時 3 個物體都不動。
+
+**發現的問題 2：Gazebo 的夾爪夾不住**
+- 夾爪的連桿是用位置命令驅動的，閉合時把物體推開約 5 cm，而不是夾住。夾取點本身是對的：手指墊的中心離控制用的工具點約 6 mm。
+- 這是 Gazebo Classic 夾取的已知問題。
+- 處理方式（使用者選擇）：**模擬夾取** `gz_attach.py`。
+  - 夾爪開始閉合時，如果有物體的中心離工具點 3 cm 內，就把物體固定在夾爪上（保持當下的相對位置、直立），每 10 ms 設定一次。
+  - 夾爪張開後放開；之後再固定在放下的位置 0.5 秒，等手指離開，物體才交給物理。
+  - 沒有這 0.5 秒時，有一次物體在放開後被彈飛（手指在夾著時穿進物體裡，放開瞬間接觸計算把它推出去）。
+- 這個方法驗證的是：搬運、放下的位置和高度、放下的物體能不能站穩、其他物體有沒有被碰到。**不能**驗證真的夾爪夾不夾得住，這要用實機。
+
+**測試**（`modes_keytest.py`，和 35.63 RViz 相同的 20 個按鍵步驟：鎖物體 2 再取消、夾起物體 0、在架子裡 D 和 E 被拒絕、抬高退出、搬到空架子 3、往下壓過頭、放下、退出、H、E）：
+- 每次重新開一個新的 Gazebo 世界（無畫面），連續 5 次（`gz_test.sh`，紀錄 `results/assist/gazebo_keytest.txt`）。
+- 結果：**5 次全部通過**。
+  - 20 個按鍵步驟每次都通過；模擬器的關節角度和指令相差 0.0°；最後回到起點 (0.58, 0, 0.35)。
+  - 夾取時物體中心離工具點 8–12 mm（夾取範圍 15 mm 內）。
+  - 物體 0 每次都放在架子 3（中心 (0.72, −0.25)，架面高 0.05 m）上：最後位置 x 0.715–0.723、y −0.253 到 −0.258、z 0.099（站在架面上），**傾斜 0°**，離放下的位置 < 5 mm。
+  - 物體 1、2 每次都沒有被碰到（位置和傾斜不變）。
+- 測試過程中的問題（不是控制的問題）：
+  - 停止腳本原本沒有結束模擬夾取程式，舊的程式會同時抓同一個物體；修正後才做這 5 次。
+  - 被強制結束的 ROS 程式會留下 Fast DDS 的共享記憶體鎖，下一次 Gazebo 生成手臂時會卡住；`gz_test.sh` 在沒有任何 ROS 程式時清掉這些鎖。
+
+**限制**：
+- 夾取是模擬的（見上）。
+- 架子是固定的，手臂其他部位（手肘、手腕）如果碰到架子，架子不會動，目前看不出來；要加接觸感測器才能檢查。
+- 只跑了一條按鍵流程（一個物體搬到一個架子）；隨機任務和解碼錯誤仍然只有 35.63 的幾何模擬。
+
+### 35.65 用模擬測試輔助系統產生的任務標籤（2026-11-19）
+
+**為什麼**：
+- 35.55 / 35.56 的結論：標籤要來自和 EMG 無關的目標（任務給的，或夾取 / 放下成功後事後確認），軟標籤在情境錯誤 < 10 % 時安全，硬標籤在 ≥ 10 % 時崩潰。
+- 但 35.55 的「情境錯誤」是隨機注入的。實際使用時，系統看不到使用者想做哪個手勢，只看得到自己的模式、位置和事件。要知道：**事後推回的標籤有多少比例是錯的**。
+- 使用者要求先用模擬做。
+
+**方法**（`src/assist/label_sim.py`；場景、模擬使用者、解碼器都和 35.63 的 `modes_sim.py` 相同：5 類、視窗錯誤率 e、K = 3）：
+- 每次任務：把隨機一個物體搬到隨機一個空架子。只有成功的任務才產生標籤。
+- 兩種模擬使用者：
+  - **dominant**：模式 1 先走差距大的方向（35.63 的使用者）；
+  - **any-order**：每次任務隨機決定先走左右或先走上下，走完一軸再走另一軸（人的習慣不同）。
+- 系統事後只用自己記錄的資訊（從不看使用者的真實意圖）：每個視窗的模式、階段、位置；成功的那次鎖定點（拿取、放置）；夾取和放下的時間點。
+- 三種規則：
+  1. **geometry（位置）**：模式 1 看「鎖定點 − 夾爪位置」，差距大的那一軸、且 ≥ 另一軸 2 倍、> 1.5 cm → 那個方向；離鎖定點 1 cm 內 → 放鬆；斜向 → 不標。模式 2 拿取 / 放置還沒到 → 前進（W 的手勢）；到了 → 放鬆；系統自動放下時 → 放鬆；退出 → 後退。
+  2. **motion（動作）**：看手臂自己那個視窗實際往哪動，只有「朝著事後確認的點移動」才標成那個方向；停著且在鎖定點 / 夾取點 / 放下點 → 放鬆。解碼器要 K 個一樣的視窗才換輸出，所以使用者放手後手臂還會多動 K − 1 個視窗：停下前那幾個移動中的視窗不標。
+  3. **agree（一致）**：兩個規則給一樣的類別才標。
+- 比較基準：自我訓練（用解碼器自己的輸出當標籤），錯誤率就是 e。
+
+**結果**（每列 300 次任務；e = 0.123、0.237 是 GrabMyo 5 類、9 類的視窗錯誤率）：
+
+| 使用者 | e | 規則 | 有標籤的視窗 | 標籤錯誤 | 自我訓練錯誤 |
+|---|---|---|---|---|---|
+| dominant | 0.123 | geometry | 84.7 % | 2.90 % | 12.20 % |
+| dominant | 0.123 | motion | 88.1 % | 4.25 % | 12.20 % |
+| dominant | 0.123 | **agree** | 71.7 % | **0.73 %** | 12.20 % |
+| dominant | 0.237 | geometry | 84.6 % | 3.72 % | 23.59 % |
+| dominant | 0.237 | motion | 85.7 % | 6.48 % | 23.59 % |
+| dominant | 0.237 | **agree** | 69.4 % | **1.74 %** | 23.59 % |
+| any-order | 0.123 | geometry | 93.7 % | 10.35 % | 12.33 % |
+| any-order | 0.123 | motion | 85.1 % | 2.25 % | 12.33 % |
+| any-order | 0.123 | **agree** | 74.2 % | **1.21 %** | 12.33 % |
+| any-order | 0.237 | geometry | 94.0 % | 12.89 % | 23.67 % |
+| any-order | 0.237 | motion | 82.0 % | 4.08 % | 23.67 % |
+| any-order | 0.237 | **agree** | 70.7 % | **2.70 %** | 23.67 % |
+
+（完整表格含 e = 0、0.1、0.2、0.3 和各類別錯誤：`results/assist/label_sim.txt`）
+
+- **geometry** 只在使用者剛好先走差距大的方向時準；使用者習慣不同（any-order）時錯誤升到 10–13 %，已經超過 35.55 硬標籤崩潰的 10 %。
+- **motion** 對使用者習慣不敏感（any-order 2–4 %）。
+- **agree** 最準：在兩種使用者、兩種錯誤率下，標籤錯誤 0.7–2.7 %，約為自我訓練的 1/10；代價是只標 69–74 % 的視窗。
+- 剩下的錯誤大多在「真實是放鬆」的視窗：使用者放鬆，但解碼器誤判讓手臂剛好往對的方向動，被標成方向。
+
+**和 35.55 的關係**：
+- 35.55 在 GrabMyo 上（`results/grabmyo/grabmyo_labels_sweep_1-43.txt`，後期準確率減去不用任務標籤的累積）：情境錯誤 10 % 時，軟標籤仍有幫助（G5，ε 0.05–0.15：+0.56 到 +0.72），硬標籤已經變差（G5 −1.76）；0 % 時兩者都有幫助（G5 硬 +1.26、軟 ε 0.05–0.15 +0.88 到 +1.06）。
+- agree 規則的錯誤（0.7–2.7 %）落在 0 % 和 10 % 之間，所以預期軟標籤有幫助；**但這是推估**：35.55 的錯誤是隨機的類別，這裡的錯誤集中在「放鬆 → 方向」，型態不同。
+
+**限制**：
+- 模擬使用者是規則寫成的；真人會猶豫、繞路、半途改主意。any-order 只是其中一種差異。
+- 解碼錯誤假設每個視窗獨立（偏樂觀；實際的誤判常會連續發生）。
+- 只有 5 類（4 方向 + 放鬆），模式 2 的前進 / 後退用「上 / 下」的手勢；如果週一的判準選到 S7 或 S9，前進 / 後退會是獨立的手勢，規則一樣適用。
+
+**下一步建議**：把這個規則產生的標籤（含錯誤型態）接到 GrabMyo 的累積流程，直接量測準確率變化，而不是用 35.55 的隨機錯誤推估。

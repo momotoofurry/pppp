@@ -51,12 +51,12 @@ import kin  # noqa: E402
 import modes as M  # noqa: E402
 
 JOINTS = [f'joint_{i}' for i in range(1, 8)]
-RD = np.array([[0, 0, 1], [0, 1, 0], [-1, 0, 0]], float)      # tool z forward (+x), horizontal approach
+RD = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]], float)      # tool z forward (+x); tool x (the 2F-85 finger axis) horizontal, so the fingers close sideways on an upright object (35.64)
 OBJECTS = np.array([[0.75, 0.25, 0.10], [0.70, -0.25, 0.30], [0.77, 0.0, 0.10]])
 # shelf tops (centre): one under each object + two empty ones to put things down (35.59)
 SHELVES = np.vstack([OBJECTS - [0, 0, 0.05], [[0.72, -0.25, 0.05], [0.72, 0.25, 0.25]]])
 SEEDS = ([0, 15, 180, 230, 0, 55, 90], [0, 30, 0, 110, 0, 40, 90], [0, 40, 180, 250, 0, -60, 90],
-         [30, 70, 280, 120, 0, -100, 70])
+         [30, 70, 280, 120, 0, -100, 70], [30, 70, 280, 120, 0, -100, 160], [0, 40, 180, 250, 0, -60, 180])
 # start point of the demo (35.61): at (0.50, 0, 0.30) the horizontal tool needs the elbow 0.5 deg from its limit; here the
 # best posture keeps every limited joint >= 17 deg from its limit
 X0 = np.array([0.58, 0.0, 0.35])
