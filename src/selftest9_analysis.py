@@ -61,6 +61,7 @@ recall and the 9-class confusion matrix (cue), chance 1 / |S|, offline command a
 same with --cal-s 2 (first 2 s of each cue).
 
 usage: python src/selftest9_analysis.py --dir D:/selftest_data/T00 --days T00_d1_G [T00_d2_G ...] [--out ...] [--cal-s 4]
+  (each day's files are read from <dir>/<day>/ if that folder has them (the panel's per-day folders, 35.75), else <dir>/)
 """
 import argparse
 import math
@@ -90,7 +91,14 @@ FS, WIN, STEP, WARMUP, REACT_S, HOLD_S, K_DC = SA.FS, SA.WIN, SA.STEP, SA.WARMUP
 EPS, P0, BETA, DECAY = 0.15, 0.05, 0.3, 0.97
 
 
+def day_folder(folder, name):
+    """35.75: the panel saves each day in <dir>/<name>/; older recordings are all in <dir>/"""
+    sub = os.path.join(folder, name)
+    return sub if os.path.isfile(os.path.join(sub, f'{name}_emg.csv')) else folder
+
+
 def load_day(folder, name, cal_s):
+    folder = day_folder(folder, name)
     X, t0, rate = SA.load_emg(os.path.join(folder, f'{name}_emg.csv'))
     F = SA.features(X)
     nw = len(F)

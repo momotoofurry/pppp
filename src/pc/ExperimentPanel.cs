@@ -140,12 +140,13 @@ class ExperimentPanel : Form
 
         // ---- SOP 5.6: save
         g = Group(left, "⑧ 存資料（5.6，複製不是移動）");
-        dest = Box(330, @"D:\selftest_data\T00", "存檔資料夾");
+        dest = Box(330, @"D:\selftest_data\T00\T00_d1_G", "存檔資料夾（每天一個，開始錄製時自動建立）");
         var pick = Btn("選…", delegate {
             using (var d = new FolderBrowserDialog()) if (d.ShowDialog() == DialogResult.OK) dest.Text = d.SelectedPath; });
         var copy = Btn("複製今天的檔案", delegate { CopyFiles(); });
         Row(g, dest, pick); Row(g, copy); needIdle.Add(copy);
-        g.Controls.Add(Hint("帶子位置照片請自己改名成 <代號>_d<天>_strap.jpg（例如 T00_d1_strap.jpg）一起放進去，再另外備份一份。"));
+        g.Controls.Add(Hint("每天一個資料夾：D:\\selftest_data\\<代號>\\<今天的檔名>，按「開始錄製」時自動建立。\n"
+            + "帶子位置照片請自己改名成 <代號>_d<天>_strap.jpg（例如 T00_d1_strap.jpg）放進同一個資料夾，再另外備份一份。"));
 
         // ---- right: log and raw command line
         log.Dock = DockStyle.Fill; log.ReadOnly = true; log.BackColor = Color.Black; log.ForeColor = Color.Gainsboro;
@@ -236,7 +237,8 @@ class ExperimentPanel : Form
     void UpdateName()
     {
         nameLbl.Text = "今天的檔名：" + Name0;
-        if (dest != null && dest.Text.StartsWith(@"D:\selftest_data\")) dest.Text = @"D:\selftest_data\" + subj.Text.Trim();
+        // 35.75: one folder per day, D:\selftest_data\<subject>\<today's file name>
+        if (dest != null && dest.Text.StartsWith(@"D:\selftest_data\")) dest.Text = Path.Combine(@"D:\selftest_data\" + subj.Text.Trim(), Name0);
     }
 
     void UpdateState()
@@ -320,6 +322,7 @@ class ExperimentPanel : Form
             bridge = Launch(args, true);
             bridgeIn = new StreamWriter(bridge.StandardInput.BaseStream, Encoding.Default) { AutoFlush = true };
             for (int i = 0; i < 9; i++) { calCount[i] = 0; ShowCal(i); }
+            EnsureDayDir();
             calibrateBtn.BackColor = SystemColors.Control; calibrateBtn.Text = calibrateBtn.Text.Replace(" ✓", "");
             bridge.Exited += delegate {
                 Log("（橋接程式已結束，代碼 " + bridge.ExitCode + "）", Color.SkyBlue);
@@ -397,6 +400,19 @@ class ExperimentPanel : Form
         RunTool(args, "verify");
         Log("看到「OK: all files are there」就好；有 WARNING 就截圖，不要刪任何檔案。", Color.Gold);
         Log("（自我測試沒有打 report 1，所以「no predictions from the board」這一條是預期的；分析用的是肌電檔，不受影響。）", Color.Gold);
+    }
+
+    // 35.75: create today's folder when the recording starts (photos can go in right away); the recording itself is
+    // still written to the tool folder and copied with ⑧ as before. A failure only logs: it never stops the recording.
+    void EnsureDayDir()
+    {
+        string to = dest.Text.Trim();
+        if (to == "") return;
+        try {
+            bool had = Directory.Exists(to);
+            Directory.CreateDirectory(to);
+            Log((had ? "今天的資料夾已經存在：" : "建立今天的資料夾：") + to + "（帶子照片也放這裡；錄完按 ⑧ 複製）", Color.LightGreen);
+        } catch (Exception e) { Log("無法建立今天的資料夾 " + to + "：" + e.Message + "（錄製不受影響，錄完在 ⑧ 換一個資料夾）", Color.OrangeRed); }
     }
 
     void CopyFiles()

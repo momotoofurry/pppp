@@ -27,6 +27,9 @@ def main():
         print(s, flush=True)
         lines.append(s)
 
+    sub = os.path.join(a.dir, a.name)             # 35.75: per-day folder <dir>/<name>/, else the old flat <dir>/
+    if os.path.isfile(os.path.join(sub, f'{a.name}_emg.csv')):
+        a.dir = sub
     emg = pd.read_csv(os.path.join(a.dir, f'{a.name}_emg.csv'))
     ops = pd.read_csv(os.path.join(a.dir, f'{a.name}_ops.csv'))
     notes = ' | '.join(str(c) for c in ops.command if str(c).startswith('note'))
