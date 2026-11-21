@@ -48,6 +48,12 @@ with the same placement:
   pass only. Per later day d: D3_d = A_acc - A_cue, A = window accuracy over all probe windows (P0-P2 pooled), S9.
   GO if mean D3 >= +2 points and D3 > 0 on at least ceil(2/3 x (days - 1)) later days; else NO-GO.
   Reported, not decided: S7, S5, and acc_soft (acc + every day's soft labels) - cue.
+Comparison groups added 2026-11-22 (35.74), reported only; rules 1-3 are computed exactly as before:
+  fixed     no recalibration: the day-1 model, with day 1's z-score, used unchanged on each later day's probes
+  cue_self  self-training: as cue_soft, but the expected command of the prior is the model's OWN decided command
+            (first run of K_DC equal non-Rest predictions), not the cued one: same amount of extra data, no task
+            information. Answers whether cue_soft's gain comes from the task information or just from more windows.
+  acc_self  acc + self-training labels every day (vs acc_soft)
 Also reported: the board's real-time commands in the task segments (cued-pass model): right / wrong / none and the
 latency from the cue to the first command (TaskScreen latency_ms, median and quartiles; includes the user's reaction).
 Also reported: per probe, cue-level majority accuracy, bootstrap 95 % intervals over cues (2000 resamples), per-class
@@ -225,22 +231,30 @@ def decide(mdl, X):
 def replay(day, sname, cond):
     """-> per probe a list of (cue, true, preds); command counts in the task trials"""
     mdl = Model(day['F'], day['cal_rows'], day['cal_lab'], SETS[sname])
-    return run_day(day, SETS[sname], mdl, cond == 'cue_soft')
+    return run_day(day, SETS[sname], mdl, cond in ('cue_soft', 'cue_self'), 'self' if cond == 'cue_self' else 'task')
 
 
-def replay_days(days, sname, soft):
-    """rule 3: one model carried across the days (acc / acc_soft); -> per day the run_day result"""
+def replay_days(days, sname, soft, label='task'):
+    """rule 3: one model carried across the days (acc / acc_soft / acc_self); -> per day the run_day result"""
     out, mdl = [], None
     for day in days:
         if mdl is None:
             mdl = Model(day['F'], day['cal_rows'], day['cal_lab'], SETS[sname])
         else:
             mdl.new_session(day['F'], day['cal_rows'], day['cal_lab'])
-        out.append(run_day(day, SETS[sname], mdl, soft))
+        out.append(run_day(day, SETS[sname], mdl, soft, label))
     return out
 
 
-def run_day(day, classes, mdl, soft):
+def replay_fixed(days, sname):
+    """35.74 'fixed': the day-1 model (and day 1's z-score) never changed; -> per later day the run_day result"""
+    mdl = Model(days[0]['F'], days[0]['cal_rows'], days[0]['cal_lab'], SETS[sname])
+    return [run_day(day, SETS[sname], mdl, False) for day in days[1:]]
+
+
+def run_day(day, classes, mdl, soft, label='task'):
+    """label: 'task' = the cued command is the prior's expected command (cue_soft); 'self' = the model's own
+    decided command (self-training, 35.74)"""
     F = day['F']
     cond = 'cue_soft' if soft else 'cue'
     probes = {}
@@ -260,7 +274,7 @@ def run_day(day, classes, mdl, soft):
             cmd['cmd'] += 1
             cmd['ok'] += int(pred == g)
             if cond == 'cue_soft':
-                mdl.soft(X, g)
+                mdl.soft(X, g if label == 'task' else pred)
     return [probes[k] for k in sorted(probes)], cmd
 
 
@@ -316,7 +330,7 @@ def main():
         p('set  classes  chance   window acc %   cue-majority %   95 % CI (cues)   per probe (window %)')
         res = {}
         for s in ORDER:
-            res[s] = {c: replay(d, s, c) for c in ('cue', 'cue_soft')}
+            res[s] = {c: replay(d, s, c) for c in ('cue', 'cue_soft', 'cue_self')}
             pr_cue = res[s]['cue'][0]
             allc = [x for pr in pr_cue for x in pr]
             wa, ma, lo, hi = summarize(allc, rng)
@@ -342,9 +356,19 @@ def main():
             D[s].append(dd)
             p(f"{s}: " + '  '.join(f'P{k} {win_acc(pc[k]):5.1f} -> {win_acc(ps[k]):5.1f}' for k in range(len(pc)))
               + f'   D = {dd:+.2f} (bootstrap 95 % {lo:+.2f}, {hi:+.2f})')
+        p('(reported, not decided; 35.74) self-training: probe window accuracy % (cue -> cue_self), '
+          'D_self = mean over P1, P2 of (cue_self - cue); D - D_self = what the task information adds')
+        for s in ORDER:
+            pc, pf = res[s]['cue'][0], res[s]['cue_self'][0]
+            if len(pc) < 3:
+                continue
+            dself = np.mean([win_acc(pf[k]) - win_acc(pc[k]) for k in (1, 2)])
+            dtask = np.mean([win_acc(res[s]['cue_soft'][0][k]) - win_acc(pc[k]) for k in (1, 2)])
+            p(f"{s}: " + '  '.join(f'P{k} {win_acc(pc[k]):5.1f} -> {win_acc(pf[k]):5.1f}' for k in range(len(pc)))
+              + f'   D_self = {dself:+.2f}, D - D_self = {dtask - dself:+.2f}')
         p('\noffline commands in the task trials (first run of 3 equal non-Rest windows)')
         for s in ORDER:
-            for c in ('cue', 'cue_soft'):
+            for c in ('cue', 'cue_soft', 'cue_self'):
                 m = res[s][c][1]
                 p(f"{s} {c:8s}: trials {m['trials']}, commands {m['cmd']}, right {m['ok']}, none {m['miss']}, "
                   f"command accuracy {100 * m['ok'] / max(m['cmd'], 1):.1f} %")
@@ -380,10 +404,17 @@ def main():
             cue = [win_acc([x for pr in replay(dd, s, 'cue')[0] for x in pr]) for dd in days]
             acc = [win_acc([x for pr in r[0] for x in pr]) for r in replay_days(days, s, False)]
             accs = [win_acc([x for pr in r[0] for x in pr]) for r in replay_days(days, s, True)]
+            accf = [win_acc([x for pr in r[0] for x in pr]) for r in replay_days(days, s, True, 'self')]
+            fix = [float('nan')] + [win_acc([x for pr in r[0] for x in pr]) for r in replay_fixed(days, s)]
             D3[s] = [acc[k] - cue[k] for k in range(1, len(days))]
             p(f'{s}: ' + '  '.join(f"{days[k]['name']}: cue {cue[k]:5.1f}, acc {acc[k]:5.1f}, acc_soft {accs[k]:5.1f}"
                                    for k in range(1, len(days)))
               + f'   D3 = {np.mean(D3[s]):+.2f}, acc_soft - cue {np.mean([accs[k] - cue[k] for k in range(1, len(days))]):+.2f}')
+            later = range(1, len(days))
+            p(f'    (reported, not decided; 35.74) ' + '  '.join(f"{days[k]['name']}: fixed {fix[k]:5.1f}, "
+                                                                f"acc_self {accf[k]:5.1f}" for k in later)
+              + f'   cue - fixed {np.mean([cue[k] - fix[k] for k in later]):+.2f}, '
+              f'acc_soft - acc_self {np.mean([accs[k] - accf[k] for k in later]):+.2f}')
         dbar = float(np.mean(D3['S9']))
         pos = sum(x > 0 for x in D3['S9'])
         need = math.ceil(2 / 3 * len(D3['S9']))
