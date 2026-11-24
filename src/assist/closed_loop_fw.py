@@ -24,6 +24,8 @@ usage (container): python src/assist/closed_loop_fw.py --dir /sd/T00 [--days T00
   --prior P (35.86): a goal prior from speech / an LLM at the start of every trial: with probability P it names the
   target object (and, separately, the target shelf), else a random other one; the named one gets --prior-mass, the
   rest share the remainder. modes.py: P(g) x prior; a low-prior object / shelf locks only after a 1 s stop.
+  --scene crowded (35.87): 6 objects, two side by side (8 cm apart) on each of 3 lower shelves, 3 empty upper shelves
+  for putting down (the 3-object scene of 35.63 separates its objects by 25-50 cm).
 """
 import argparse
 import ctypes
@@ -242,6 +244,12 @@ class Player:
 LABEL_CLASSES = ('up', 'down', 'left', 'right', 'rest')
 
 
+# 35.87: crowded scene: lower shelf tops z 0.05, upper 0.25, y -0.25 / 0 / 0.25, x 0.72; two objects per lower shelf
+CROWD_LOWER = [(0.72, y, 0.05) for y in (-0.25, 0.0, 0.25)]
+CROWD_SHELVES = np.array(CROWD_LOWER + [(0.72, y, 0.25) for y in (-0.25, 0.0, 0.25)])
+CROWD_OBJ = np.array([(x, y + dy, z + 0.05) for (x, y, z) in CROWD_LOWER for dy in (-0.04, 0.04)])
+
+
 def prior_vec(rng, n, target):
     named = target if rng.random() < PRIOR else int(rng.choice([k for k in range(n) if k != target]))
     v = np.full(n, (1 - PRIOR_MASS) / (n - 1))
@@ -361,7 +369,10 @@ def main():
     ap.add_argument('--prior', type=float, default=None)
     ap.add_argument('--prior-mass', type=float, default=0.8)
     ap.add_argument('--labels', default='both', choices=['both', 'off', 'on'])
+    ap.add_argument('--scene', default='3obj', choices=['3obj', 'crowded'])
     a = ap.parse_args()
+    if a.scene == 'crowded':
+        MS.OBJ, MS.SHELVES = CROWD_OBJ.copy(), CROWD_SHELVES.copy()
     global GRIP_CMDS, PRIOR, PRIOR_MASS
     GRIP_CMDS, PRIOR, PRIOR_MASS = a.grip_cmds, a.prior, a.prior_mass
     global LABEL_CLASSES
@@ -375,7 +386,8 @@ def main():
         lines.append(s)
     p(f'closed loop with rt_lda.c (S7, gate 0.5, k 5, stop k 2) and hindsight range labels ({a.label_classes}); '
       f'{a.sessions} sessions x {a.trials} trials; first half pool A, second half pool B (held out); grip commands '
-      f'{a.grip_cmds}; goal prior ' + ('off' if a.prior is None else f'P {a.prior} mass {a.prior_mass}'))
+      f'{a.grip_cmds}; goal prior ' + ('off' if a.prior is None else f'P {a.prior} mass {a.prior_mass}')
+      + f'; scene {a.scene} ({len(MS.OBJ)} objects, {len(MS.SHELVES)} shelves)')
     p('  donning  labels  half   success   time median s   wrong locks/trial   wrong-direction steps   '
       'ranges/trial   windows added/trial   label error (vs intent)')
     allres = []
