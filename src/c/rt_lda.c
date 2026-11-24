@@ -110,6 +110,7 @@ void rtl_init(const rtl_config_t *cfg)
     s_gate_k = 0.0f;
     s_gate_thr = -1.0f;
     s_gate_mode = 0;
+    ld_set_active(0xFFFFFFFFu);
 }
 
 static float activity(const float *feat)
@@ -140,10 +141,34 @@ static float class_median(int n, int c)
     return (m & 1) ? s_act[m / 2] : 0.5f * (s_act[m / 2 - 1] + s_act[m / 2]);
 }
 
+/* median activity of all the cued windows of the active non-Rest classes (mode 2) */
+static float pooled_median(int n)
+{
+    int m = 0;
+    for (int i = 0; i < n; i++) {
+        if (s_lab_y[i] == LD_CLASSES - 1 || !ld_is_active(s_lab_y[i]))
+            continue;
+        float v = activity(s_lab_x[i]);
+        int j = m++;
+        while (j > 0 && s_act[j - 1] > v) {
+            s_act[j] = s_act[j - 1];
+            j--;
+        }
+        s_act[j] = v;
+    }
+    if (!m)
+        return -1.0f;
+    return (m & 1) ? s_act[m / 2] : 0.5f * (s_act[m / 2 - 1] + s_act[m / 2]);
+}
+
 static float gate_threshold(int n)
 {
+    if (s_gate_mode == 2)
+        return pooled_median(n);
     float rest = class_median(n, LD_CLASSES - 1), lo = -1.0f;
     for (int c = 0; c < LD_CLASSES - 1; c++) {
+        if (!ld_is_active(c))
+            continue;
         float v = class_median(n, c);
         if (v < 0.0f)
             return -1.0f;
@@ -306,6 +331,7 @@ static void on_control(const uint8_t *p, uint16_t len)
             s_cfg.dist2 = (uint16_t)(p[3] | (p[4] << 8));
             s_cfg.k = p[5];
             dc_init(&s_dc, 500, p[5]);
+            dc_set_rest_k(&s_dc, len >= 7 ? p[6] : 0);
         }
         break;
     case RTL_SET_REPORT:
@@ -328,10 +354,14 @@ static void on_control(const uint8_t *p, uint16_t len)
             s_gate_mode = p[3];
         }
         break;
+    case RTL_SET_CLASSES:
+        if (len >= 3 && !s_fit_request && !s_task_request)
+            ld_set_active((uint32_t)(p[1] | (p[2] << 8)));
+        break;
     case RTL_TASK_LABEL:
         if (len < 3 || s_fit_request || s_task_request)
             break;
-        if (p[1] >= LD_CLASSES - 1) {
+        if (p[1] >= LD_CLASSES - 1 || !ld_is_active(p[1])) {
             status(RTL_EV_TASK, -4);
             break;
         }
@@ -347,12 +377,12 @@ static void on_control(const uint8_t *p, uint16_t len)
             const int e = p[1];
             int others = 0;
             for (int c = 0; c < LD_CLASSES - 1; c++)
-                others += c != e && ((p[2] >> c) & 1u);
+                others += c != e && ((p[2] >> c) & 1u) && ld_is_active(c);
             for (int c = 0; c < LD_CLASSES; c++)
                 s_prior[c] = RTL_P_INVALID;
             s_prior[e] = others ? 1.0f - RTL_EPS : 1.0f - RTL_P0;
             for (int c = 0; c < LD_CLASSES - 1; c++)
-                if (c != e && ((p[2] >> c) & 1u))
+                if (c != e && ((p[2] >> c) & 1u) && ld_is_active(c))
                     s_prior[c] = RTL_EPS / (float)others;
             s_prior[LD_CLASSES - 1] = RTL_P0;
             s_pend_open = 0;
@@ -400,7 +430,17 @@ void rtl_idle(void)
     }
     if (!s_fit_request)
         return;
-    const int n = (int)s_cnt.label_windows;
+    /* the cued windows of inactive classes are dropped from the session buffer (kept in order) */
+    int n = 0;
+    for (int i = 0; i < (int)s_cnt.label_windows; i++) {
+        if (!ld_is_active(s_lab_y[i]))
+            continue;
+        if (n != i) {
+            memcpy(s_lab_x[n], s_lab_x[i], sizeof s_lab_x[0]);
+            s_lab_y[n] = s_lab_y[i];
+        }
+        n++;
+    }
     int r = -3;
     const uint32_t t0 = now();
     if (n >= RTL_LABEL_MIN) {
@@ -423,7 +463,7 @@ void rtl_idle(void)
             ld_add(s_q, s_lab_y[i]);
         }
         r = ld_fit();
-        if (r == 0 && (s_gate_thr < 0.0f || s_gate_mode == 1)) {
+        if (r == 0 && (s_gate_thr < 0.0f || s_gate_mode >= 1)) {
             const float t = gate_threshold(n);
             if (t > 0.0f)
                 s_gate_thr = t;

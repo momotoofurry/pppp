@@ -18,7 +18,8 @@
  *                                     after a fit (or after reset) starts a new session buffer
  *   RTL_LABEL_END (3)
  *   RTL_FIT (4)                       session statistics + add the session's windows + refit, then run mode
- *   RTL_SET_REJECT (5) margin_x100 u16, dist2 u16 (0 = off), k u8
+ *   RTL_SET_REJECT (5) margin_x100 u16, dist2 u16 (0 = off), k u8 [, k_rest u8]
+ *                                     k_rest (report 35.79): windows that establish Rest (stop); 0 or absent = k
  *   RTL_SET_REPORT (6) flags u8       bit 0: PK_PRED for every classified window
  *   RTL_FORGET (11)                   drop all accumulated labels (ld_reset), e.g. after the band was moved
  *   RTL_TASK_LABEL (12) expected u8, valid u8 [, window u32]
@@ -41,6 +42,14 @@
  *                                     activity of the Rest windows x smallest median of a gesture) over the cued
  *                                     windows of a fit: mode 0 the first fit after init / RTL_FORGET (day 1), mode
  *                                     1 every fit. k_x100 = 0: off (default). PK_PRED byte 12 = 1 for a gated window.
+ *                                     mode 2 (report 35.78): threshold = median activity of ALL the cued windows of
+ *                                     the active non-Rest classes, new at every fit (k 0.5 = half a typical
+ *                                     gesture; the cued Rest is not used, it can carry mains noise).
+ *   RTL_SET_CLASSES (14) mask u16     active classes (report 35.78): bit c = class c (Rest always on; default all).
+ *                                     Inactive classes are never predicted; at the next RTL_FIT their cued windows
+ *                                     are left out of the z-score, the sums and the gate threshold, and their task
+ *                                     labels are refused (-4). E.g. S7 of the 9-class build = 0x1CF (no index
+ *                                     point, no thumb up). Not while a fit or task update is pending.
  * Status events (PK_STATUS): RTL_EV_FIT value = 0 or the error (-1 a gesture has no window in the sums, -2
  *   degenerate data, -3 fewer than RTL_LABEL_MIN session windows); RTL_EV_LOST packets lost; RTL_EV_LABEL_FULL
  *   session buffer full; RTL_EV_FORGOT; RTL_EV_FIT_US value = duration of the fit in microseconds (sent before
@@ -73,7 +82,7 @@
 #define RTL_MAV0 (4 * FE_CH)              /* first MAV feature (feature-major, features.h) */
 
 enum { RTL_STREAM_RESET = 1, RTL_LABEL_START = 2, RTL_LABEL_END = 3, RTL_FIT = 4, RTL_SET_REJECT = 5,
-       RTL_SET_REPORT = 6, RTL_FORGET = 11, RTL_TASK_LABEL = 12, RTL_SET_GATE = 13 };
+       RTL_SET_REPORT = 6, RTL_FORGET = 11, RTL_TASK_LABEL = 12, RTL_SET_GATE = 13, RTL_SET_CLASSES = 14 };
 enum { RTL_EV_FIT = 1, RTL_EV_LOST = 3, RTL_EV_LABEL_FULL = 4, RTL_EV_FORGOT = 16, RTL_EV_FIT_US = 17,
        RTL_EV_TASK = 18, RTL_EV_TASK_US = 19, RTL_EV_GATE_THR = 20,
        /* diagnostics sent by the board main loop (app_rt_lda.c), same numbers as rt.h */
@@ -87,7 +96,7 @@ typedef struct {
     uint16_t margin_x100;                           /* reject below this margin (0: accept all) */
     uint16_t dist2;                                 /* reject above this squared distance (0: off) */
     uint8_t k;
-} rtl_config_t;
+} rtl_config_t;                                     /* k_rest starts equal to k (RTL_SET_REJECT sets it) */
 
 typedef struct {
     uint32_t windows, windows_used, classified, skipped_busy, commands, lost_packets, seq_gaps, label_windows, fits;

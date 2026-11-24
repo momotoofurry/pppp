@@ -35,11 +35,15 @@ def main():
     notes = ' | '.join(str(c) for c in ops.command if str(c).startswith('note'))
     m = re.search(r'note classes (\d+) ([A-Za-z ]+)', notes)
     gest = m.group(2).split()[:int(m.group(1))] if m else SIX
+    # 35.80: an S7 recording (TrignoBridge --preset s7, panel set S7) cues 7 of the 9 gestures, not Point / ThumbUp
+    s7 = any(str(c).strip() == 'preset s7' for c in ops.command)
+    skip = {4, 5} if s7 and len(gest) == 9 else set()
     ms = re.search(r'note slots (\S+)', notes)
     slots = ms.group(1).split(':') if ms else [str(i) for i in range(1, 9)]
     t = emg.unix_ms.to_numpy()
     fr = emg.frame.to_numpy()
-    p(f'{a.name}: {len(emg)} rows, {(t[-1] - t[0]) / 60000:.2f} min, gestures {len(gest)}, slots {":".join(slots)}')
+    p(f'{a.name}: {len(emg)} rows, {(t[-1] - t[0]) / 60000:.2f} min, gestures {len(gest)}'
+      + (' (S7: Point / ThumbUp not cued)' if skip else '') + f', slots {":".join(slots)}')
     df = np.diff(fr)
     p(f'frame steps != 1: {(df != 1).sum()} (largest {df.max()}); pc time gaps > 200 ms: {(np.diff(t) > 200).sum()} '
       f'(largest {np.diff(t).max():.0f} ms)')
@@ -75,6 +79,9 @@ def main():
     p('\ncued gestures: RMS (uV) over 0.5-4.0 s of each cue, all passes averaged; * = largest channel of the gesture')
     p('gesture        n  ' + ''.join(f'{nm[:12]:>14s}' for nm in names))
     for g, gname in enumerate(gest):
+        if g in skip:
+            p(f'{g} {gname:11s} -  (not used in S7)')
+            continue
         rows = ops[ops.command.astype(str) == f'cal {g}']
         vals = []
         for u in rows.unix_ms:

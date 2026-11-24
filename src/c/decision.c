@@ -16,7 +16,13 @@ void dc_init(dc_state_t *s, uint16_t tau_permille, uint8_t k)
 {
     s->tau_permille = tau_permille;
     s->k = k ? k : 1;
+    s->k_rest = s->k;
     dc_reset(s);
+}
+
+void dc_set_rest_k(dc_state_t *s, uint8_t k_rest)
+{
+    s->k_rest = k_rest ? k_rest : s->k;
 }
 
 void dc_reset(dc_state_t *s)
@@ -41,14 +47,16 @@ int dc_step(dc_state_t *s, const uint16_t *votes, int total, dc_out_t *out)
         s->run = 0;
         return DC_NONE;
     }
+    const uint8_t need = top == DC_CLASSES - 1 ? s->k_rest : s->k;
+    const uint8_t cap = s->k > s->k_rest ? s->k : s->k_rest;
     if (top == s->last) {
-        if (s->run < s->k)
+        if (s->run < cap)
             s->run++;
     } else {
         s->last = (int8_t)top;
         s->run = 1;
     }
-    if (s->run < s->k || top == s->latched)
+    if (s->run < need || top == s->latched)
         return DC_NONE;
     s->latched = (int8_t)top;
     out->established = (int8_t)top;

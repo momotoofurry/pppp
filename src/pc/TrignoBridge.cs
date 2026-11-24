@@ -15,6 +15,7 @@
 //       largest |value| and the RMS; warns when a channel comes near the +-8.19 mV the MCU encoding can carry.
 //   TrignoBridge run    --port COM5 [--tcu 127.0.0.1] [--rate 2000] [--emg-csv emg.csv] [--mcu-csv mcu.csv]
 //                       [--ops-csv ops.csv] [--udp 50555] [--gate 1] [--script commands.txt] [--slots 1-8]
+//                       [--firmware lda [--classes 9 [--preset s7]]]
 //       --slots: which 8 TCU sensor slots become channels 1-8, in that order (default 1-8). Ranges a-b and lists
 //       joined with ':' (no commas: cmd.exe splits on them), e.g. --slots 4-11 or --slots 1-4:9-12; a slot may repeat
 //       (4 sensors: --slots 5:11:15:16:5:11:15:16). emg.csv, the
@@ -47,7 +48,17 @@
 //       alignment gate off (the LDA firmware has no 'align') and adds the commands
 //         forget                      drop all accumulated labels (RTL_FORGET), e.g. after the band was moved
 //         gate <k_x100> <mode>        activity gate (RTL_SET_GATE): k_x100 (0 = off, 100 = k 1.0), mode 0 = threshold
-//                                     of day 1, 1 = new threshold at every calibrate
+//                                     of day 1, 1 = new threshold at every calibrate, 2 = k x the median activity of
+//                                     all the cued gesture windows, new at every calibrate (rtl_task_s7b, 35.78)
+//         classes <mask>              active classes (RTL_SET_CLASSES, rtl_task_s7b): bit c = class c, decimal or 0x..;
+//                                     the others are never predicted and are left out at the next calibrate
+//         reject <margin_x100> <dist2> <k> [<k_rest>]
+//                                     RTL_SET_REJECT: margin (0 = off), Mahalanobis limit (0 = off), windows that must
+//                                     agree for a command, and for Rest (stop; 0 / absent = k; rtl_task_s7b, 35.79).
+//                                     ('decision' is the frozen firmware's command; the LDA firmware ignores it.)
+//         preset s7                   = classes 0x1CF (no Point / ThumbUp), gate 50 2, reject 0 0 5 2 (report 35.79);
+//                                     needs --classes 9. Send it before calibrate (the class mask and the gate act at
+//                                     the fit). --preset s7 sends it right after the port is opened.
 //         task <expected> <mask> [window]  task label for the last command (RTL_TASK_LABEL), normally sent by
 //                                     kinova_bridge.py --task-labels through --task-udp
 //       In the LDA firmware cal / calend / calibrate are LABEL_START / LABEL_END / FIT (same numbers).
@@ -75,7 +86,8 @@ static class Proto
     public const byte SAMPLES = 0x01, CONTROL = 0x02, COMMAND = 0x81, STATUS = 0x82, PRED = 0x83;
     public const byte STREAM_RESET = 1, CAL_START = 2, CAL_END = 3, CALIBRATE = 4, SET_DECISION = 5, SET_REPORT = 6,
                       ALIGN_START = 7, ALIGN_END = 8, LOAD = 9, SET_ADAPT = 10;
-    public const byte FORGET = 11, TASK_LABEL = 12, SET_GATE = 13;          // LDA firmware (rt_lda.h)
+    public const byte FORGET = 11, TASK_LABEL = 12, SET_GATE = 13, SET_CLASSES = 14;   // LDA firmware (rt_lda.h)
+    public const byte SET_REJECT = SET_DECISION;                            // the LDA firmware's meaning of 5
     public const int CH = 8, FRAMES_PER_PACKET = 20, MAX_PAYLOAD = 512, OVERHEAD = 9;
     public const double LSB_VOLT = 2.5e-7;
     public static string[] GESTURES = { "Power", "Lateral", "Tripod", "Pointer", "Open", "Rest" };
@@ -121,8 +133,13 @@ static class Proto
     public static byte[] Control(byte sub, params int[] args)
     {
         if (sub == CAL_START || sub == SET_REPORT || sub == SET_ADAPT) return Build(CONTROL, new byte[] { sub, (byte)args[0] });
+        if (sub == SET_REJECT && args.Length >= 4)          // LDA: margin_x100 u16, dist2 u16, k u8, k_rest u8
+            return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)(args[0] >> 8), (byte)args[1], (byte)(args[1] >> 8),
+                                               (byte)args[2], (byte)args[3] });
         if (sub == SET_DECISION)
             return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)(args[0] >> 8), (byte)args[1] });
+        if (sub == SET_CLASSES)
+            return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)(args[0] >> 8) });
         if (sub == SET_GATE)
             return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)(args[0] >> 8), (byte)args[1] });
         if (sub == TASK_LABEL && args.Length >= 3)
@@ -823,13 +840,39 @@ static class Program
             if (adaptOn) NeedAlign("adapt 1"); else Gate(true, "adapt 0: fixed model, no alignment");
         }
         else if (c == "note" && p.Length >= 2) { Console.WriteLine("  note saved in ops.csv"); return true; }
-        else if (c == "decision" && p.Length == 3) Send(Proto.Control(Proto.SET_DECISION, int.Parse(p[1]), int.Parse(p[2])));
+        else if (c == "decision" && p.Length == 3) {
+            if (lda) { Console.WriteLine("the LDA firmware ignores 'decision': use reject <margin_x100> <dist2> <k> [<k_rest>]"); return false; }
+            Send(Proto.Control(Proto.SET_DECISION, int.Parse(p[1]), int.Parse(p[2])));
+        }
+        else if (lda && c == "reject" && (p.Length == 4 || p.Length == 5)) {
+            int m = int.Parse(p[1]), d2 = int.Parse(p[2]), k = int.Parse(p[3]), kr = p.Length == 5 ? int.Parse(p[4]) : 0;
+            if (m < 0 || m > 65535 || d2 < 0 || d2 > 65535 || k < 1 || k > 255 || kr < 0 || kr > 255) {
+                Console.WriteLine("reject <margin_x100 0-65535> <dist2 0-65535> <k 1-255> [<k_rest 0-255>]"); return false; }
+            Send(Proto.Control(Proto.SET_REJECT, m, d2, k, kr));
+        }
+        else if (lda && c == "classes" && p.Length == 2) {
+            int mask;
+            string v = p[1].ToLowerInvariant();
+            bool okm = v.StartsWith("0x") ? int.TryParse(v.Substring(2), NumberStyles.HexNumber, IC, out mask) : int.TryParse(v, out mask);
+            int all = (1 << Proto.K) - 1;
+            if (!okm || mask < 0 || mask > all) { Console.WriteLine("classes <mask 0-" + all + " or 0x..>: bit c = class c (" + Proto.GestureList() + ")"); return false; }
+            Send(Proto.Control(Proto.SET_CLASSES, mask));
+            var on = new List<string>();
+            for (int g = 0; g < Proto.K; g++) if (((mask >> g) & 1) != 0 || g == Proto.K - 1) on.Add(Proto.GESTURES[g]);
+            Console.WriteLine("  active classes after the next calibrate: " + string.Join(" ", on));
+        }
+        else if (lda && c == "preset" && p.Length == 2 && p[1] == "s7") {
+            if (Proto.K != 9) { Console.WriteLine("preset s7 needs --classes 9"); return false; }
+            bool all = DoCommand1("classes 0x1CF") & DoCommand1("gate 50 2") & DoCommand1("reject 0 0 5 2");
+            Console.WriteLine("  preset s7: S7 (no Point / ThumbUp), activity gate 0.5 x median gesture, k 5, stop k 2 (report 35.79)");
+            return all;
+        }
         else if (c == "report" && p.Length == 2) Send(Proto.Control(Proto.SET_REPORT, int.Parse(p[1])));
         else if (c == "status") return true;
         else if (c == "forget") Send(Proto.Control(Proto.FORGET));
         else if (c == "gate" && p.Length == 3) {
             int k = int.Parse(p[1]), mode = int.Parse(p[2]);
-            if (k < 0 || k > 65535 || mode < 0 || mode > 1) { Console.WriteLine("gate <k_x100 0-65535> <mode 0|1>"); return false; }
+            if (k < 0 || k > 65535 || mode < 0 || mode > 2) { Console.WriteLine("gate <k_x100 0-65535> <mode 0|1|2>"); return false; }
             Send(Proto.Control(Proto.SET_GATE, k, mode));
         }
         else if (c == "task" && (p.Length == 3 || p.Length == 4)) {
@@ -840,7 +883,7 @@ static class Program
             return true;                                          // quiet: one per robot command
         }
         else { Console.WriteLine("? reset | cal <0-5> | calend | calibrate | load | adapt <0|1> | verify <0-5> | align | decision <tau_permille> <k> | report <0|1> | note <text> | status | quit"
-                                 + (lda ? " | forget | gate <k_x100> <mode> | task <e> <mask> [window]" : "")); return false; }
+                                 + (lda ? " | forget | gate <k_x100> <mode> | classes <mask> | reject <margin> <dist2> <k> [<k_rest>] | preset s7 | task <e> <mask> [window]" : "")); return false; }
         Console.WriteLine(string.Format(IC, "[{0:F1} s] sent: {1}", clock.Elapsed.TotalSeconds, line.Trim()));
         return true;
     }
@@ -959,7 +1002,9 @@ static class Program
         Console.WriteLine("gestures (" + Proto.K + "): " + Proto.GestureList());
         lock (opsCsv) { opsCsv.WriteLine(UnixMs().ToString("F1", IC) + ",note classes " + Proto.K + " " + string.Join(" ", Proto.GESTURES) + ",1"); opsCsv.Flush(); }
         gateOn = !lda && Get(a, "gate", "1") != "0";
-        if (lda) Console.WriteLine("firmware lda: LDA main line (rt_lda.c); no alignment gate; extra commands forget | gate | task");
+        if (lda) Console.WriteLine("firmware lda: LDA main line (rt_lda.c); no alignment gate; extra commands forget | gate | classes | reject | preset | task");
+        string preset = Get(a, "preset", "");
+        if (preset != "" && (preset != "s7" || !lda || Proto.K != 9)) { Console.WriteLine("--preset: only s7, with --firmware lda --classes 9"); return 1; }
         Console.WriteLine(gateOn ? "alignment gate on: board commands are forwarded only after a good 'align' (--gate 0: off)"
                                  : "alignment gate off");
         if (portName.StartsWith("file:")) {
@@ -972,6 +1017,7 @@ static class Program
             var reader = new Thread(Reader) { IsBackground = true };
             reader.Start();
         }
+        if (preset != "" && !DoCommand("preset " + preset)) { Console.WriteLine("preset " + preset + " failed"); return 1; }
         int taskPort = int.Parse(Get(a, "task-udp", "0"));
         if (taskPort > 0) {
             var tl = new Thread(() => TaskLabels(taskPort)) { IsBackground = true };

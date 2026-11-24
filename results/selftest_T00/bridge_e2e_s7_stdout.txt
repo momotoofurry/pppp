@@ -1,0 +1,79 @@
+TCU banner: Delsys Trigno System Digital Protocol Version (fake_tcu_s7.py)
+TCU: ENDIAN LITTLE -> OK; ENDIANNESS? -> OK; RATE? -> OK
+TCU slots 1,2,3,4,5,6,7,8 -> channels 1-8
+gestures (9): 0 WristExt, 1 WristFlex, 2 RadialDev, 3 UlnarDev, 4 Point, 5 ThumbUp, 6 HandOpen, 7 Fist, 8 Rest
+firmware lda: LDA main line (rt_lda.c); no alignment gate; extra commands forget | gate | classes | reject | preset | task
+alignment gate off
+no MCU: the serial bytes go to C:\Users\kirit\AppData\Local\Temp\claude\f717a9ffb3f804d0\940361ee-1e88-4b6f-b364-4f25c47f2d6e\scratchpad\s7pc\run\bridge_out.bin
+  active classes after the next calibrate: WristExt WristFlex RadialDev UlnarDev HandOpen Fist Rest
+[0.0 s] sent: classes 0x1CF
+[0.0 s] sent: gate 50 2
+[0.0 s] sent: reject 0 0 5 2
+  preset s7: S7 (no Point / ThumbUp), activity gate 0.5 x median gesture, k 5, stop k 2 (report 35.79)
+input 2000 Hz: no resampling
+START -> OK
+[0.1 s] sent: report 1
+[2.1 s] cal 0 (WristExt): do the gesture now and hold it; calend comes by itself after 4 s
+[6.1 s] calend (auto, 4 s): you can relax
+[7.9 s] cal 0 (WristExt): do the gesture now and hold it; calend comes by itself after 4 s
+[10 s] in 20041 frames (2002.9 Hz measured), out 20041, clipped 0, MCU packets 0 (PRED 0)
+[11.9 s] calend (auto, 4 s): you can relax
+[14.5 s] cal 1 (WristFlex): do the gesture now and hold it; calend comes by itself after 4 s
+[18.5 s] calend (auto, 4 s): you can relax
+[20.0 s] cal 1 (WristFlex): do the gesture now and hold it; calend comes by itself after 4 s
+[20 s] in 40039 frames (2001.3 Hz measured), out 40039, clipped 0, MCU packets 0 (PRED 0)
+[24.0 s] calend (auto, 4 s): you can relax
+[26.0 s] cal 2 (RadialDev): do the gesture now and hold it; calend comes by itself after 4 s
+[30.0 s] calend (auto, 4 s): you can relax
+[30 s] in 60030 frames (2000.0 Hz measured), out 60030, clipped 0, MCU packets 0 (PRED 0)
+[31.2 s] cal 2 (RadialDev): do the gesture now and hold it; calend comes by itself after 4 s
+[35.2 s] calend (auto, 4 s): you can relax
+[38.6 s] cal 3 (UlnarDev): do the gesture now and hold it; calend comes by itself after 4 s
+[40 s] in 80069 frames (2000.7 Hz measured), out 80069, clipped 0, MCU packets 0 (PRED 0)
+[42.6 s] calend (auto, 4 s): you can relax
+[44.4 s] cal 3 (UlnarDev): do the gesture now and hold it; calend comes by itself after 4 s
+[48.4 s] calend (auto, 4 s): you can relax
+[50 s] in 100095 frames (2000.6 Hz measured), out 100095, clipped 0, MCU packets 0 (PRED 0)
+[52.0 s] cal 4 (Point): do the gesture now and hold it; calend comes by itself after 4 s
+[56.0 s] calend (auto, 4 s): you can relax
+[57.3 s] cal 4 (Point): do the gesture now and hold it; calend comes by itself after 4 s
+[60 s] in 120105 frames (2000.5 Hz measured), out 120105, clipped 0, MCU packets 0 (PRED 0)
+[61.3 s] calend (auto, 4 s): you can relax
+[65.7 s] cal 5 (ThumbUp): do the gesture now and hold it; calend comes by itself after 4 s
+[69.7 s] calend (auto, 4 s): you can relax
+[70 s] in 140097 frames (2000.0 Hz measured), out 140097, clipped 0, MCU packets 0 (PRED 0)
+[71.8 s] cal 5 (ThumbUp): do the gesture now and hold it; calend comes by itself after 4 s
+[75.8 s] calend (auto, 4 s): you can relax
+[77.7 s] cal 6 (HandOpen): do the gesture now and hold it; calend comes by itself after 4 s
+[80 s] in 160139 frames (2000.4 Hz measured), out 160139, clipped 0, MCU packets 0 (PRED 0)
+[81.7 s] calend (auto, 4 s): you can relax
+[84.2 s] cal 6 (HandOpen): do the gesture now and hold it; calend comes by itself after 4 s
+[88.2 s] calend (auto, 4 s): you can relax
+[90 s] in 180163 frames (2000.3 Hz measured), out 180163, clipped 0, MCU packets 0 (PRED 0)
+[91.1 s] cal 7 (Fist): do the gesture now and hold it; calend comes by itself after 4 s
+[95.1 s] calend (auto, 4 s): you can relax
+[100 s] in 200172 frames (2000.3 Hz measured), out 200172, clipped 0, MCU packets 0 (PRED 0)
+[100.5 s] cal 7 (Fist): do the gesture now and hold it; calend comes by itself after 4 s
+[104.5 s] calend (auto, 4 s): you can relax
+[106.0 s] cal 8 (Rest): do the gesture now and hold it; calend comes by itself after 4 s
+[110.0 s] calend (auto, 4 s): you can relax
+[110 s] in 220174 frames (2000.3 Hz measured), out 220174, clipped 0, MCU packets 0 (PRED 0)
+[111.2 s] cal 8 (Rest): do the gesture now and hold it; calend comes by itself after 4 s
+[115.2 s] calend (auto, 4 s): you can relax
+[117.6 s] sent: calibrate
+[120 s] in 240198 frames (2000.2 Hz measured), out 240198, clipped 0, MCU packets 0 (PRED 0)
+[130 s] in 260216 frames (2000.2 Hz measured), out 260216, clipped 0, MCU packets 0 (PRED 0)
+[140 s] in 280230 frames (2000.2 Hz measured), out 280230, clipped 0, MCU packets 0 (PRED 0)
+[150 s] in 300258 frames (2000.2 Hz measured), out 300258, clipped 0, MCU packets 0 (PRED 0)
+[160 s] in 320259 frames (2000.2 Hz measured), out 320259, clipped 0, MCU packets 0 (PRED 0)
+[170 s] in 340277 frames (2000.2 Hz measured), out 340277, clipped 0, MCU packets 0 (PRED 0)
+[180 s] in 360259 frames (2000.0 Hz measured), out 360259, clipped 0, MCU packets 0 (PRED 0)
+[190 s] in 380315 frames (2000.2 Hz measured), out 380315, clipped 0, MCU packets 0 (PRED 0)
+[200 s] in 400317 frames (2000.1 Hz measured), out 400317, clipped 0, MCU packets 0 (PRED 0)
+[210 s] in 420326 frames (2000.1 Hz measured), out 420326, clipped 0, MCU packets 0 (PRED 0)
+[220 s] in 440340 frames (2000.1 Hz measured), out 440340, clipped 0, MCU packets 0 (PRED 0)
+[230 s] in 460350 frames (2000.1 Hz measured), out 460350, clipped 0, MCU packets 0 (PRED 0)
+[240 s] in 480382 frames (2000.1 Hz measured), out 480382, clipped 0, MCU packets 0 (PRED 0)
+[250 s] in 500380 frames (2000.0 Hz measured), out 500380, clipped 0, MCU packets 0 (PRED 0)
+[260 s] in 520418 frames (2000.1 Hz measured), out 520418, clipped 0, MCU packets 0 (PRED 0)
+done: 537327 frames in, 537327 out, 0 samples clipped, 0 MCU packets (0 PRED), 0 commands held before alignment

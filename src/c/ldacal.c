@@ -14,11 +14,23 @@ static float s_w[LD_CLASSES][LD_DIM];
 static float s_b[LD_CLASSES];
 static float s_rho;
 static float s_x[LD_DIM];
+#define LD_ALL ((1u << LD_CLASSES) - 1u)
+static uint32_t s_active = LD_ALL;
 
 unsigned ld_static_bytes(void)
 {
     return (unsigned)(sizeof s_g + sizeof s_sum + sizeof s_n + sizeof s_l + sizeof s_w + sizeof s_b + sizeof s_rho +
-                      sizeof s_x);
+                      sizeof s_x + sizeof s_active);
+}
+
+void ld_set_active(uint32_t mask)
+{
+    s_active = (mask & LD_ALL) | (1u << (LD_CLASSES - 1));
+}
+
+int ld_is_active(int c)
+{
+    return c >= 0 && c < LD_CLASSES && ((s_active >> c) & 1u);
 }
 
 void ld_reset(void)
@@ -53,6 +65,8 @@ int ld_fit(void)
 {
     float n_all = 0.0f;
     for (int c = 0; c < LD_CLASSES; c++) {
+        if (!ld_is_active(c))
+            continue;
         if (!(s_n[c] > 0.0f))
             return -1;
         n_all += s_n[c];
@@ -63,7 +77,8 @@ int ld_fit(void)
         for (int j = 0; j <= i; j++) {
             float v = s_g[TRI(i, j)];
             for (int c = 0; c < LD_CLASSES; c++)
-                v -= s_sum[c][i] * s_sum[c][j] / s_n[c];
+                if (ld_is_active(c))
+                    v -= s_sum[c][i] * s_sum[c][j] / s_n[c];
             s_l[TRI(i, j)] = v * inv_n;
         }
     /* OAS shrinkage */
@@ -104,6 +119,8 @@ int ld_fit(void)
         }
     /* w_c = C^-1 m_c, b_c = -m_c.w_c / 2 */
     for (int c = 0; c < LD_CLASSES; c++) {
+        if (!ld_is_active(c))
+            continue;                           /* scored -INFINITY by ld_scores */
         float *w = s_w[c];
         const float inv = 1.0f / s_n[c];
         for (int i = 0; i < LD_DIM; i++) {      /* L y = m */
@@ -129,13 +146,17 @@ int ld_fit(void)
 
 int ld_scores(const int16_t *x, float *scores)
 {
-    int best = 0;
+    int best = -1;                              /* the first active class wins ties, as before the mask */
     for (int c = 0; c < LD_CLASSES; c++) {
+        if (!ld_is_active(c)) {
+            scores[c] = -INFINITY;
+            continue;
+        }
         float v = 0.0f;
         for (int i = 0; i < LD_DIM; i++)
             v += (float)x[i] * s_w[c][i];
         scores[c] = v / LD_Q + s_b[c];
-        if (scores[c] > scores[best])
+        if (best < 0 || scores[c] > scores[best])
             best = c;
     }
     return best;

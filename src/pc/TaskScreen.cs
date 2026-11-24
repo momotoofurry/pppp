@@ -6,8 +6,11 @@
 //              [--commands grip,release,pose_A,pose_B,home] [--n 40] [--timeout 5] [--rest 2.5]
 //              [--reps 5] [--cue 2] [--gap 3] [--practice 120] [--items 1,2,3,5] [--item 60]
 //              [--retry 0|1] [--udp 50555] [--fake] [--auto] [--windowed] [--postures selftest]
-//              [--gestures six|nine]   nine (2026-11-17): the 9 directional gestures; the task's commands are then
-//                                      up, down, left, right, forward, back, grip_open, grip_close (fake keys 1-8)
+//              [--gestures six|seven|nine]   nine (2026-11-17): the 9 directional gestures; the task's commands are
+//                                      then up, down, left, right, forward, back, grip_open, grip_close (fake keys 1-8)
+//                                      seven (report 35.80): S7 of the firmware rtl_task_s7b (TrignoBridge --classes 9
+//                                      --preset s7): the 9 gestures without Point / ThumbUp; the task's commands up,
+//                                      down, left, right, grip_open, grip_close (fake keys 1-6); --n a multiple of 6
 // --postures selftest (SELFTEST.md, SOP section 4): a line at the top tells the arm posture of the next cue / trial;
 // it turns gold with '換姿勢 →' at the rest where the posture changes, and the change is logged as event 'posture'
 // (target = N / A / B / C). 1st labelled segment: neutral; 2nd: A then B after half the cues; 3rd: C then A; task
@@ -78,6 +81,9 @@ class TaskForm : Form
         { "right", new[] { "往右", "UlnarDev" } }, { "forward", new[] { "往前", "Point" } }, { "back", new[] { "往後", "ThumbUp" } },
         { "grip_open", new[] { "夾爪打開", "HandOpen" } }, { "grip_close", new[] { "夾爪夾緊", "Fist" } } };
     static readonly string[] FAKE_KEYS9 = { "up", "down", "left", "right", "forward", "back", "grip_open", "grip_close" };
+    // --gestures seven (report 35.80): S7 = the 9 classes without Point / ThumbUp (labelled cues of 7 gestures)
+    static readonly string[] GESTURES7 = { "WristExt", "WristFlex", "RadialDev", "UlnarDev", "HandOpen", "Fist", "Rest" };
+    static readonly string[] FAKE_KEYS7 = { "up", "down", "left", "right", "grip_open", "grip_close" };
     static Dictionary<string, string[]> COMMAND = new Dictionary<string, string[]> {
         { "grip", new[] { "夾", "Tripod" } }, { "release", new[] { "放", "Open" } }, { "pose_A", new[] { "位置 A", "Power" } },
         { "pose_B", new[] { "位置 B", "Pointer" } }, { "home", new[] { "回原位", "Lateral" } } };
@@ -143,8 +149,11 @@ class TaskForm : Form
         string gset = Get("gestures", "six");
         if (gset == "nine") {
             GESTURES = GESTURES9; GESTURE_ZH = GESTURE9_ZH; COMMAND = COMMAND9; FAKE_KEYS = FAKE_KEYS9;
-        } else if (gset != "six") throw new ArgumentException("--gestures: six or nine");
-        commands = Get("commands", gset == "nine" ? string.Join(",", FAKE_KEYS9) : "grip,release,pose_A,pose_B,home").Split(',');
+        } else if (gset == "seven") {
+            GESTURES = GESTURES7; GESTURE_ZH = GESTURE9_ZH; COMMAND = COMMAND9; FAKE_KEYS = FAKE_KEYS7;
+        } else if (gset != "six") throw new ArgumentException("--gestures: six, seven or nine");
+        commands = Get("commands", gset == "nine" ? string.Join(",", FAKE_KEYS9)
+                                   : gset == "seven" ? string.Join(",", FAKE_KEYS7) : "grip,release,pose_A,pose_B,home").Split(',');
         foreach (var c in commands) if (!COMMAND.ContainsKey(c)) throw new ArgumentException("unknown command " + c);
         nTrials = int.Parse(Get("n", "40")); reps = int.Parse(Get("reps", "5"));
         if (nTrials % commands.Length != 0) throw new ArgumentException("--n must be a multiple of the number of commands (balanced targets)");

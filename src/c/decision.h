@@ -30,6 +30,7 @@ enum { DC9_UP = 1, DC9_DOWN = 2, DC9_LEFT = 3, DC9_RIGHT = 4, DC9_FORWARD = 5, D
 typedef struct {
     uint16_t tau_permille;      /* rejection threshold, 0..1000 */
     uint8_t k;                  /* windows that must agree (>= 1) */
+    uint8_t k_rest;             /* windows that must agree to establish Rest (the last class; >= 1; dc_init: k) */
     int8_t last;                /* top class of the current run of accepted windows, -1 none */
     uint8_t run;                /* length of that run (saturates at k) */
     int8_t latched;             /* last established class, -1 none */
@@ -47,5 +48,8 @@ extern const uint8_t dc_class_command[DC_CLASSES];
 
 void dc_init(dc_state_t *s, uint16_t tau_permille, uint8_t k);
 void dc_reset(dc_state_t *s);   /* forget the run and the latch (e.g. after a gap in the data) */
+/* report 35.79: Rest (stop) may need fewer agreeing windows than a command (start): stopping fast is the safe side.
+ * 0 = the same as k. Call after dc_init. */
+void dc_set_rest_k(dc_state_t *s, uint8_t k_rest);
 /* one window; votes: DC_CLASSES counts summing to total. Returns the command to send (DC_NONE: nothing). */
 int dc_step(dc_state_t *s, const uint16_t *votes, int total, dc_out_t *out);

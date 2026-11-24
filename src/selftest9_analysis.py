@@ -61,6 +61,12 @@ recall and the 9-class confusion matrix (cue), chance 1 / |S|, offline command a
 same with --cal-s 2 (first 2 s of each cue).
 
 usage: python src/selftest9_analysis.py --dir D:/selftest_data/T00 --days T00_d1_G [T00_d2_G ...] [--out ...] [--cal-s 4]
+       [--sets S9 S7 S5]
+  --sets (report 35.80): the sets to analyse, largest first; the recording needs cued windows of their gestures only.
+  S7 recordings (panel set S7, files <subj>_d<day>_S_*, firmware rtl_task_s7b with TrignoBridge --preset s7; Point /
+  ThumbUp are not cued): --sets S7 (S5 may be added). Rules 1-3 were pre-registered for the 9-gesture days (S9); with
+  --sets without S9 the same numbers are printed as a report, not as the pre-registered decisions. The board's real-time
+  line is then the S7 firmware (gate, k 5, stop k 2), not the cued-pass S9 model.
   (each day's files are read from <dir>/<day>/ if that folder has them (the panel's per-day folders, 35.75), else <dir>/)
 """
 import argparse
@@ -97,7 +103,7 @@ def day_folder(folder, name):
     return sub if os.path.isfile(os.path.join(sub, f'{name}_emg.csv')) else folder
 
 
-def load_day(folder, name, cal_s):
+def load_day(folder, name, cal_s, need=frozenset(range(9))):
     folder = day_folder(folder, name)
     X, t0, rate = SA.load_emg(os.path.join(folder, f'{name}_emg.csv'))
     F = SA.features(X)
@@ -117,7 +123,7 @@ def load_day(folder, name, cal_s):
             cue_rows.append(rows)
             cue_lab.append(np.full(len(rows), g))
             seen.add(g)
-    assert seen == set(range(9)), f'{name}: cued pass incomplete, cal rows for {sorted(seen)}'
+    assert set(need) <= seen, f'{name}: cued pass incomplete, cal rows for {sorted(seen)}, needs {sorted(need)}'
     runs, cur = {}, None
     for r in task.itertuples():
         if r.event == 'seg_start':
@@ -157,7 +163,8 @@ def load_day(folder, name, cal_s):
     # the cue to the first command)
     live = [(r.result, float(r.latency_ms)) if r.latency_ms not in ('', 'nan') else (r.result, np.nan)
             for r in task.itertuples() if r.event == 'trial_end' and r.segment == 'task']
-    return dict(name=name, F=F, cal_rows=np.concatenate(cue_rows), cal_lab=np.concatenate(cue_lab), probes=probes,
+    s7fw = any(str(c).strip() == 'preset s7' for c in ops.command)    # 35.80: recorded with the S7 firmware settings
+    return dict(name=name, F=F, cal_rows=np.concatenate(cue_rows), cal_lab=np.concatenate(cue_lab), probes=probes, s7fw=s7fw,
                 events=events, rate=rate, cal_counts=np.bincount(np.concatenate(cue_lab), minlength=9),
                 trials=sum(e[1] == 'trial' for e in events), live=live)
 
@@ -317,7 +324,12 @@ def main():
     ap.add_argument('--days', nargs='+', required=True)
     ap.add_argument('--out', default=None)
     ap.add_argument('--cal-s', type=float, default=4.0)
+    ap.add_argument('--sets', nargs='+', default=ORDER, choices=ORDER)
     args = ap.parse_args()
+    run = [s for s in ORDER if s in args.sets]                 # largest first
+    pre = 'S9' in run                                          # the pre-registered analysis of the 9-gesture days
+    lead = run[0]
+    need = frozenset(c for s_ in run for c in SETS[s_])
     lines = []
 
     def p(s=''):
@@ -325,19 +337,20 @@ def main():
         lines.append(s)
 
     rng = np.random.default_rng(0)
-    days = [load_day(args.dir, n, args.cal_s) for n in args.days]
-    p(f'cued pass: first {args.cal_s:g} s of each cue; rule 1 threshold {THRESHOLD:g} %, rule 2 D_bar >= +2 (pre-registered)')
+    days = [load_day(args.dir, n, args.cal_s, need) for n in args.days]
+    p(f'cued pass: first {args.cal_s:g} s of each cue; rule 1 threshold {THRESHOLD:g} %, rule 2 D_bar >= +2 (pre-registered)'
+      + ('' if pre else f'; sets {" ".join(run)}: reported, not the pre-registered decisions (those were for S9)'))
     for d in days:
         p(f"{d['name']}: rate {d['rate']:.1f} Hz, cued windows per gesture {d['cal_counts'].tolist()}, "
           f"probes {len(d['probes'])} with {[len(x) for x in d['probes']]} cues, task trials {d['trials']}")
-    A = {s: [] for s in ORDER}
-    D = {s: [] for s in ORDER}
+    A = {s: [] for s in run}
+    D = {s: [] for s in run}
     for d in days:
         p(f"\n== {d['name']}")
         p('rule 1, condition cue')
         p('set  classes  chance   window acc %   cue-majority %   95 % CI (cues)   per probe (window %)')
         res = {}
-        for s in ORDER:
+        for s in run:
             res[s] = {c: replay(d, s, c) for c in ('cue', 'cue_soft', 'cue_self')}
             pr_cue = res[s]['cue'][0]
             allc = [x for pr in pr_cue for x in pr]
@@ -346,15 +359,17 @@ def main():
             p(f"{s}   {len(SETS[s]):7d}  {100 / len(SETS[s]):5.1f}   {wa:12.1f}   {ma:14.1f}   {lo:6.1f} - {hi:5.1f}    "
               + '  '.join(f'P{k} {win_acc(x):5.1f}' for k, x in enumerate(pr_cue)))
         cm = np.zeros((9, 9), int)
-        for pr in res['S9']['cue'][0]:
+        for pr in res[lead]['cue'][0]:
             for _, g, pred in pr:
                 np.add.at(cm[g], pred, 1)
-        p('\nS9 confusion, cue (rows = cued gesture, columns = predicted; windows)')
-        p(pd.DataFrame(cm, index=GESTURES, columns=[g[:6] for g in GESTURES]).to_string())
-        rec = 100 * np.diag(cm) / np.maximum(cm.sum(1), 1)
-        p('S9 recall %: ' + ', '.join(f'{g} {r:.0f}' for g, r in zip(GESTURES, rec)))
+        cl = SETS[lead]
+        gl = [GESTURES[c] for c in cl]
+        p(f'\n{lead} confusion, cue (rows = cued gesture, columns = predicted; windows)')
+        p(pd.DataFrame(cm[np.ix_(cl, cl)], index=gl, columns=[g[:6] for g in gl]).to_string())
+        rec = 100 * np.diag(cm)[cl] / np.maximum(cm[cl].sum(1), 1)
+        p(f'{lead} recall %: ' + ', '.join(f'{g} {r:.0f}' for g, r in zip(gl, rec)))
         p('\nrule 2: probe window accuracy % (cue -> cue_soft), D = mean over P1, P2 of (cue_soft - cue)')
-        for s in ORDER:
+        for s in run:
             pc, ps = res[s]['cue'][0], res[s]['cue_soft'][0]
             if len(pc) < 3:
                 p(f'{s}: fewer than 3 probes, no D')
@@ -366,7 +381,7 @@ def main():
               + f'   D = {dd:+.2f} (bootstrap 95 % {lo:+.2f}, {hi:+.2f})')
         p('(reported, not decided; 35.74) self-training: probe window accuracy % (cue -> cue_self), '
           'D_self = mean over P1, P2 of (cue_self - cue); D - D_self = what the task information adds')
-        for s in ORDER:
+        for s in run:
             pc, pf = res[s]['cue'][0], res[s]['cue_self'][0]
             if len(pc) < 3:
                 continue
@@ -375,7 +390,7 @@ def main():
             p(f"{s}: " + '  '.join(f'P{k} {win_acc(pc[k]):5.1f} -> {win_acc(pf[k]):5.1f}' for k in range(len(pc)))
               + f'   D_self = {dself:+.2f}, D - D_self = {dtask - dself:+.2f}')
         p('\noffline commands in the task trials (first run of 3 equal non-Rest windows)')
-        for s in ORDER:
+        for s in run:
             for c in ('cue', 'cue_soft', 'cue_self'):
                 m = res[s][c][1]
                 p(f"{s} {c:8s}: trials {m['trials']}, commands {m['cmd']}, right {m['ok']}, none {m['miss']}, "
@@ -386,19 +401,26 @@ def main():
             lat_all = np.array([v for _, v in live if np.isfinite(v)])
             lat_ok = np.array([v for x, v in live if x == 'success' and np.isfinite(v)])
             q = lambda a: f'median {np.median(a):.0f} ms (quartiles {np.percentile(a, 25):.0f}-{np.percentile(a, 75):.0f})' if len(a) else 'none'  # noqa: E731
-            p(f"\nboard's real-time commands in the task (cued-pass model, S9): " + ', '.join(f'{k} {v}' for k, v in res_n.items())
+            p(f"\nboard's real-time commands in the task ("
+              + ('S7 firmware: gate, k 5, stop k 2' if d['s7fw'] else 'cued-pass model, S9') + '): '
+              + ', '.join(f'{k} {v}' for k, v in res_n.items())
               + f' of {len(live)}')
             p(f'  latency cue -> first command: all commands {q(lat_all)}; right commands {q(lat_ok)}')
-    mean = {s: float(np.mean(A[s])) for s in ORDER}
-    ok = [s for s in ORDER if mean[s] >= THRESHOLD]
-    p('\nrule 1, mean over days: ' + ', '.join(f'{s} {mean[s]:.1f} %' for s in ORDER))
+    mean = {s: float(np.mean(A[s])) for s in run}
+    ok = [s for s in run if mean[s] >= THRESHOLD]
+    tag = 'RULE 1 DECISION (pre-registered)' if pre else f'rule 1 as a report (sets {" ".join(run)})'
+    p('\nrule 1, mean over days: ' + ', '.join(f'{s} {mean[s]:.1f} %' for s in run))
     if ok:
-        p(f'RULE 1 DECISION (pre-registered): {ok[0]} ({len(SETS[ok[0]])} gestures) is the largest set with A >= {THRESHOLD:g} %')
+        p(f'{tag}: {ok[0]} ({len(SETS[ok[0]])} gestures) is the largest set with A >= {THRESHOLD:g} %')
     else:
-        best = max(ORDER, key=lambda s: mean[s])
-        p(f'RULE 1 DECISION (pre-registered): no set reaches {THRESHOLD:g} %; best is {best} ({mean[best]:.1f} %): '
+        best = max(run, key=lambda s: mean[s])
+        p(f'{tag}: no set reaches {THRESHOLD:g} %; best is {best} ({mean[best]:.1f} %): '
           'revise placement / gestures before the arm experiment')
-    if D['S9']:
+    if not pre:
+        for s in run:
+            if D[s]:
+                p(f'rule 2 as a report: {s} D_bar = {np.mean(D[s]):+.2f}, positive on {sum(x > 0 for x in D[s])}/{len(D[s])} days')
+    if pre and D['S9']:
         dbar = float(np.mean(D['S9']))
         pos = sum(x > 0 for x in D['S9'])
         need = math.ceil(2 / 3 * len(D['S9']))
@@ -408,7 +430,7 @@ def main():
     if len(days) >= 2:
         p('\nrule 3: accumulation across donnings; pooled probe window accuracy % on each later day')
         D3 = {}
-        for s in ORDER:
+        for s in run:
             cue = [win_acc([x for pr in replay(dd, s, 'cue')[0] for x in pr]) for dd in days]
             acc = [win_acc([x for pr in r[0] for x in pr]) for r in replay_days(days, s, False)]
             accs = [win_acc([x for pr in r[0] for x in pr]) for r in replay_days(days, s, True)]
@@ -423,14 +445,19 @@ def main():
                                                                 f"acc_self {accf[k]:5.1f}" for k in later)
               + f'   cue - fixed {np.mean([cue[k] - fix[k] for k in later]):+.2f}, '
               f'acc_soft - acc_self {np.mean([accs[k] - accf[k] for k in later]):+.2f}')
-        dbar = float(np.mean(D3['S9']))
-        pos = sum(x > 0 for x in D3['S9'])
-        need = math.ceil(2 / 3 * len(D3['S9']))
-        p(f"RULE 3 DECISION (pre-registered): S9 mean D3 = {dbar:+.2f}, positive on {pos}/{len(D3['S9'])} later days "
-          f"(need {need}) -> {'GO' if dbar >= 2.0 and pos >= need else 'NO-GO'}")
-        for s in ('S7', 'S5'):
-            if D[s]:
-                p(f'   (reported, not decided) {s} D_bar = {np.mean(D[s]):+.2f}')
+        if pre:
+            dbar = float(np.mean(D3['S9']))
+            pos = sum(x > 0 for x in D3['S9'])
+            need3 = math.ceil(2 / 3 * len(D3['S9']))
+            p(f"RULE 3 DECISION (pre-registered): S9 mean D3 = {dbar:+.2f}, positive on {pos}/{len(D3['S9'])} later days "
+              f"(need {need3}) -> {'GO' if dbar >= 2.0 and pos >= need3 else 'NO-GO'}")
+            for s in ('S7', 'S5'):
+                if s in D and D[s]:
+                    p(f'   (reported, not decided) {s} D_bar = {np.mean(D[s]):+.2f}')
+        else:
+            for s in run:
+                p(f'rule 3 as a report: {s} mean D3 = {np.mean(D3[s]):+.2f}, positive on '
+                  f'{sum(x > 0 for x in D3[s])}/{len(D3[s])} later days')
     if args.out:
         os.makedirs(args.out, exist_ok=True)
         with open(os.path.join(args.out, f'selftest9_cal{args.cal_s:g}.txt'), 'w', encoding='utf-8') as f:

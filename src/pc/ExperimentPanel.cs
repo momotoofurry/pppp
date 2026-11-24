@@ -20,8 +20,12 @@ class ExperimentPanel : Form
                                              "食指指出（前）", "比讚（後）", "五指張開（夾開）", "握拳（夾緊）", "放鬆（停）" };
     string[] GESTURE_ZH { get { return Nine ? GESTURE9_ZH : GESTURE6_ZH; } }
     readonly ComboBox gset = new ComboBox();
-    bool Nine { get { return gset.SelectedIndex != 1; } }
-    string Cond { get { return Nine ? "G" : "A"; } }
+    // items: 0 = 9 directions (_G), 1 = 6 grasps (_A), 2 = S7 (report 35.80, default): the 9-class firmware
+    // rtl_task_s7b with TrignoBridge --preset s7 (no Point / ThumbUp, activity gate, k 5, stop k 2); files _S
+    bool Nine { get { return gset.SelectedIndex != 1; } }      // the 9-class firmware and indices (also S7)
+    bool Seven { get { return gset.SelectedIndex == 2; } }
+    bool Active(int i) { return !Seven || (i != 4 && i != 5); }
+    string Cond { get { return Seven ? "S" : Nine ? "G" : "A"; } }
     static readonly Font UI = new Font("Microsoft JhengHei UI", 10.5f);
     static readonly Font UIB = new Font("Microsoft JhengHei UI", 11f, FontStyle.Bold);
 
@@ -70,8 +74,9 @@ class ExperimentPanel : Form
         Row(g, Lbl("代號"), subj, Lbl("第幾天"), day, Lbl("板子"), com, refresh);
         Row(g, Lbl("採樣率"), rate, Lbl("slots"), slots, Lbl("TCU 位址"), tcu);
         gset.DropDownStyle = ComboBoxStyle.DropDownList; gset.Width = 260; gset.AccessibleName = "手勢組";
-        gset.Items.AddRange(new object[] { "9 方向手勢（檔名 _G，板子要 9 類韌體）", "6 抓握手勢（舊，檔名 _A）" });
-        gset.SelectedIndex = 0;
+        gset.Items.AddRange(new object[] { "9 方向手勢（舊，檔名 _G）", "6 抓握手勢（舊，檔名 _A）",
+                                           "S7：7 個手勢（檔名 _S，板子要 rtl_task_s7b）" });
+        gset.SelectedIndex = 2;
         Row(g, Lbl("手勢組"), gset);
         g.Controls.Add(Hint("空白 = 預設（2000 Hz、slots 1-8、本機）。採樣率只在 check 量到不是 2000 時才填。"));
         nameLbl.AutoSize = true; nameLbl.Font = UIB; g.Controls.Add(nameLbl);
@@ -102,7 +107,7 @@ class ExperimentPanel : Form
         Row(g, envBtn); needBridge.Add(envBtn);
 
         // ---- SOP 5.3: cue pass
-        g = Group(left, "④ 提示輪（中立姿勢，5.3；9 手勢做兩輪）");
+        g = Group(left, "④ 提示輪（中立姿勢，5.3；S7／9 手勢做兩輪）");
         calHint = Hint(""); g.Controls.Add(calHint);
         for (int i = 0; i < 9; i++) {
             int k = i;
@@ -215,15 +220,17 @@ class ExperimentPanel : Form
     {
         for (int i = 0; i < 9; i++) {
             calCount[i] = 0;
-            calBtn[i].Visible = i < K;
+            calBtn[i].Visible = i < K && Active(i);
             ShowCal(i);
         }
-        calibrateBtn.Text = Passes == 1 ? "calibrate（" + K + " 個都做完再按）" : "calibrate（" + K + " 個各做 " + Passes + " 輪再按）";
+        int nk = Seven ? 7 : K;
+        string pass = Seven ? "cal 0 → cal 3、cal 6 → cal 8（沒有 4、5）" : "cal 0 → cal " + (K - 1);
+        calibrateBtn.Text = Passes == 1 ? "calibrate（" + nk + " 個都做完再按）" : "calibrate（" + nk + " 個各做 " + Passes + " 輪再按）";
         calibrateBtn.BackColor = SystemColors.Control;
         if (calHint != null)
             calHint.Text = Passes == 1
                 ? "按下去就馬上做該手勢並維持，看到 calend 再放鬆 2–3 秒。做錯就再按一次同一個。"
-                : "第一輪 cal 0 → cal " + (K - 1) + "，再第二輪 cal 0 → cal " + (K - 1) + "。按下去就馬上做該手勢並維持 4 秒，看到 calend 再放鬆 2–3 秒。\n按鈕後面會顯示做了幾次；做錯就再按一次同一個（會變 3 次，沒關係）。";
+                : "第一輪 " + pass + "，再第二輪一樣。按下去就馬上做該手勢並維持 4 秒，看到 calend 再放鬆 2–3 秒。\n按鈕後面會顯示做了幾次；做錯就再按一次同一個（會變 3 次，沒關係）。";
     }
 
     void ShowCal(int i)
@@ -313,7 +320,7 @@ class ExperimentPanel : Form
             MessageBox.Show(Name0 + "_emg.csv 已經存在：今天已經錄過。\n不要刪舊檔，先停下來問。", Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
-        string args = "run --port " + com.Text.Trim() + " --firmware lda" + (Nine ? " --classes 9" : "");
+        string args = "run --port " + com.Text.Trim() + " --firmware lda" + (Nine ? " --classes 9" : "") + (Seven ? " --preset s7" : "");
         if (rate.Text.Trim() != "") args += " --rate " + rate.Text.Trim();
         if (slots.Text.Trim() != "") args += " --slots " + slots.Text.Trim();
         args += TcuArg();
@@ -358,7 +365,7 @@ class ExperimentPanel : Form
     void Calibrate()
     {
         var missing = new List<string>();
-        for (int i = 0; i < K; i++) if (calCount[i] < Passes) missing.Add("cal " + i + " " + GESTURE_ZH[i] + "（" + calCount[i] + "/" + Passes + "）");
+        for (int i = 0; i < K; i++) if (Active(i) && calCount[i] < Passes) missing.Add("cal " + i + " " + GESTURE_ZH[i] + "（" + calCount[i] + "/" + Passes + "）");
         if (missing.Count > 0 && MessageBox.Show("次數不夠：" + string.Join("、", missing) + "\n還是要 calibrate？", Text, MessageBoxButtons.YesNo) != DialogResult.Yes) return;
         Send("calibrate"); Mark(calibrateBtn);
     }
@@ -368,7 +375,12 @@ class ExperimentPanel : Form
         string exe = Path.Combine(DIR, "TaskScreen.exe");
         // 9 gestures (2026-11-17, report 35.49): as the 6-gesture day, labelled / task / labelled / task / labelled; each
         // labelled segment 3 x 9 cues, each task segment 40 trials = 8 arm commands x 5 (soft labels replayed offline)
-        string args = Nine
+        // S7 (report 35.80): labelled 3 x 7 cues, task 42 trials = 6 arm commands x 7
+        string args = Seven
+            ? (warmup
+               ? "--subject W00 --day " + day.Text + " --cond S --gestures seven --segments labelled,task --reps 1 --n 6 --postures selftest"
+               : "--subject " + subj.Text.Trim() + " --day " + day.Text + " --cond S --gestures seven --segments labelled,task,labelled,task,labelled --reps 3 --n 42 --postures selftest")
+            : Nine
             ? (warmup
                ? "--subject W00 --day " + day.Text + " --cond G --gestures nine --segments labelled,task --reps 1 --n 8 --postures selftest"
                : "--subject " + subj.Text.Trim() + " --day " + day.Text + " --cond G --gestures nine --segments labelled,task,labelled,task,labelled --reps 3 --n 40 --postures selftest")

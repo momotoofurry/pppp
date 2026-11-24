@@ -1,0 +1,12 @@
+two-mode pick-and-place (modes_sim.py, rule mix) driven by the recorded EMG, 300 trials per row, limit 90 s
+  decoder                    success   time median (IQR) s  collisions (trials)  wrong locks/trial   arm moving while resting   wrong-direction steps   spurious grips/trial   stop delay ms median (p75, p95)   moving after 1.5 s of rest   stopped while held > 1.5 s
+  random e 0.0 (35.63)       100.0 %    31.4 (29.3-33.0)      0 (0)    0.00     0.00 s/min     0.0 %    0.00      -                    -          -
+  random e 0.1 (35.63)       100.0 %    32.9 (30.2-34.1)      0 (0)    0.02     0.00 s/min     0.0 %    0.00      -                    -          -
+  d1 old (no gate, k 3)      100.0 %    39.9 (37.5-42.7)      0 (0)    0.18    28.11 s/min    13.2 %    5.08     400 (500, 1000)   16.60 s/min     0.0 %
+  d1 new (gate 0.5, k 5)     100.0 %    42.5 (39.4-45.7)      0 (0)    0.37    31.72 s/min     9.0 %    0.40     600 (700, 1000)    1.03 s/min     1.9 %
+  d1 new, stop k 2           100.0 %    38.7 (35.8-40.9)      0 (0)    0.43    21.37 s/min     7.2 %    0.33     300 (400, 700)     0.00 s/min     1.6 %
+  d1 new, stop k 1           100.0 %    41.0 (35.4-44.5)      0 (0)    0.61    16.39 s/min     3.6 %    0.22     200 (300, 600)     0.00 s/min     4.0 %
+  d2 old (no gate, k 3)       97.3 %    48.7 (44.4-57.1)      0 (0)    0.04    46.57 s/min    11.4 %    2.09     900 (1500, 3800)  38.54 s/min     1.0 %
+  d2 new (gate 0.5, k 5)     100.0 %    40.4 (38.6-43.7)      0 (0)    0.33    32.22 s/min     6.9 %    0.43     600 (800, 1100)    0.00 s/min     2.3 %
+  d2 new, stop k 2           100.0 %    37.6 (36.0-39.7)      0 (0)    0.31    22.60 s/min     5.8 %    0.49     300 (500, 800)     0.00 s/min     2.2 %
+  d2 new, stop k 1           100.0 %    37.6 (34.4-41.8)      0 (0)    0.49    18.38 s/min     1.6 %    0.42     300 (400, 700)     0.00 s/min     2.6 %

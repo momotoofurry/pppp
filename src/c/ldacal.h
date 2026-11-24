@@ -42,3 +42,9 @@ unsigned ld_static_bytes(void);
 void ld_add_soft(const int16_t *x, const float *q);
 void ld_decay(float f);
 int ld_soft_q(const int16_t *rows, int nrows, const float *prior, float beta, float *q);
+/* Active classes (report 35.78, 2026-11-24): bit c = class c takes part (default: all). An inactive class needs no
+ * window for ld_fit, is left out of the pooled covariance and gets the score -INFINITY (never the argmax; its soft
+ * weight q is 0). Its sums are kept, so switching it back on needs no new data. Rest (the last class) is always
+ * active. The caller leaves out the windows of inactive classes (ld_add would still count them). */
+void ld_set_active(uint32_t mask);
+int ld_is_active(int c);

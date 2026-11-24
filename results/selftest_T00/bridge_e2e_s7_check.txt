@@ -1,0 +1,9 @@
+8839534 bytes, 26925 packets, crc errors 0, skipped 0
+control sub-commands: {'STREAM_RESET': 18, 'LABEL_START': 18, 'LABEL_END': 18, 'FIT': 1, 'SET_REJECT': 1, 'SET_REPORT': 1, 'SET_GATE': 1, 'SET_CLASSES': 1}
+  SET_CLASSES: payload [14, 207, 1]
+  SET_GATE: payload [13, 50, 0, 2]
+  SET_REJECT: payload [5, 0, 0, 0, 0, 5, 2]
+frames 537320 (268.7 s), windows 2660, label windows 540, fits 1 result [0], gate threshold [90437] nV, lost 0
+predicted classes after the fit: {'WristExt': 83, 'WristFlex': 29, 'RadialDev': 87, 'UlnarDev': 62, 'HandOpen': 83, 'Fist': 86, 'Rest': 1081} gated 68.3 %
+commands: {'WristExt': 4, 'WristFlex': 2, 'RadialDev': 3, 'UlnarDev': 4, 'HandOpen': 4, 'Fist': 4}
+probe 1 S7 cues 18: right 17, wrong 1, none 0; latency median 1301 ms; commands in the 0.5 s before a cue (rest): 0
