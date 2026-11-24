@@ -26,6 +26,8 @@ usage (container): python src/assist/closed_loop_fw.py --dir /sd/T00 [--days T00
   rest share the remainder. modes.py: P(g) x prior; a low-prior object / shelf locks only after a 1 s stop.
   --scene crowded (35.87): 6 objects, two side by side (8 cm apart) on each of 3 lower shelves, 3 empty upper shelves
   for putting down (the 3-object scene of 35.63 separates its objects by 25-50 cm).
+  --lock-dwell context|all (35.88): a stop locks a crowded object / shelf (another within 10 cm in y-z) only after
+  1 s ('context'), crowded objects and every shelf ('place'), or every one ('all'); default none (as before).
 """
 import argparse
 import ctypes
@@ -55,6 +57,7 @@ REST = S9.REST
 NAME = {0: 'up', 1: 'down', 2: 'left', 3: 'right', 6: 'grip_open', 7: 'grip_close', 8: 'rest'}
 CLS = {'up': 0, 'down': 1, 'left': 2, 'right': 3, 'rest': 8, 'grip_open': 6, 'grip_close': 7}
 GRIP_CMDS = False
+LOCK_DWELL = 'none'
 PRIOR, PRIOR_MASS = None, 0.8
 DIRS = ('up', 'down', 'left', 'right')
 LSB = np.float32(2.5e-7)
@@ -257,8 +260,8 @@ def prior_vec(rng, n, target):
     return v, named == target
 
 
-def trial(board, player, rng, labels_on, st):
-    ma = M.ModeAssist(MS.OBJ, MS.SHELVES, rule='mix', grip_cmds=GRIP_CMDS)
+def trial(board, player, rng, labels_on, st, prng=None):
+    ma = M.ModeAssist(MS.OBJ, MS.SHELVES, rule='mix', grip_cmds=GRIP_CMDS, lock_dwell=LOCK_DWELL)
     lab = LB.Labeler(ma)
     t_obj = int(rng.integers(3))
     free = [k for k in range(len(MS.SHELVES))
@@ -266,8 +269,9 @@ def trial(board, player, rng, labels_on, st):
                    for o in MS.OBJ)]
     t_shelf = int(rng.choice(free))
     if PRIOR is not None:
-        ma.base.prior, ok_o = prior_vec(rng, len(MS.OBJ), t_obj)
-        sp, ok_s = prior_vec(rng, len(MS.SHELVES), t_shelf)
+        # 35.88: own stream, so trials stay paired by seed with the no-prior runs (35.86-35.87 drew it from rng)
+        ma.base.prior, ok_o = prior_vec(prng, len(MS.OBJ), t_obj)
+        sp, ok_s = prior_vec(prng, len(MS.SHELVES), t_shelf)
         ma.shelf_prior = sp
         st['prior_right'] += ok_o + ok_s
         st['prior_n'] += 2
@@ -324,6 +328,7 @@ def trial(board, player, rng, labels_on, st):
         if lock != last_lock and lock is not None and lock[0] in ('pick', 'place'):
             if (lock[0] == 'pick' and lock[1] != t_obj) or (lock[0] == 'place' and lock[2] != t_shelf):
                 wrong_lock += 1
+                st['wl_' + lock[0]] += 1                    # 35.88: wrong object (pick) or wrong shelf (place)
         last_lock = lock
         x = x + v * M.DT
         hist.append(x.copy())
@@ -342,6 +347,7 @@ def trial(board, player, rng, labels_on, st):
 
 def session(lib, d, seed, n, labels_on):
     rng = np.random.default_rng(seed)
+    prng = np.random.default_rng(seed + 100000)
     board = Board(lib, d)
     board.est, board.last_w, board.last_step, board.step = 'rest', None, 0, 0
     P = pools(d)
@@ -350,8 +356,8 @@ def session(lib, d, seed, n, labels_on):
         player = Player(d, P[half], rng)
         for i in range(n // 2):
             st = dict(dir_steps=0, dir_wrong=0, ranges=0, added=0, lab_n=0, lab_ok=0, grip_ok=0, grip_refused=0,
-                      prior_right=0, prior_n=0)
-            ok, tm, wl = trial(board, player, rng, labels_on, st)
+                      prior_right=0, prior_n=0, wl_pick=0, wl_place=0)
+            ok, tm, wl = trial(board, player, rng, labels_on, st, prng)
             rows.append(dict(half=half, ok=ok, time=tm, wrong_locks=wl, **st))
     return pd.DataFrame(rows)
 
@@ -370,7 +376,10 @@ def main():
     ap.add_argument('--prior-mass', type=float, default=0.8)
     ap.add_argument('--labels', default='both', choices=['both', 'off', 'on'])
     ap.add_argument('--scene', default='3obj', choices=['3obj', 'crowded'])
+    ap.add_argument('--lock-dwell', default='none', choices=['none', 'context', 'place', 'all'])
     a = ap.parse_args()
+    global LOCK_DWELL
+    LOCK_DWELL = a.lock_dwell
     if a.scene == 'crowded':
         MS.OBJ, MS.SHELVES = CROWD_OBJ.copy(), CROWD_SHELVES.copy()
     global GRIP_CMDS, PRIOR, PRIOR_MASS
@@ -387,7 +396,7 @@ def main():
     p(f'closed loop with rt_lda.c (S7, gate 0.5, k 5, stop k 2) and hindsight range labels ({a.label_classes}); '
       f'{a.sessions} sessions x {a.trials} trials; first half pool A, second half pool B (held out); grip commands '
       f'{a.grip_cmds}; goal prior ' + ('off' if a.prior is None else f'P {a.prior} mass {a.prior_mass}')
-      + f'; scene {a.scene} ({len(MS.OBJ)} objects, {len(MS.SHELVES)} shelves)')
+      + f'; scene {a.scene} ({len(MS.OBJ)} objects, {len(MS.SHELVES)} shelves); lock dwell {a.lock_dwell}')
     p('  donning  labels  half   success   time median s   wrong locks/trial   wrong-direction steps   '
       'ranges/trial   windows added/trial   label error (vs intent)')
     allres = []
@@ -405,7 +414,8 @@ def main():
                   f'{100 * r.dir_wrong.sum() / max(r.dir_steps.sum(), 1):5.1f} %                {r.ranges.mean():5.2f}          '
                   f'{r.added.mean():6.1f}              {100 * (1 - r.lab_ok.sum() / max(r.lab_n.sum(), 1)):5.1f} %'
                   + (f'   grips ok {r.grip_ok.mean():.2f} refused {r.grip_refused.mean():.2f}/trial' if a.grip_cmds else '')
-                  + (f'   prior right {100 * r.prior_right.sum() / max(r.prior_n.sum(), 1):.0f} %' if a.prior is not None else ''))
+                  + (f'   prior right {100 * r.prior_right.sum() / max(r.prior_n.sum(), 1):.0f} %' if a.prior is not None else '')
+                  + f'   wrong locks: object {r.wl_pick.mean():.2f}, shelf {r.wl_place.mean():.2f}')
     df = pd.concat(allres)
     df.to_csv(os.path.join(a.out, f'closed_loop_fw_trials{a.tag}.csv'), index=False)
     # paired: pool B, labels on - off, per session

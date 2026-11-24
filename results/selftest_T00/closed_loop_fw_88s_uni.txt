@@ -1,0 +1,6 @@
+closed loop with rt_lda.c (S7, gate 0.5, k 5, stop k 2) and hindsight range labels (all); 15 sessions x 40 trials; first half pool A, second half pool B (held out); grip commands False; goal prior P 1.0 mass 0.1666667; scene crowded (6 objects, 6 shelves); lock dwell none
+  donning  labels  half   success   time median s   wrong locks/trial   wrong-direction steps   ranges/trial   windows added/trial   label error (vs intent)
+  d1       off     A      97.7 %     64.8           0.61                26.0 %                 0.00             0.0                1.7 %   prior right 100 %   wrong locks: object 0.08, shelf 0.53
+  d1       off     B      99.3 %     56.2           2.54                10.0 %                 0.00             0.0                2.5 %   prior right 100 %   wrong locks: object 0.11, shelf 2.43
+  d2       off     A     100.0 %     48.0           0.17                12.0 %                 0.00             0.0                1.4 %   prior right 100 %   wrong locks: object 0.00, shelf 0.17
+  d2       off     B     100.0 %     56.2           0.01                24.1 %                 0.00             0.0                1.8 %   prior right 100 %   wrong locks: object 0.00, shelf 0.01

@@ -63,6 +63,10 @@ GRIPS = ('grip_close', 'grip_open')
 # 35.86: goal prior (speech / LLM): an object or shelf whose prior is below PRIOR_LOW is locked only after the user
 # stays stopped CONFIRM_STEPS in front of it (a deliberate choice overrides the prior); the others lock at once
 PRIOR_LOW = 0.2
+# 35.88: lock dwell by context: an object (shelf) whose pre-grasp point (centre) has another one within NEAR_LOCK in
+# y-z is crowded; there a stop locks only after CONFIRM_STEPS (35.87: the dwell removed most wrong locks in a crowded
+# scene but cost 2-4 s per trial when applied everywhere)
+NEAR_LOCK = 0.10
 ARRIVE = 0.02
 MISMATCH_STEPS, MISMATCH_COS = 10, -0.2
 
@@ -73,10 +77,11 @@ def unit(v):
 
 
 class ModeAssist:
-    def __init__(self, objects, shelves, level=0.6, zone=0.12, rule='mix', grip_cmds=False):
+    def __init__(self, objects, shelves, level=0.6, zone=0.12, rule='mix', grip_cmds=False, lock_dwell='none'):
         """objects: (n, 3) object centres; shelves: (m, 3) centres of the shelf tops; rule: 'mix' | 'lead' (mode-1
         steering, see MIX_ON); grip_cmds: explicit gripper commands (35.86, see GRIPS)"""
         self.grip_cmds = grip_cmds
+        self.lock_dwell = lock_dwell                # 35.88: 'none' | 'context' | 'place' | 'all'
         self.n_grip_ok = self.n_grip_refused = 0
         self._prev_cmd = None                       # 35.86: a held Fist / HandOpen counts once
         self.shelf_prior = None                     # 35.86: prior over the shelves (None: off); objects: self.base.prior
@@ -202,9 +207,19 @@ class ModeAssist:
             return self._rest(x)                        # a stop, as a relax (the relax rules still apply)
         return np.zeros(3)
 
-    def _prior_ok(self, prior, k):
-        """35.86: lock k now? Always without a prior; with one, a low-prior target needs a deliberate 1 s stop"""
-        return prior is None or prior[k] >= PRIOR_LOW or self.rest_n >= CONFIRM_STEPS
+    def _prior_ok(self, prior, k, pts=None, shelf=False):
+        """lock k now? 35.86: with a prior, a low-prior target needs a deliberate 1 s stop. 35.88: lock_dwell 'all'
+        needs it everywhere, 'context' only where another candidate (pts) is within NEAR_LOCK in y-z"""
+        crowded = shelf and self.lock_dwell == 'place'     # 'place': every shelf lock dwells (35.88: most wrong locks)
+        if pts is not None and self.lock_dwell in ('context', 'place'):
+            d = np.linalg.norm((pts - pts[k])[:, 1:], axis=1)
+            d[k] = np.inf
+            crowded = crowded or bool((d < NEAR_LOCK).any())
+        if prior is not None:
+            need = prior[k] < PRIOR_LOW and (self.lock_dwell not in ('context', 'place') or crowded)
+        else:
+            need = self.lock_dwell == 'all' or crowded
+        return not need or self.rest_n >= CONFIRM_STEPS
 
     def _lock(self, x, manual=False):
         """mode 1 -> 2 when stopped in front of an object (empty hand) or a shelf (holding)"""
@@ -214,7 +229,7 @@ class ModeAssist:
             prior = getattr(self.base, 'prior', None)
             for g in np.argsort(d):
                 if d[g] < LOCK_ALIGN and self.at_travel(x) and g != self.block and not self._on_hold(g):
-                    if not self._prior_ok(prior, g):
+                    if not self._prior_ok(prior, g, pre):
                         return                          # wait: a longer stop locks it anyway
                     self.m, self.phase, self.goal = 2, 'pick', int(g)
                     return
@@ -225,7 +240,7 @@ class ModeAssist:
             if k is not None and self.at_travel(x):
                 bottom = x[2] - OBJ_H / 2 - self.shelves[k][2]
                 if abs(x[1] - self.shelves[k][1]) <= SHELF_HY - EDGE and -0.02 <= bottom <= 0.10:
-                    if not self._prior_ok(self.shelf_prior, k):
+                    if not self._prior_ok(self.shelf_prior, k, self.shelves, shelf=True):
                         return
                     self.m, self.phase, self.shelf = 2, 'place', k
                     return
