@@ -1,0 +1,11 @@
+S7 confirmation (report 35.81 / 35.86, rules frozen 2026-11-24): the board's real-time commands as TaskScreen logged them
+
+== Z99_d1_S  (S7 firmware settings (preset s7))
+M1 task success          4.2 %  (24 trials)
+M2 task-rest commands   4.60 / min  (5 in 1.09 min)
+M3 probe cues (S7)     right 0, wrong 4, none 14 of 18  (0.0 % right)
+M4 latency (success)   70 ms (70-70)
+M5 labelled-rest cmds  11.28 / min  (13 in 1.15 min)
+
+mean over 1 donning(s): M1 4.2 % (P1 needs >= 80), M2 4.60 / min (P2 needs <= 2)
+DECISION (frozen rules, 35.86): P1 fail, P2 fail -> revise placement / gestures / gate first

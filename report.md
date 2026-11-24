@@ -6378,3 +6378,44 @@ PC 上，探索性。要回答口試或審稿常問的問題：為什麼用 LDA�
 **保留**：
 - `check_rt_s7.py --fast K,M`、`closed_loop_fw.py --fast K,M` 和 C 的選項都保留，預設關閉。
 - 之後如果跨配戴累積或事後標籤讓解碼器更準，高 margin 的錯誤變少，可以用同一套判準再測一次。
+
+### 35.96 下週 S7 錄製的演練：面板版本、整條流程、錄完後的分析（2026-11-25）
+
+**1. 面板上的板子版本**：
+- ExperimentPanel 的 S7 選項原本寫「板子要 rtl_task_s7e」，改成 `rtl_task_s7f`，只改了這兩個字串。
+- 重新編譯（csc，`-codepage:65001`）後部署到 `lab_kit_selftest`：新的 exe md5 `c2651d53`，裡面只有 s7f、沒有 s7e。
+- 舊的 exe（`f9dfda0f`）和原始碼備份在 `_舊版_2026-11-25_面板s7f字串之前`。
+- 部署資料夾裡的 `src/ExperimentPanel.cs` 原本是 S7 之前的舊版本（exe 是對的），現在換成和 exe 一致的版本。
+
+**2. 板子上的韌體**：
+- 用 ST-Link 讀回 flash（under-reset，只讀）。0x08000000 起 26056 bytes 的 md5 是 `4d60a4f3`，和 `build/rtl_task_s7f/blink.elf` 轉出的 image 相同。**板子確定是 s7f**。
+
+**3. 整條流程的演練**：
+- 用的是部署資料夾裡的 TrignoBridge（`296DBCE6`）和 TaskScreen（`D5ACDDDC`）的副本，以及真的板子（COM6）。
+- 假的 TCU 重播 T00_d2_G，`fake_tcu_s7.py` 新增 `--more`，讓重播一直延續到任務段。
+- 橋接程式照面板的 S7 參數：`--firmware lda --classes 9 --preset s7`。它照錄音裡的時間送出 18 個 cal 和 calibrate。
+- 校正完成後，TaskScreen 用面板的 S7 參數開始，只是縮短（`--reps 1 --n 12`）並加上 `--auto --windowed`。
+- 受試者代號 Z99，不會和真的資料撞名。
+- 結果：
+  - 4 個檔案都產生了（emg 221 MB、mcu、ops、task）；
+  - TaskScreen 383 s 跑完，代碼 0；
+  - 1,497,312 個 frame，進出相同，沒有 clipping；
+  - 板子 6311 個 PRED，0 個 UART byte 遺失；
+  - 堆疊峰值 1124 bytes，接收緩衝最高 267 bytes。
+- **板子回報 UART errors 1**：在第一次狀態回報時就是 1，之後 12 分鐘都沒有增加，也沒有遺失 byte。這是板子重置、橋接程式打開序列埠時的一次雜訊；35.82 的演練是 0。正式錄的時候，只要確認它不會一直增加。
+
+**4. 錄完後的分析**（三個程式，照下週要用的方式跑）：
+
+| 程式 | 結果 |
+|---|---|
+| `selftest_quality.py` | 讀得到；ch5–8 是 ch1–4 的複本（雙通道設定，預期內）；沒有警告。演練沒有給 `--slots`，所以顯示「slot ?」，正式錄時在面板填 16:11:15:5（SOP 3B） |
+| `selftest_s7_prereg.py`（凍結的 P1／P2） | 讀到 `preset s7`，算出 M1–M5 和決定 |
+| `selftest9_analysis.py --sets S7` | 混淆矩陣、規則 1–2、事後標籤、板子即時指令的成功率和延遲都算得出來 |
+
+- **演練的數字沒有意義，而且本來就應該接近隨機**：重播的 EMG 和 TaskScreen 的提示沒有對應。
+  - P1 4.2 %、P2 4.60 /min；
+  - 離線視窗準確率 12.9 %，隨機是 14.3 %。
+- 接近隨機也代表分析沒有偷看答案。
+- 下週真正錄的時候，流程是：面板錄製 → 三個程式各跑一次 → 看 `s7_prereg_*.txt` 的 DECISION 那一行。
+
+**結論**：從面板、橋接程式、板子、TaskScreen 到分析，整條流程在下週的設定下都能跑通。剩下要確認的只有：正式錄時在面板填 slots，以及 UART errors 不會增加。

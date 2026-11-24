@@ -21,7 +21,7 @@ class ExperimentPanel : Form
     string[] GESTURE_ZH { get { return Nine ? GESTURE9_ZH : GESTURE6_ZH; } }
     readonly ComboBox gset = new ComboBox();
     // items: 0 = 9 directions (_G), 1 = 6 grasps (_A), 2 = S7 (report 35.80, default): the 9-class firmware
-    // rtl_task_s7e (35.83; s7b + stop events + range labels) with TrignoBridge --preset s7 (no Point / ThumbUp, activity gate, k 5, stop k 2); files _S
+    // rtl_task_s7f (35.85; s7b + stop events + range labels + stop on a stream reset) with TrignoBridge --preset s7 (no Point / ThumbUp, activity gate, k 5, stop k 2); files _S
     bool Nine { get { return gset.SelectedIndex != 1; } }      // the 9-class firmware and indices (also S7)
     bool Seven { get { return gset.SelectedIndex == 2; } }
     bool Active(int i) { return !Seven || (i != 4 && i != 5); }
@@ -75,7 +75,7 @@ class ExperimentPanel : Form
         Row(g, Lbl("採樣率"), rate, Lbl("slots"), slots, Lbl("TCU 位址"), tcu);
         gset.DropDownStyle = ComboBoxStyle.DropDownList; gset.Width = 260; gset.AccessibleName = "手勢組";
         gset.Items.AddRange(new object[] { "9 方向手勢（舊，檔名 _G）", "6 抓握手勢（舊，檔名 _A）",
-                                           "S7：7 個手勢（檔名 _S，板子要 rtl_task_s7e）" });
+                                           "S7：7 個手勢（檔名 _S，板子要 rtl_task_s7f）" });
         gset.SelectedIndex = 2;
         Row(g, Lbl("手勢組"), gset);
         g.Controls.Add(Hint("空白 = 預設（2000 Hz、slots 1-8、本機）。採樣率只在 check 量到不是 2000 時才填。"));

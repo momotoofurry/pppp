@@ -2,7 +2,9 @@
 (channels 1-8 of the recording on TCU slots 1-8), from 2 s before its first cued gesture to 2 s after the end of its
 first labelled probe; writes script.txt (report 1, the day's cal commands and calibrate at their recorded times,
 quit) and cues.csv (probe cues: start / end in seconds from the stream start, gesture).
-usage: python fake_tcu_s7.py --day D:/selftest_data/T00/T00_d2_G --name T00_d2_G --out <dir> [--host 127.0.0.2]"""
+usage: python fake_tcu_s7.py --day D:/selftest_data/T00/T00_d2_G --name T00_d2_G --out <dir> [--host 127.0.0.2]
+  [--more S]   (2026-11-25 dry run) stream S more seconds of the recording after the first labelled probe (the task
+               screen's session runs on it; its cues do not match the recording)"""
 import argparse
 import os
 import socket
@@ -17,6 +19,7 @@ ap.add_argument('--day', required=True)
 ap.add_argument('--name', required=True)
 ap.add_argument('--out', required=True)
 ap.add_argument('--host', default='127.0.0.2')
+ap.add_argument('--more', type=float, default=0.0)
 a = ap.parse_args()
 os.makedirs(a.out, exist_ok=True)
 emg = pd.read_csv(os.path.join(a.day, f'{a.name}_emg.csv'))
@@ -29,7 +32,7 @@ cal = ops[ops.command.str.match(r'^(cal \d+|calibrate)$')]
 seg = task[task.segment == 'labelled']
 first_end = seg.loc[seg.event == 'seg_end', 't'].iloc[0]
 t_start = cal.unix_ms.iloc[0] - 2000
-t_end = first_end + 2000
+t_end = first_end + 2000 + 1000 * a.more
 i0, i1 = np.searchsorted(ms, t_start), np.searchsorted(ms, t_end)
 data = np.zeros((i1 - i0, 16), np.float32)
 data[:, :8] = X[i0:i1]

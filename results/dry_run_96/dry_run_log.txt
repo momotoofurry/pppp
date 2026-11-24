@@ -1,0 +1,22 @@
+﻿bridge md5 296DBCE6A1824F43E641F1C41716201F, task screen md5 D5ACDDDC05B374E744785AC2B47F5C5E
+  board: Hard reset is performed
+script: 21 lines, calibrate at 117.541 s; 1497312 frames (748.7 s), 19 cal / calibrate lines, 27 probe cues; waiting on 127.0.0.2:50040 / 50041
+
+bridge: run --port COM6 --firmware lda --classes 9 --preset s7 --tcu 127.0.0.2 --emg-csv Z99_d1_S_emg.csv --mcu-csv Z99_d1_S_mcu.csv --ops-csv Z99_d1_S_ops.csv --script script.txt
+task screen at 122 s: --subject Z99 --day 1 --cond S --gestures seven --segments labelled,task,labelled,task,labelled --reps 1 --n 12 --postures selftest --auto --windowed
+task screen done at 383 s, exit 0
+bridge done, exit 
+Z99_d1_S_emg.csv              220848687
+Z99_d1_S_mcu.csv                 374821
+Z99_d1_S_ops.csv                    711
+Z99_d1_S_task.csv                 22020
+bridge tail:
+[736.9 s] MCU: command,7342,732899184,WristFlex,down,,2.346,,,
+[741 s] in 1481198 frames (2000.0 Hz measured), out 1481198, clipped 0, MCU packets 6612 (PRED 6230)
+[744.1 s] MCU: status,,,,,,,,receive ring high-water (bytes),267
+[744.1 s] MCU: status,,,,,,,,stack peak (bytes),1124
+[744.1 s] MCU: status,,,,,,,,UART bytes dropped,0
+[744.1 s] MCU: status,,,,,,,,UART errors,1
+[746.5 s] MCU: command,7438,742348177,Fist,grip_close,,17.934,,,
+done: 1497312 frames in, 1497312 out, 0 samples clipped, 6698 MCU packets (6311 PRED), 0 commands held before alignment
+DRY_RUN_DONE

@@ -1,0 +1,382 @@
+unix_ms,segment,event,step,trial,target,command,command_gesture,window,phase,result,latency_ms,text
+1795549807544.6,,session,,,,,,,,,,subject Z99 day 1 segments labelled task labelled task labelled commands up down left right grip_open grip_close n 12 timeout_s 5 fake 0 retry 0 postures selftest gestures WristExt WristFlex RadialDev UlnarDev HandOpen Fist Rest udp 50555
+1795549807670.3,labelled,seg_start,,,,,,,,,,0
+1795549807672.1,labelled,posture,0,,N,,,,,,,中立：前臂平放桌上
+1795549807672.1,labelled,rest_on,0,,,,,,,,,
+1795549809480.3,labelled,status,0,,,,,,,,,receive ring high-water (bytes) 246
+1795549809483.2,labelled,status,0,,,,,,,,,stack peak (bytes) 1124
+1795549809483.3,labelled,status,0,,,,,,,,,UART bytes dropped 0
+1795549809483.5,labelled,status,0,,,,,,,,,UART errors 1
+1795549810673.9,labelled,rest_off,0,,,,,,,,,
+1795549810673.9,labelled,cue_on,1,,HandOpen,,,,,,,
+1795549812677.7,labelled,cue_off,1,,HandOpen,,,,,,,
+1795549812677.7,labelled,rest_on,2,,,,,,,,,
+1795549815679.3,labelled,rest_off,2,,,,,,,,,
+1795549815679.3,labelled,cue_on,3,,Rest,,,,,,,
+1795549817680.3,labelled,cue_off,3,,Rest,,,,,,,
+1795549817680.3,labelled,rest_on,4,,,,,,,,,
+1795549819638.8,labelled,status,4,,,,,,,,,receive ring high-water (bytes) 246
+1795549819641.8,labelled,status,4,,,,,,,,,stack peak (bytes) 1124
+1795549819642.1,labelled,status,4,,,,,,,,,UART bytes dropped 0
+1795549819642.2,labelled,status,4,,,,,,,,,UART errors 1
+1795549820693.1,labelled,rest_off,4,,,,,,,,,
+1795549820693.1,labelled,cue_on,5,,UlnarDev,,,,,,,
+1795549822703.1,labelled,cue_off,5,,UlnarDev,,,,,,,
+1795549822703.1,labelled,rest_on,6,,,,,,,,,
+1795549823178.5,labelled,command,6,,,left,RadialDev,1354,rest,,,
+1795549825707.5,labelled,rest_off,6,,,,,,,,,
+1795549825707.5,labelled,cue_on,7,,Fist,,,,,,,
+1795549827719.1,labelled,cue_off,7,,Fist,,,,,,,
+1795549827719.1,labelled,rest_on,8,,,,,,,,,
+1795549827880.8,labelled,command,8,,,down,WristFlex,1401,rest,,,
+1795549829800.1,labelled,status,8,,,,,,,,,receive ring high-water (bytes) 266
+1795549829803.0,labelled,status,8,,,,,,,,,stack peak (bytes) 1124
+1795549829803.1,labelled,status,8,,,,,,,,,UART bytes dropped 0
+1795549829803.2,labelled,status,8,,,,,,,,,UART errors 1
+1795549830729.7,labelled,rest_off,8,,,,,,,,,
+1795549830729.7,labelled,cue_on,9,,RadialDev,,,,,,,
+1795549832681.3,labelled,command,9,,RadialDev,grip_close,Fist,1449,cue,,,
+1795549832752.2,labelled,cue_off,9,,RadialDev,,,,,,,
+1795549832752.2,labelled,rest_on,10,,,,,,,,,
+1795549835762.3,labelled,rest_off,10,,,,,,,,,
+1795549835762.3,labelled,cue_on,11,,WristExt,,,,,,,
+1795549837769.1,labelled,cue_off,11,,WristExt,,,,,,,
+1795549837769.1,labelled,rest_on,12,,,,,,,,,
+1795549838775.8,labelled,command,12,,,grip_open,HandOpen,1510,rest,,,
+1795549839959.4,labelled,status,12,,,,,,,,,receive ring high-water (bytes) 266
+1795549839962.2,labelled,status,12,,,,,,,,,stack peak (bytes) 1124
+1795549839962.4,labelled,status,12,,,,,,,,,UART bytes dropped 0
+1795549839962.6,labelled,status,12,,,,,,,,,UART errors 1
+1795549840777.5,labelled,rest_off,12,,,,,,,,,
+1795549840777.5,labelled,cue_on,13,,WristFlex,,,,,,,
+1795549842785.1,labelled,cue_off,13,,WristFlex,,,,,,,
+1795549842785.1,labelled,rest_on,14,,,,,,,,,
+1795549845800.3,labelled,rest_off,14,,,,,,,,,
+1795549845800.8,labelled,seg_end,,,,,,,,,,0
+1795549845816.1,task,seg_start,,,,,,,,,,1
+1795549845816.1,task,posture,0,,A,,,,,,,A 往前伸：像拿桌子另一邊的東西
+1795549845816.1,task,rest_on,0,,,,,,,,,
+1795549848329.7,task,rest_off,0,,,,,,,,,
+1795549848329.7,task,trial_on,1,0,left,,,,,,,
+1795549850120.5,task,status,1,,,,,,,,,receive ring high-water (bytes) 266
+1795549850123.5,task,status,1,,,,,,,,,stack peak (bytes) 1124
+1795549850123.9,task,status,1,,,,,,,,,UART bytes dropped 0
+1795549850124.1,task,status,1,,,,,,,,,UART errors 1
+1795549852776.7,task,command,1,0,left,grip_open,HandOpen,1650,trial,,,
+1795549852776.7,task,trial_end,1,0,left,grip_open,HandOpen,1650,,wrong,4447.0,
+1795549852788.2,task,trial_off,1,0,left,,,,,,,
+1795549852788.2,task,rest_on,2,,,,,,,,,
+1795549855294.0,task,rest_off,2,,,,,,,,,
+1795549855294.0,task,trial_on,3,1,grip_open,,,,,,,
+1795549860281.3,task,status,3,,,,,,,,,receive ring high-water (bytes) 266
+1795549860284.1,task,status,3,,,,,,,,,stack peak (bytes) 1124
+1795549860284.4,task,status,3,,,,,,,,,UART bytes dropped 0
+1795549860284.6,task,status,3,,,,,,,,,UART errors 1
+1795549860294.0,task,trial_end,3,1,grip_open,,,,,timeout,,
+1795549860456.6,task,trial_off,3,1,grip_open,,,,,,,
+1795549860456.6,task,rest_on,4,,,,,,,,,
+1795549862671.5,task,command,4,,,right,UlnarDev,1749,rest,,,
+1795549862956.7,task,rest_off,4,,,,,,,,,
+1795549862956.7,task,trial_on,5,2,right,,,,,,,
+1795549867678.5,task,command,5,2,right,grip_open,HandOpen,1799,trial,,,
+1795549867678.5,task,trial_end,5,2,right,grip_open,HandOpen,1799,,wrong,4721.8,
+1795549867689.5,task,trial_off,5,2,right,,,,,,,
+1795549867689.5,task,posture,6,,B,,,,,,,B 抬到肩高：手臂往前平舉
+1795549867689.5,task,rest_on,6,,,,,,,,,
+1795549870197.8,task,rest_off,6,,,,,,,,,
+1795549870197.8,task,trial_on,7,3,down,,,,,,,
+1795549870440.0,task,status,7,,,,,,,,,receive ring high-water (bytes) 266
+1795549870442.8,task,status,7,,,,,,,,,stack peak (bytes) 1124
+1795549870443.0,task,status,7,,,,,,,,,UART bytes dropped 0
+1795549870443.2,task,status,7,,,,,,,,,UART errors 1
+1795549875197.8,task,trial_end,7,3,down,,,,,timeout,,
+1795549875360.3,task,trial_off,7,3,down,,,,,,,
+1795549875360.3,task,rest_on,8,,,,,,,,,
+1795549877580.1,task,command,8,,,up,WristExt,1898,rest,,,
+1795549877868.9,task,rest_off,8,,,,,,,,,
+1795549877868.9,task,trial_on,9,4,up,,,,,,,
+1795549880600.6,task,status,9,,,,,,,,,receive ring high-water (bytes) 266
+1795549880603.7,task,status,9,,,,,,,,,stack peak (bytes) 1124
+1795549880604.0,task,status,9,,,,,,,,,UART bytes dropped 0
+1795549880604.4,task,status,9,,,,,,,,,UART errors 1
+1795549882776.0,task,command,9,4,up,grip_close,Fist,1950,trial,,,
+1795549882776.0,task,trial_end,9,4,up,grip_close,Fist,1950,,wrong,4907.1,
+1795549882786.5,task,trial_off,9,4,up,,,,,,,
+1795549882786.5,task,rest_on,10,,,,,,,,,
+1795549885297.9,task,rest_off,10,,,,,,,,,
+1795549885297.9,task,trial_on,11,5,grip_close,,,,,,,
+1795549887579.2,task,command,11,5,grip_close,up,WristExt,1998,trial,,,
+1795549887579.2,task,trial_end,11,5,grip_close,up,WristExt,1998,,wrong,2281.3,
+1795549887589.6,task,trial_off,11,5,grip_close,,,,,,,
+1795549887589.6,task,posture,12,,C,,,,,,,C 往外側伸：手往身體外側伸
+1795549887589.6,task,rest_on,12,,,,,,,,,
+1795549890106.1,task,rest_off,12,,,,,,,,,
+1795549890106.1,task,trial_on,13,6,up,,,,,,,
+1795549890757.9,task,status,13,,,,,,,,,receive ring high-water (bytes) 266
+1795549890758.2,task,status,13,,,,,,,,,stack peak (bytes) 1124
+1795549890758.8,task,status,13,,,,,,,,,UART bytes dropped 0
+1795549890759.0,task,status,13,,,,,,,,,UART errors 1
+1795549892977.7,task,command,13,6,up,left,RadialDev,2052,trial,,,
+1795549892977.7,task,trial_end,13,6,up,left,RadialDev,2052,,wrong,2871.6,
+1795549893004.8,task,trial_off,13,6,up,,,,,,,
+1795549893004.8,task,rest_on,14,,,,,,,,,
+1795549895508.7,task,rest_off,14,,,,,,,,,
+1795549895508.7,task,trial_on,15,7,grip_close,,,,,,,
+1795549897571.4,task,command,15,7,grip_close,up,WristExt,2098,trial,,,
+1795549897571.4,task,trial_end,15,7,grip_close,up,WristExt,2098,,wrong,2062.7,
+1795549897578.4,task,trial_off,15,7,grip_close,,,,,,,
+1795549897578.4,task,rest_on,16,,,,,,,,,
+1795549900079.9,task,rest_off,16,,,,,,,,,
+1795549900079.9,task,trial_on,17,8,grip_open,,,,,,,
+1795549900917.3,task,status,17,,,,,,,,,receive ring high-water (bytes) 266
+1795549900917.9,task,status,17,,,,,,,,,stack peak (bytes) 1124
+1795549900918.2,task,status,17,,,,,,,,,UART bytes dropped 0
+1795549900918.3,task,status,17,,,,,,,,,UART errors 1
+1795549902772.2,task,command,17,8,grip_open,grip_close,Fist,2150,trial,,,
+1795549902772.2,task,trial_end,17,8,grip_open,grip_close,Fist,2150,,wrong,2692.3,
+1795549902778.6,task,trial_off,17,8,grip_open,,,,,,,
+1795549902778.6,task,posture,18,,A,,,,,,,A 往前伸：像拿桌子另一邊的東西
+1795549902778.6,task,rest_on,18,,,,,,,,,
+1795549905283.3,task,rest_off,18,,,,,,,,,
+1795549905283.3,task,trial_on,19,9,right,,,,,,,
+1795549910283.3,task,trial_end,19,9,right,,,,,timeout,,
+1795549910458.1,task,trial_off,19,9,right,,,,,,,
+1795549910458.1,task,rest_on,20,,,,,,,,,
+1795549911076.3,task,status,20,,,,,,,,,receive ring high-water (bytes) 266
+1795549911079.3,task,status,20,,,,,,,,,stack peak (bytes) 1124
+1795549911079.5,task,status,20,,,,,,,,,UART bytes dropped 0
+1795549911079.7,task,status,20,,,,,,,,,UART errors 1
+1795549912973.9,task,rest_off,20,,,,,,,,,
+1795549912973.9,task,trial_on,21,10,left,,,,,,,
+1795549917874.0,task,command,21,10,left,right,UlnarDev,2301,trial,,,
+1795549917874.0,task,trial_end,21,10,left,right,UlnarDev,2301,,wrong,4900.1,
+1795549917881.0,task,trial_off,21,10,left,,,,,,,
+1795549917881.0,task,rest_on,22,,,,,,,,,
+1795549920384.9,task,rest_off,22,,,,,,,,,
+1795549920384.9,task,trial_on,23,11,down,,,,,,,
+1795549921234.1,task,status,23,,,,,,,,,receive ring high-water (bytes) 266
+1795549921236.8,task,status,23,,,,,,,,,stack peak (bytes) 1124
+1795549921237.1,task,status,23,,,,,,,,,UART bytes dropped 0
+1795549921237.2,task,status,23,,,,,,,,,UART errors 1
+1795549922879.7,task,command,23,11,down,grip_close,Fist,2351,trial,,,
+1795549922879.7,task,trial_end,23,11,down,grip_close,Fist,2351,,wrong,2494.8,
+1795549922889.7,task,trial_off,23,11,down,,,,,,,
+1795549922889.7,task,rest_on,24,,,,,,,,,
+1795549925397.6,task,rest_off,24,,,,,,,,,
+1795549925397.7,task,seg_end,,,,,,,,,,1
+1795549925413.3,labelled,seg_start,,,,,,,,,,2
+1795549925413.4,labelled,rest_on,0,,,,,,,,,
+1795549928418.7,labelled,rest_off,0,,,,,,,,,
+1795549928418.7,labelled,cue_on,1,,Rest,,,,,,,
+1795549930434.0,labelled,cue_off,1,,Rest,,,,,,,
+1795549930434.0,labelled,rest_on,2,,,,,,,,,
+1795549931393.6,labelled,status,2,,,,,,,,,receive ring high-water (bytes) 266
+1795549931396.6,labelled,status,2,,,,,,,,,stack peak (bytes) 1124
+1795549931397.0,labelled,status,2,,,,,,,,,UART bytes dropped 0
+1795549931397.3,labelled,status,2,,,,,,,,,UART errors 1
+1795549933278.5,labelled,command,2,,,left,RadialDev,2455,rest,,,
+1795549933442.8,labelled,rest_off,2,,,,,,,,,
+1795549933442.8,labelled,cue_on,3,,RadialDev,,,,,,,
+1795549935447.0,labelled,cue_off,3,,RadialDev,,,,,,,
+1795549935447.0,labelled,rest_on,4,,,,,,,,,
+1795549937674.8,labelled,command,4,,,grip_open,HandOpen,2499,rest,,,
+1795549938459.9,labelled,rest_off,4,,,,,,,,,
+1795549938459.9,labelled,cue_on,5,,WristFlex,,,,,,,
+1795549940466.4,labelled,cue_off,5,,WristFlex,,,,,,,
+1795549940466.4,labelled,posture,6,,B,,,,,,,B 抬到肩高：手臂往前平舉
+1795549940466.4,labelled,rest_on,6,,,,,,,,,
+1795549941551.9,labelled,status,6,,,,,,,,,receive ring high-water (bytes) 266
+1795549941552.2,labelled,status,6,,,,,,,,,stack peak (bytes) 1124
+1795549941552.4,labelled,status,6,,,,,,,,,UART bytes dropped 0
+1795549941552.5,labelled,status,6,,,,,,,,,UART errors 1
+1795549943381.5,labelled,command,6,,,down,WristFlex,2556,rest,,,
+1795549943467.3,labelled,rest_off,6,,,,,,,,,
+1795549943467.3,labelled,cue_on,7,,HandOpen,,,,,,,
+1795549945473.0,labelled,cue_off,7,,HandOpen,,,,,,,
+1795549945473.0,labelled,rest_on,8,,,,,,,,,
+1795549948174.0,labelled,command,8,,,right,UlnarDev,2604,rest,,,
+1795549948474.2,labelled,rest_off,8,,,,,,,,,
+1795549948474.2,labelled,cue_on,9,,UlnarDev,,,,,,,
+1795549950481.9,labelled,cue_off,9,,UlnarDev,,,,,,,
+1795549950481.9,labelled,rest_on,10,,,,,,,,,
+1795549951713.0,labelled,status,10,,,,,,,,,receive ring high-water (bytes) 266
+1795549951713.5,labelled,status,10,,,,,,,,,stack peak (bytes) 1124
+1795549951713.9,labelled,status,10,,,,,,,,,UART bytes dropped 0
+1795549951714.2,labelled,status,10,,,,,,,,,UART errors 1
+1795549953272.6,labelled,command,10,,,up,WristExt,2655,rest,,,
+1795549953497.4,labelled,rest_off,10,,,,,,,,,
+1795549953497.4,labelled,cue_on,11,,WristExt,,,,,,,
+1795549955506.5,labelled,cue_off,11,,WristExt,,,,,,,
+1795549955506.5,labelled,rest_on,12,,,,,,,,,
+1795549958509.4,labelled,rest_off,12,,,,,,,,,
+1795549958509.4,labelled,cue_on,13,,Fist,,,,,,,
+1795549960474.6,labelled,command,13,,Fist,up,WristExt,2727,cue,,,
+1795549960512.9,labelled,cue_off,13,,Fist,,,,,,,
+1795549960512.9,labelled,rest_on,14,,,,,,,,,
+1795549961873.6,labelled,status,14,,,,,,,,,receive ring high-water (bytes) 266
+1795549961876.5,labelled,status,14,,,,,,,,,stack peak (bytes) 1124
+1795549961876.7,labelled,status,14,,,,,,,,,UART bytes dropped 0
+1795549961877.0,labelled,status,14,,,,,,,,,UART errors 1
+1795549963526.2,labelled,rest_off,14,,,,,,,,,
+1795549963526.2,labelled,seg_end,,,,,,,,,,2
+1795549963541.7,task,seg_start,,,,,,,,,,3
+1795549963541.8,task,posture,0,,A,,,,,,,A 往前伸：像拿桌子另一邊的東西
+1795549963541.8,task,rest_on,0,,,,,,,,,
+1795549963876.1,task,command,0,,,grip_close,Fist,2761,rest,,,
+1795549966052.1,task,rest_off,0,,,,,,,,,
+1795549966052.1,task,trial_on,1,0,up,,,,,,,
+1795549967572.4,task,command,1,0,up,right,UlnarDev,2798,trial,,,
+1795549967572.4,task,trial_end,1,0,up,right,UlnarDev,2798,,wrong,1520.4,
+1795549967583.9,task,trial_off,1,0,up,,,,,,,
+1795549967583.9,task,rest_on,2,,,,,,,,,
+1795549970097.5,task,rest_off,2,,,,,,,,,
+1795549970097.5,task,trial_on,3,1,left,,,,,,,
+1795549970978.3,task,command,3,1,left,grip_close,Fist,2832,trial,,,
+1795549970978.3,task,trial_end,3,1,left,grip_close,Fist,2832,,wrong,880.8,
+1795549970988.3,task,trial_off,3,1,left,,,,,,,
+1795549970988.3,task,rest_on,4,,,,,,,,,
+1795549972033.2,task,status,4,,,,,,,,,receive ring high-water (bytes) 266
+1795549972037.7,task,status,4,,,,,,,,,stack peak (bytes) 1124
+1795549972037.9,task,status,4,,,,,,,,,UART bytes dropped 0
+1795549972038.0,task,status,4,,,,,,,,,UART errors 1
+1795549973499.7,task,rest_off,4,,,,,,,,,
+1795549973499.7,task,trial_on,5,2,up,,,,,,,
+1795549978371.8,task,command,5,2,up,right,UlnarDev,2906,trial,,,
+1795549978371.8,task,trial_end,5,2,up,right,UlnarDev,2906,,wrong,4872.1,
+1795549978378.0,task,trial_off,5,2,up,,,,,,,
+1795549978378.0,task,posture,6,,B,,,,,,,B 抬到肩高：手臂往前平舉
+1795549978378.0,task,rest_on,6,,,,,,,,,
+1795549980885.3,task,rest_off,6,,,,,,,,,
+1795549980885.3,task,trial_on,7,3,grip_open,,,,,,,
+1795549982193.1,task,status,7,,,,,,,,,receive ring high-water (bytes) 266
+1795549982196.0,task,status,7,,,,,,,,,stack peak (bytes) 1124
+1795549982196.2,task,status,7,,,,,,,,,UART bytes dropped 0
+1795549982196.3,task,status,7,,,,,,,,,UART errors 1
+1795549985885.3,task,trial_end,7,3,grip_open,,,,,timeout,,
+1795549986046.9,task,trial_off,7,3,grip_open,,,,,,,
+1795549986046.9,task,rest_on,8,,,,,,,,,
+1795549988552.1,task,rest_off,8,,,,,,,,,
+1795549988552.1,task,trial_on,9,4,right,,,,,,,
+1795549992351.8,task,status,9,,,,,,,,,receive ring high-water (bytes) 266
+1795549992354.9,task,status,9,,,,,,,,,stack peak (bytes) 1124
+1795549992355.3,task,status,9,,,,,,,,,UART bytes dropped 0
+1795549992355.6,task,status,9,,,,,,,,,UART errors 1
+1795549993552.1,task,trial_end,9,4,right,,,,,timeout,,
+1795549993707.0,task,trial_off,9,4,right,,,,,,,
+1795549993707.0,task,rest_on,10,,,,,,,,,
+1795549996209.6,task,rest_off,10,,,,,,,,,
+1795549996209.6,task,trial_on,11,5,grip_close,,,,,,,
+1795549996280.1,task,command,11,5,grip_close,grip_close,Fist,3085,trial,,,
+1795549996280.1,task,trial_end,11,5,grip_close,grip_close,Fist,3085,,success,70.5,
+1795549996290.0,task,trial_off,11,5,grip_close,,,,,,,
+1795549996290.0,task,posture,12,,C,,,,,,,C 往外側伸：手往身體外側伸
+1795549996290.0,task,rest_on,12,,,,,,,,,
+1795549998797.2,task,rest_off,12,,,,,,,,,
+1795549998797.2,task,trial_on,13,6,down,,,,,,,
+1795550000174.1,task,command,13,6,down,left,RadialDev,3124,trial,,,
+1795550000174.1,task,trial_end,13,6,down,left,RadialDev,3124,,wrong,1376.9,
+1795550000181.3,task,trial_off,13,6,down,,,,,,,
+1795550000181.3,task,rest_on,14,,,,,,,,,
+1795550002511.4,task,status,14,,,,,,,,,receive ring high-water (bytes) 266
+1795550002511.6,task,status,14,,,,,,,,,stack peak (bytes) 1124
+1795550002511.8,task,status,14,,,,,,,,,UART bytes dropped 0
+1795550002512.0,task,status,14,,,,,,,,,UART errors 1
+1795550002694.5,task,rest_off,14,,,,,,,,,
+1795550002694.5,task,trial_on,15,7,right,,,,,,,
+1795550005877.3,task,command,15,7,right,up,WristExt,3181,trial,,,
+1795550005877.3,task,trial_end,15,7,right,up,WristExt,3181,,wrong,3182.8,
+1795550005886.9,task,trial_off,15,7,right,,,,,,,
+1795550005886.9,task,rest_on,16,,,,,,,,,
+1795550008392.7,task,rest_off,16,,,,,,,,,
+1795550008392.7,task,trial_on,17,8,down,,,,,,,
+1795550012669.1,task,status,17,,,,,,,,,receive ring high-water (bytes) 266
+1795550012674.9,task,status,17,,,,,,,,,stack peak (bytes) 1124
+1795550012675.1,task,status,17,,,,,,,,,UART bytes dropped 0
+1795550012675.4,task,status,17,,,,,,,,,UART errors 1
+1795550013392.7,task,trial_end,17,8,down,,,,,timeout,,
+1795550013558.3,task,trial_off,17,8,down,,,,,,,
+1795550013558.3,task,posture,18,,A,,,,,,,A 往前伸：像拿桌子另一邊的東西
+1795550013558.3,task,rest_on,18,,,,,,,,,
+1795550014378.5,task,command,18,,,left,RadialDev,3266,rest,,,
+1795550016068.6,task,rest_off,18,,,,,,,,,
+1795550016068.6,task,trial_on,19,9,grip_close,,,,,,,
+1795550021068.6,task,trial_end,19,9,grip_close,,,,,timeout,,
+1795550021222.2,task,trial_off,19,9,grip_close,,,,,,,
+1795550021222.2,task,rest_on,20,,,,,,,,,
+1795550021671.4,task,command,20,,,down,WristFlex,3339,rest,,,
+1795550022829.1,task,status,20,,,,,,,,,receive ring high-water (bytes) 266
+1795550022832.2,task,status,20,,,,,,,,,stack peak (bytes) 1124
+1795550022832.4,task,status,20,,,,,,,,,UART bytes dropped 0
+1795550022832.6,task,status,20,,,,,,,,,UART errors 1
+1795550023725.8,task,rest_off,20,,,,,,,,,
+1795550023725.8,task,trial_on,21,10,grip_open,,,,,,,
+1795550024574.9,task,command,21,10,grip_open,grip_close,Fist,3368,trial,,,
+1795550024574.9,task,trial_end,21,10,grip_open,grip_close,Fist,3368,,wrong,849.1,
+1795550024584.5,task,trial_off,21,10,grip_open,,,,,,,
+1795550024584.5,task,rest_on,22,,,,,,,,,
+1795550027099.2,task,rest_off,22,,,,,,,,,
+1795550027099.2,task,trial_on,23,11,left,,,,,,,
+1795550027773.0,task,command,23,11,left,up,WristExt,3400,trial,,,
+1795550027773.0,task,trial_end,23,11,left,up,WristExt,3400,,wrong,673.8,
+1795550027783.4,task,trial_off,23,11,left,,,,,,,
+1795550027783.4,task,rest_on,24,,,,,,,,,
+1795550030290.9,task,rest_off,24,,,,,,,,,
+1795550030290.9,task,seg_end,,,,,,,,,,3
+1795550030306.3,labelled,seg_start,,,,,,,,,,4
+1795550030306.4,labelled,posture,0,,C,,,,,,,C 往外側伸：手往身體外側伸
+1795550030306.4,labelled,rest_on,0,,,,,,,,,
+1795550032988.7,labelled,status,0,,,,,,,,,receive ring high-water (bytes) 266
+1795550032991.5,labelled,status,0,,,,,,,,,stack peak (bytes) 1124
+1795550032991.6,labelled,status,0,,,,,,,,,UART bytes dropped 0
+1795550032991.8,labelled,status,0,,,,,,,,,UART errors 1
+1795550033321.9,labelled,rest_off,0,,,,,,,,,
+1795550033321.9,labelled,cue_on,1,,WristExt,,,,,,,
+1795550035328.1,labelled,cue_off,1,,WristExt,,,,,,,
+1795550035328.1,labelled,rest_on,2,,,,,,,,,
+1795550038332.4,labelled,rest_off,2,,,,,,,,,
+1795550038332.4,labelled,cue_on,3,,Rest,,,,,,,
+1795550040342.7,labelled,cue_off,3,,Rest,,,,,,,
+1795550040342.7,labelled,rest_on,4,,,,,,,,,
+1795550040878.7,labelled,command,4,,,grip_open,HandOpen,3531,rest,,,
+1795550043146.4,labelled,status,4,,,,,,,,,receive ring high-water (bytes) 266
+1795550043149.2,labelled,status,4,,,,,,,,,stack peak (bytes) 1124
+1795550043149.3,labelled,status,4,,,,,,,,,UART bytes dropped 0
+1795550043149.4,labelled,status,4,,,,,,,,,UART errors 1
+1795550043344.5,labelled,rest_off,4,,,,,,,,,
+1795550043344.5,labelled,cue_on,5,,Fist,,,,,,,
+1795550045350.3,labelled,cue_off,5,,Fist,,,,,,,
+1795550045350.3,labelled,posture,6,,A,,,,,,,A 往前伸：像拿桌子另一邊的東西
+1795550045350.3,labelled,rest_on,6,,,,,,,,,
+1795550046976.9,labelled,command,6,,,left,RadialDev,3592,rest,,,
+1795550048351.0,labelled,rest_off,6,,,,,,,,,
+1795550048351.0,labelled,cue_on,7,,RadialDev,,,,,,,
+1795550050354.0,labelled,cue_off,7,,RadialDev,,,,,,,
+1795550050354.0,labelled,rest_on,8,,,,,,,,,
+1795550053305.7,labelled,status,8,,,,,,,,,receive ring high-water (bytes) 266
+1795550053308.4,labelled,status,8,,,,,,,,,stack peak (bytes) 1124
+1795550053308.6,labelled,status,8,,,,,,,,,UART bytes dropped 0
+1795550053308.7,labelled,status,8,,,,,,,,,UART errors 1
+1795550053357.8,labelled,rest_off,8,,,,,,,,,
+1795550053357.8,labelled,cue_on,9,,WristFlex,,,,,,,
+1795550053381.9,labelled,command,9,,WristFlex,grip_close,Fist,3656,cue,,,
+1795550055363.8,labelled,cue_off,9,,WristFlex,,,,,,,
+1795550055363.8,labelled,rest_on,10,,,,,,,,,
+1795550055975.5,labelled,command,10,,,left,RadialDev,3682,rest,,,
+1795550058367.6,labelled,rest_off,10,,,,,,,,,
+1795550058367.6,labelled,cue_on,11,,UlnarDev,,,,,,,
+1795550059571.5,labelled,command,11,,UlnarDev,grip_close,Fist,3718,cue,,,
+1795550060373.0,labelled,cue_off,11,,UlnarDev,,,,,,,
+1795550060373.0,labelled,rest_on,12,,,,,,,,,
+1795550063075.5,labelled,command,12,,,left,RadialDev,3753,rest,,,
+1795550063387.5,labelled,rest_off,12,,,,,,,,,
+1795550063387.5,labelled,cue_on,13,,HandOpen,,,,,,,
+1795550063462.6,labelled,status,13,,,,,,,,,receive ring high-water (bytes) 266
+1795550063465.3,labelled,status,13,,,,,,,,,stack peak (bytes) 1124
+1795550063465.7,labelled,status,13,,,,,,,,,UART bytes dropped 0
+1795550063465.9,labelled,status,13,,,,,,,,,UART errors 1
+1795550065388.4,labelled,cue_off,13,,HandOpen,,,,,,,
+1795550065388.4,labelled,rest_on,14,,,,,,,,,
+1795550066473.1,labelled,command,14,,,up,WristExt,3787,rest,,,
+1795550068391.2,labelled,rest_off,14,,,,,,,,,
+1795550068391.3,labelled,seg_end,,,,,,,,,,4
+1795550068404.7,,session_end,,,,,,,,,,任務成功 1/24，休息中誤觸發 5

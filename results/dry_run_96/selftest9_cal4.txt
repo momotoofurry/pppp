@@ -1,0 +1,35 @@
+cued pass: first 4 s of each cue; rule 1 threshold 85 %, rule 2 D_bar >= +2 (pre-registered); sets S7: reported, not the pre-registered decisions (those were for S9)
+Z99_d1_S: rate 2000.0 Hz, cued windows per gesture [60, 60, 60, 60, 60, 60, 60, 60, 60], probes 3 with [7, 7, 7] cues, task trials 24
+
+== Z99_d1_S
+rule 1, condition cue
+set  classes  chance   window acc %   cue-majority %   95 % CI (cues)   per probe (window %)
+S7         7   14.3           12.9              9.5      3.8 -  24.8    P0  22.9  P1   8.6  P2   7.1
+
+S7 confusion, cue (rows = cued gesture, columns = predicted; windows)
+           WristE  WristF  Radial  UlnarD  HandOp  Fist  Rest
+WristExt        4       0       2       3       0     0    21
+WristFlex       3       0       1       6       2     0    18
+RadialDev       3       0       2       2       2     4    17
+UlnarDev        1       0      10       0       0     7    12
+HandOpen        1       0       1       6       0     0    22
+Fist            3       2       1       2       0     2    20
+Rest            1       0       7       3       0     0    19
+S7 recall %: WristExt 13, WristFlex 0, RadialDev 7, UlnarDev 0, HandOpen 0, Fist 7, Rest 63
+
+rule 2: probe window accuracy % (cue -> cue_soft), D = mean over P1, P2 of (cue_soft - cue)
+S7: P0  22.9 ->  22.9  P1   8.6 ->  15.7  P2   7.1 ->  12.9   D = +6.43 (bootstrap 95 % -10.00, +27.14)
+(reported, not decided; 35.74) self-training: probe window accuracy % (cue -> cue_self), D_self = mean over P1, P2 of (cue_self - cue); D - D_self = what the task information adds
+S7: P0  22.9 ->  22.9  P1   8.6 ->  14.3  P2   7.1 ->  12.9   D_self = +5.71, D - D_self = +0.71
+
+offline commands in the task trials (first run of 3 equal non-Rest windows)
+S7 cue     : trials 24, commands 21, right 4, none 3, command accuracy 19.0 %
+S7 cue_soft: trials 24, commands 24, right 6, none 0, command accuracy 25.0 %
+S7 cue_self: trials 24, commands 24, right 6, none 0, command accuracy 25.0 %
+
+board's real-time commands in the task (S7 firmware: gate, k 5, stop k 2): success 1, timeout 7, wrong 16 of 24
+  latency cue -> first command: all commands median 2495 ms (quartiles 1377-4447); right commands median 70 ms (quartiles 70-70)
+
+rule 1, mean over days: S7 12.9 %
+rule 1 as a report (sets S7): no set reaches 85 %; best is S7 (12.9 %): revise placement / gestures before the arm experiment
+rule 2 as a report: S7 D_bar = +6.43, positive on 1/1 days
