@@ -467,6 +467,10 @@ class TaskForm : Form
             lock (inbox) { if (inbox.Count == 0) break; f = inbox.Dequeue(); }
             double ms;
             if (!double.TryParse(f[0], NumberStyles.Float, IC, out ms)) continue;
+            if (f[1] == "command" && f.Length >= 6 && f[5] == "none") {     // 35.82: report bit 1, Rest established = stop
+                Log(ms, segName, "stop", stepIdx, -1, "", "", f[4], f[2], "", "", "", "");
+                continue;
+            }
             if (f[1] == "command" && f.Length >= 6) OnCommand(ms, f[5], f[4], f[2], "");
             else if (f[1] == "status" && f.Length >= 11)
                 Log(ms, segName, "status", segName != "" ? stepIdx : -1, -1, "", "", "", "", "", "", "", f[9] + " " + f[10]);

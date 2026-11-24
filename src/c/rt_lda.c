@@ -41,12 +41,22 @@ static float s_prior[LD_CLASSES];
 static float s_gate_k, s_gate_thr = -1.0f;
 static uint8_t s_gate_mode;
 static float s_act[RTL_LABEL_MAX];
+/* 35.83: ring of the last classified windows for hindsight range labels */
+static int16_t s_hist_q[RTL_HIST][FE_DIM];
+static uint32_t s_hist_w[RTL_HIST];
+static uint8_t s_hist_g[RTL_HIST];
+static uint32_t s_hist_n;                       /* windows written since the last fit (ring position) */
+/* range-label queue: a single-producer / single-consumer ring, rx writes s_range_head, idle writes s_range_done */
+static volatile uint32_t s_range_head, s_range_done;
+static uint32_t s_range_first[RTL_RANGE_Q], s_range_last[RTL_RANGE_Q];
+static uint8_t s_range_cls[RTL_RANGE_Q];
 
 unsigned rtl_static_bytes(void)
 {
     return (unsigned)(sizeof s_cfg + sizeof s_pk + sizeof s_cnt + sizeof s_dc + sizeof s_lab_x + sizeof s_lab_y +
                       sizeof s_mu + sizeof s_inv_sd + sizeof s_feat + sizeof s_q + sizeof s_tx_seq + sizeof s_run +
-                      sizeof s_pend + sizeof s_prior + sizeof s_act);
+                      sizeof s_pend + sizeof s_prior + sizeof s_act + sizeof s_hist_q + sizeof s_hist_w +
+                      sizeof s_hist_g);
 }
 
 static uint32_t now(void)
@@ -107,6 +117,8 @@ void rtl_init(const rtl_config_t *cfg)
     s_pend_n = 0;
     s_pend_cls = -1;
     s_task_request = 0;
+    s_range_head = s_range_done = 0;
+    s_hist_n = 0;
     s_gate_k = 0.0f;
     s_gate_thr = -1.0f;
     s_gate_mode = 0;
@@ -185,7 +197,7 @@ static void on_window(void)
     if (s_win_since_reset++ < s_cfg.warmup)
         return;
     s_cnt.windows_used++;
-    if (s_fit_request || s_task_request) {      /* the fit owns the session buffer and the model */
+    if (s_fit_request || s_task_request || s_range_head != s_range_done) {   /* the fit owns the buffers and the model */
         s_cnt.skipped_busy++;
         return;
     }
@@ -219,6 +231,12 @@ static void on_window(void)
         top = LD_CLASSES - 1;
         accepted = 1;
         s_cnt.gated++;
+    }
+    {                                           /* 35.83: keep the window for hindsight range labels */
+        const uint32_t h = s_hist_n++ % RTL_HIST;
+        memcpy(s_hist_q[h], s_q, sizeof s_q);
+        s_hist_w[h] = s_cnt.windows;
+        s_hist_g[h] = gated;
     }
     /* windows for the task label: the run of agreeing accepted windows; after a command, further windows of the
      * same class are added to that command's windows until the class changes */
@@ -260,6 +278,16 @@ static void on_window(void)
         p[12] = gated;
         p[13] = 0;
         send(PK_PRED, 1, p, 14);
+    }
+    if (cmd == DC_NONE && o.established == LD_CLASSES - 1 && (s_report & 2u)) {
+        uint8_t p[12];                          /* 35.82: Rest established = stop (command 0) */
+        put32(p, s_cnt.windows);
+        put32(p + 4, t);
+        p[8] = 0;
+        p[9] = (uint8_t)(LD_CLASSES - 1);
+        p[10] = (uint8_t)margin;
+        p[11] = (uint8_t)(margin >> 8);
+        send(PK_COMMAND, 0, p, 12);
     }
     if (cmd != DC_NONE) {
         uint8_t p[12];
@@ -358,8 +386,27 @@ static void on_control(const uint8_t *p, uint16_t len)
         if (len >= 3 && !s_fit_request && !s_task_request)
             ld_set_active((uint32_t)(p[1] | (p[2] << 8)));
         break;
+    case RTL_LABEL_RANGE:
+        if (len < 10 || s_fit_request || s_task_request)
+            break;
+        if (p[9] >= LD_CLASSES || !ld_is_active(p[9]) || s_mode != RTL_MODE_RUN) {
+            status(RTL_EV_RANGE, -4);
+            break;
+        }
+        if (s_range_head - s_range_done >= RTL_RANGE_Q) {
+            status(RTL_EV_RANGE, -3);
+            break;
+        }
+        {
+            const uint32_t i = s_range_head % RTL_RANGE_Q;
+            s_range_first[i] = (uint32_t)p[1] | ((uint32_t)p[2] << 8) | ((uint32_t)p[3] << 16) | ((uint32_t)p[4] << 24);
+            s_range_last[i] = (uint32_t)p[5] | ((uint32_t)p[6] << 8) | ((uint32_t)p[7] << 16) | ((uint32_t)p[8] << 24);
+            s_range_cls[i] = p[9];
+            s_range_head++;                     /* published after the entry is written */
+        }
+        break;
     case RTL_TASK_LABEL:
-        if (len < 3 || s_fit_request || s_task_request)
+        if (len < 3 || s_fit_request || s_task_request || s_range_head != s_range_done)
             break;
         if (p[1] >= LD_CLASSES - 1 || !ld_is_active(p[1])) {
             status(RTL_EV_TASK, -4);
@@ -422,10 +469,45 @@ static void task_update(void)
     s_task_request = 0;
 }
 
+/* 35.83: hard labels for the buffered windows of every queued range (a direction skips gated windows), one refit */
+static void range_update(void)
+{
+    const uint32_t n = s_hist_n < RTL_HIST ? s_hist_n : RTL_HIST;
+    const uint32_t d0 = s_range_done, q = s_range_head - d0;   /* the labels queued so far; later ones wait */
+    int added[RTL_RANGE_Q], total = 0;
+    for (uint32_t k = 0; k < q; k++) {
+        const uint32_t e = (d0 + k) % RTL_RANGE_Q;
+        added[k] = 0;
+        for (uint32_t i = 0; i < n; i++) {
+            const uint32_t w = s_hist_w[i];
+            if (w < s_range_first[e] || w > s_range_last[e])
+                continue;
+            if (s_range_cls[e] != LD_CLASSES - 1 && s_hist_g[i])
+                continue;
+            ld_add(s_hist_q[i], s_range_cls[e]);
+            added[k]++;
+        }
+        total += added[k];
+    }
+    const int r = total ? ld_fit() : 0;
+    for (uint32_t k = 0; k < q; k++) {
+        if (r == 0 && added[k]) {
+            s_cnt.range_labels++;
+            s_cnt.range_windows += (uint32_t)added[k];
+        }
+        status(RTL_EV_RANGE, !added[k] ? -1 : r == 0 ? added[k] : r);
+    }
+    s_range_done = d0 + q;
+}
+
 void rtl_idle(void)
 {
     if (s_task_request) {
         task_update();
+        return;
+    }
+    if (s_range_head != s_range_done) {
+        range_update();
         return;
     }
     if (!s_fit_request)
@@ -472,6 +554,7 @@ void rtl_idle(void)
     }
     s_cnt.fit_result = r;
     s_cnt.fits++;
+    s_hist_n = 0;                               /* a new session's z-score: the old windows do not match it */
     s_label = -1;
     s_new_session = 1;
     dc_reset(&s_dc);

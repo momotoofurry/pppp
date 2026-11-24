@@ -56,6 +56,10 @@
 //                                     RTL_SET_REJECT: margin (0 = off), Mahalanobis limit (0 = off), windows that must
 //                                     agree for a command, and for Rest (stop; 0 / absent = k; rtl_task_s7b, 35.79).
 //                                     ('decision' is the frozen firmware's command; the LDA firmware ignores it.)
+//         range <first> <last> <class>  hindsight label (RTL_LABEL_RANGE, rtl_task_s7d, 35.83): the board's windows
+//                                     first..last (window numbers of its PRED / COMMAND packets) that are still in its
+//                                     ring of the last 256 get this class; normally from assist_ros.py board through
+//                                     udp_tcp_relay.py as 'range,<first>,<last>,<class>' on --task-udp
 //         preset s7                   = classes 0x1CF (no Point / ThumbUp), gate 50 2, reject 0 0 5 2 (report 35.79);
 //                                     needs --classes 9. Send it before calibrate (the class mask and the gate act at
 //                                     the fit). --preset s7 sends it right after the port is opened.
@@ -86,7 +90,7 @@ static class Proto
     public const byte SAMPLES = 0x01, CONTROL = 0x02, COMMAND = 0x81, STATUS = 0x82, PRED = 0x83;
     public const byte STREAM_RESET = 1, CAL_START = 2, CAL_END = 3, CALIBRATE = 4, SET_DECISION = 5, SET_REPORT = 6,
                       ALIGN_START = 7, ALIGN_END = 8, LOAD = 9, SET_ADAPT = 10;
-    public const byte FORGET = 11, TASK_LABEL = 12, SET_GATE = 13, SET_CLASSES = 14;   // LDA firmware (rt_lda.h)
+    public const byte FORGET = 11, TASK_LABEL = 12, SET_GATE = 13, SET_CLASSES = 14, LABEL_RANGE = 15;   // LDA firmware (rt_lda.h)
     public const byte SET_REJECT = SET_DECISION;                            // the LDA firmware's meaning of 5
     public const int CH = 8, FRAMES_PER_PACKET = 20, MAX_PAYLOAD = 512, OVERHEAD = 9;
     public const double LSB_VOLT = 2.5e-7;
@@ -140,6 +144,10 @@ static class Proto
             return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)(args[0] >> 8), (byte)args[1] });
         if (sub == SET_CLASSES)
             return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)(args[0] >> 8) });
+        if (sub == LABEL_RANGE)                             // first u32, last u32, class u8
+            return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)(args[0] >> 8), (byte)(args[0] >> 16), (byte)(args[0] >> 24),
+                                               (byte)args[1], (byte)(args[1] >> 8), (byte)(args[1] >> 16), (byte)(args[1] >> 24),
+                                               (byte)args[2] });
         if (sub == SET_GATE)
             return Build(CONTROL, new byte[] { sub, (byte)args[0], (byte)(args[0] >> 8), (byte)args[1] });
         if (sub == TASK_LABEL && args.Length >= 3)
@@ -861,6 +869,13 @@ static class Program
             for (int g = 0; g < Proto.K; g++) if (((mask >> g) & 1) != 0 || g == Proto.K - 1) on.Add(Proto.GESTURES[g]);
             Console.WriteLine("  active classes after the next calibrate: " + string.Join(" ", on));
         }
+        else if (lda && c == "range" && p.Length == 4) {
+            uint w0, w1; int cls;
+            if (!uint.TryParse(p[1], out w0) || !uint.TryParse(p[2], out w1) || !int.TryParse(p[3], out cls) || w1 < w0
+                || cls < 0 || cls >= Proto.K) {
+                Console.WriteLine("range <first window> <last window> <class 0-" + (Proto.K - 1) + ">"); return false; }
+            Send(Proto.Control(Proto.LABEL_RANGE, (int)w0, (int)w1, cls));
+        }
         else if (lda && c == "preset" && p.Length == 2 && p[1] == "s7") {
             if (Proto.K != 9) { Console.WriteLine("preset s7 needs --classes 9"); return false; }
             bool all = DoCommand1("classes 0x1CF") & DoCommand1("gate 50 2") & DoCommand1("reject 0 0 5 2");
@@ -883,7 +898,7 @@ static class Program
             return true;                                          // quiet: one per robot command
         }
         else { Console.WriteLine("? reset | cal <0-5> | calend | calibrate | load | adapt <0|1> | verify <0-5> | align | decision <tau_permille> <k> | report <0|1> | note <text> | status | quit"
-                                 + (lda ? " | forget | gate <k_x100> <mode> | classes <mask> | reject <margin> <dist2> <k> [<k_rest>] | preset s7 | task <e> <mask> [window]" : "")); return false; }
+                                 + (lda ? " | forget | gate <k_x100> <mode> | classes <mask> | reject <margin> <dist2> <k> [<k_rest>] | preset s7 | task <e> <mask> [window] | range <first> <last> <class>" : "")); return false; }
         Console.WriteLine(string.Format(IC, "[{0:F1} s] sent: {1}", clock.Elapsed.TotalSeconds, line.Trim()));
         return true;
     }
@@ -901,6 +916,12 @@ static class Program
                 byte[] b;
                 try { b = u.Receive(ref any); } catch (SocketException) { continue; }
                 var f = Encoding.ASCII.GetString(b).Trim().Split(',');
+                uint r0, r1; int rc;
+                if (f.Length == 4 && f[0] == "range" && uint.TryParse(f[1], out r0) && uint.TryParse(f[2], out r1)
+                    && int.TryParse(f[3], out rc)) {           // 35.83: hindsight range label from assist_ros.py board
+                    if (DoCommand(string.Format(IC, "range {0} {1} {2}", r0, r1, rc))) Interlocked.Increment(ref TaskLabelsSent);
+                    continue;
+                }
                 int e, m; uint w;
                 if (f.Length != 4 || f[0] != "task" || !int.TryParse(f[1], out e) || !int.TryParse(f[2], out m)
                     || !uint.TryParse(f[3], out w) || e < 0 || e > Proto.K - 2 || m < 0 || m >= (1 << (Proto.K - 1))) continue;
@@ -958,9 +979,9 @@ static class Program
         }
         if (type == Proto.STATUS && p.Length >= 8) {
             int ev = p[0], v = BitConverter.ToInt32(p, 4);
-            if (lda && ev >= 16 && ev <= 20) {
+            if (lda && ev >= 16 && ev <= 21) {
                 string[] ln = { "forgot", "fit took (us)", "task label (class x 1000 + 999 q; < 0 refused)", "task update took (us)",
-                                "activity gate threshold (nV)" };
+                                "activity gate threshold (nV)", "range label (windows added; < 0 refused)" };
                 return string.Format(IC, "status,,,,,,,,{0},{1}", ln[ev - 16], v);
             }
             string[] names = { "", "calibrated (0 = ok)", "self-calibration blocks", "packets lost", "calibration windows", "rotation",

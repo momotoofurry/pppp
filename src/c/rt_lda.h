@@ -21,6 +21,10 @@
  *   RTL_SET_REJECT (5) margin_x100 u16, dist2 u16 (0 = off), k u8 [, k_rest u8]
  *                                     k_rest (report 35.79): windows that establish Rest (stop); 0 or absent = k
  *   RTL_SET_REPORT (6) flags u8       bit 0: PK_PRED for every classified window
+ *                                     bit 1 (report 35.82): a PK_COMMAND with command 0 (none) and class Rest every
+ *                                     time Rest is established (k_rest agreeing Rest / gated windows): the 'stop' of
+ *                                     continuous arm control (hold = move, relax = stop). Not a command: no task-label
+ *                                     windows, not counted in commands. Off by default.
  *   RTL_FORGET (11)                   drop all accumulated labels (ld_reset), e.g. after the band was moved
  *   RTL_TASK_LABEL (12) expected u8, valid u8 [, window u32]
  *                                     task label for the last command (report 35.18, 35.24): the robot side
@@ -50,12 +54,24 @@
  *                                     are left out of the z-score, the sums and the gate threshold, and their task
  *                                     labels are refused (-4). E.g. S7 of the 9-class build = 0x1CF (no index
  *                                     point, no thumb up). Not while a fit or task update is pending.
+ *   RTL_LABEL_RANGE (15) first u32, last u32, class u8   (report 35.83)
+ *                                     hindsight label from the robot side (labeler.py: confirmed when an object is
+ *                                     put down, up to 20 s later): the classified windows numbered first..last
+ *                                     (PK_PRED / PK_COMMAND window numbers) that are still in the ring of the last
+ *                                     RTL_HIST windows are added to the running sums with this hard label (ld_add;
+ *                                     a non-Rest class skips the windows the activity gate made Rest), then refit, in
+ *                                     thread context like RTL_TASK_LABEL. No forgetting. Status RTL_EV_RANGE, one per
+ *                                     label. Labels arriving before rtl_idle ran queue up (RTL_RANGE_Q; the board test
+ *                                     of 35.83 lost the second of two back-to-back labels without it) and are applied
+ *                                     together with one refit; a full queue answers -3.
  * Status events (PK_STATUS): RTL_EV_FIT value = 0 or the error (-1 a gesture has no window in the sums, -2
  *   degenerate data, -3 fewer than RTL_LABEL_MIN session windows); RTL_EV_LOST packets lost; RTL_EV_LABEL_FULL
  *   session buffer full; RTL_EV_FORGOT; RTL_EV_FIT_US value = duration of the fit in microseconds (sent before
  *   RTL_EV_FIT; 0 without a time base). RTL_EV_TASK value = class x 1000 + floor(999 q[class]) of the soft
  *   label's argmax after a task update, or < 0: -1 no command waiting for a label, -2 degenerate data, -4 bad
- *   expected class, -5 the label is for an older command; RTL_EV_GATE_THR = the gate threshold in nV after a
+ *   expected class, -5 the label is for an older command; RTL_EV_RANGE = windows a range label added, or < 0: -1
+ *   none of them in the ring, -2 degenerate data (old model kept), -3 queue full, -4 bad or inactive class;
+ *   RTL_EV_GATE_THR = the gate threshold in nV after a
  *   fit that set it (-1: a gesture without cued windows); RTL_EV_TASK_US = duration of the task update in microseconds (sent before RTL_EV_TASK).
  * PK_PRED / PK_COMMAND: the field that carries the vote share for rt.c carries min(65535, margin x 100) here.
  */
@@ -80,11 +96,16 @@
 #define RTL_BETA 0.3f
 #define RTL_DECAY 0.97f
 #define RTL_MAV0 (4 * FE_CH)              /* first MAV feature (feature-major, features.h) */
+#ifndef RTL_HIST
+#define RTL_HIST 256                    /* classified windows kept for hindsight labels (35.83): 25.6 s, 42 KB */
+#endif
+#define RTL_RANGE_Q 16                  /* range labels waiting for rtl_idle (one put-down sends several) */
 
 enum { RTL_STREAM_RESET = 1, RTL_LABEL_START = 2, RTL_LABEL_END = 3, RTL_FIT = 4, RTL_SET_REJECT = 5,
-       RTL_SET_REPORT = 6, RTL_FORGET = 11, RTL_TASK_LABEL = 12, RTL_SET_GATE = 13, RTL_SET_CLASSES = 14 };
+       RTL_SET_REPORT = 6, RTL_FORGET = 11, RTL_TASK_LABEL = 12, RTL_SET_GATE = 13, RTL_SET_CLASSES = 14,
+       RTL_LABEL_RANGE = 15 };
 enum { RTL_EV_FIT = 1, RTL_EV_LOST = 3, RTL_EV_LABEL_FULL = 4, RTL_EV_FORGOT = 16, RTL_EV_FIT_US = 17,
-       RTL_EV_TASK = 18, RTL_EV_TASK_US = 19, RTL_EV_GATE_THR = 20,
+       RTL_EV_TASK = 18, RTL_EV_TASK_US = 19, RTL_EV_GATE_THR = 20, RTL_EV_RANGE = 21,
        /* diagnostics sent by the board main loop (app_rt_lda.c), same numbers as rt.h */
        RTL_EV_DIAG_RX_HW = 9, RTL_EV_DIAG_STACK = 10, RTL_EV_DIAG_RX_OVF = 11, RTL_EV_DIAG_RX_ERR = 12 };
 enum { RTL_MODE_IDLE = 0, RTL_MODE_LABEL = 1, RTL_MODE_RUN = 2 };
@@ -103,6 +124,7 @@ typedef struct {
     int32_t fit_result;
     uint32_t task_labels;                           /* task updates done */
     uint32_t gated;                                 /* windows the activity gate made Rest */
+    uint32_t range_labels, range_windows;           /* 35.83: range labels applied, windows they added */
 } rtl_counters_t;
 
 void rtl_init(const rtl_config_t *cfg);

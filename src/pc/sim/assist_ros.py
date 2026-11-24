@@ -20,6 +20,16 @@ displays) shows both: rviz2 -d src/pc/sim/assist.rviz
   blend (default, 35.58): you steer all the time; the arm adds depth toward the likely object; once aligned and sure,
   keep the SAME key to go in, the opposite key backs out, another key steers again; at the object press space and
   wait 1 s to grasp; then move freely (w lifts). takeover (35.57): after a short push the system drives.
+  python3 src/pc/sim/assist_ros.py board [--listen 127.0.0.1:50560] [--grip stop|toggle-home] [--events board_events.csv]
+      (report 35.82) the keys control (two modes) driven by the board instead of the keyboard: TrignoBridge run
+      --firmware lda --classes 9 --preset s7 --udp 50555,50556 with 'report 2' (Rest established = command 'none'),
+      src/pc/udp_tcp_relay.py on Windows passes the commands here. Hold semantics as the firmware's latch: up / down /
+      left / right stay until the next event; none = relax (stop); grip_open / grip_close (S7 HandOpen / Fist):
+      --grip stop (default) = stop, toggle-home = Fist switches the mode (E), HandOpen goes back to the start (H).
+      No connection / connection lost = stop. Every event goes to --events with its arrival times.
+      35.83: every event is acked (the relay measures the round trip), and the hindsight labels of labeler.py go back
+      as 'range,<first>,<last>,<class>' (board window numbers: the last event's window + the control steps since it)
+      -> udp_tcp_relay.py -> TrignoBridge --task-udp -> RTL_LABEL_RANGE (firmware rtl_task_s7d). --send-labels 0: off.
   python3 src/pc/sim/assist_ros.py scene           shelves + objects + numbers, until Ctrl-C
   python3 src/pc/sim/assist_ros.py home            the arm folded back to Kinova's home pose (poses_sim.json 'home'),
                                                    gripper open
@@ -29,7 +39,9 @@ displays) shows both: rviz2 -d src/pc/sim/assist.rviz
 import argparse
 import os
 import select
+import socket
 import sys
+import threading
 import termios
 import time
 import tty
@@ -290,9 +302,97 @@ def keyreader():
     return poll, lambda: termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
+def boardreader(listen, grip, events_path):
+    """(report 35.82) the board's commands over TCP from udp_tcp_relay.py: lines '<relay_ms>,<bridge_ms>,command,
+    <window>,<t_us>,<gesture>,<command>,...'. Returns poll() like keyreader: the latched command ('up' .. 'rest'), or
+    'toggle' / 'home' once (--grip toggle-home)."""
+    host, port = listen.rsplit(':', 1)
+    srv = socket.socket()
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    srv.bind((host, int(port)))
+    srv.listen(1)
+    state = {'cmd': 'rest', 'n': 0, 'conn': False, 'w': None, 't': None, 'sock': None}
+    lock = threading.Lock()
+    ev = open(events_path, 'w', encoding='utf-8')
+    ev.write('recv_unix_ms,relay_unix_ms,bridge_unix_ms,window,command,gesture,applied\n')
+
+    def serve():
+        while True:
+            c, _ = srv.accept()
+            c.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            with lock:
+                state['conn'], state['sock'] = True, c
+            print('  board connected (udp_tcp_relay.py)', flush=True)
+            for line in c.makefile('r', encoding='ascii', errors='replace'):
+                f = line.strip().split(',')
+                if len(f) < 7 or f[2] != 'command':
+                    continue
+                cmd, ges = f[6], f[5]
+                try:
+                    c.sendall(f'ack,{f[0]}\n'.encode('ascii'))
+                except OSError:
+                    pass
+                if cmd in ('up', 'down', 'left', 'right'):
+                    applied = cmd
+                elif cmd == 'none':
+                    applied = 'rest'
+                elif grip == 'toggle-home' and cmd == 'grip_close':
+                    applied = 'toggle'
+                elif grip == 'toggle-home' and cmd == 'grip_open':
+                    applied = 'home'
+                else:
+                    applied = 'rest'
+                with lock:
+                    if applied in ('toggle', 'home'):
+                        state[applied], state['cmd'] = True, 'rest'
+                    else:
+                        state['cmd'] = applied
+                    state['n'] += 1
+                    state['w'], state['t'] = int(f[3]), time.time()
+                ev.write(f'{time.time() * 1000:.1f},{f[0]},{f[1]},{f[3]},{cmd},{ges},{applied}\n')
+                ev.flush()
+                print(f'\r  board: {cmd:10s} -> {applied}', flush=True)
+            with lock:
+                state['conn'], state['cmd'], state['sock'] = False, 'rest', None
+            print('  board connection closed: stop', flush=True)
+    threading.Thread(target=serve, daemon=True).start()
+
+    def poll():
+        with lock:
+            if state.pop('toggle', False):
+                return 'toggle'
+            if state.pop('home', False):
+                return 'home'
+            return state['cmd'] if state['conn'] else 'rest'
+
+    def window_now():
+        """the board window of now: the last event's window + the 100 ms windows since it (WSL clock only)"""
+        with lock:
+            if state['w'] is None:
+                return None
+            return state['w'] + int(round((time.time() - state['t']) / A.DT))
+
+    def send(line):
+        with lock:
+            s_ = state['sock']
+        if s_ is None:
+            return False
+        try:
+            s_.sendall((line + '\n').encode('ascii'))
+            return True
+        except OSError:
+            return False
+    poll.window_now, poll.send = window_now, send
+    return poll, ev.close
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('mode', choices=['demo', 'keys', 'scene', 'home', 'start'])
+    ap.add_argument('mode', choices=['demo', 'keys', 'board', 'scene', 'home', 'start'])
+    ap.add_argument('--listen', default='127.0.0.1:50560', help='board: TCP address for udp_tcp_relay.py (35.82)')
+    ap.add_argument('--grip', choices=['stop', 'toggle-home'], default='stop', help='board: what S7 HandOpen / Fist do')
+    ap.add_argument('--events', default='board_events.csv', help='board: every board event with its arrival times')
+    ap.add_argument('--send-labels', type=int, default=1, help='board: 1 = hindsight labels back to the board (35.83)')
     ap.add_argument('--target', type=int, default=0)
     ap.add_argument('--error', type=float, default=0.12)
     ap.add_argument('--seed', type=int, default=1)
@@ -365,17 +465,19 @@ def main():
         print('at the start pose, tool', np.round(kin.fk(n.joints())[:3, 3], 3).tolist(), ', gripper open')
         rclpy.shutdown()
         return
-    if a.mode == 'keys' and a.modes:
+    live = a.mode in ('keys', 'board')                 # 35.82: the board drives the same control as the keys
+    if live and a.modes:
         sa = M.ModeAssist(OBJECTS, SHELVES, level=a.level, zone=(a.zone if a.zone > 0 else None), rule=a.rule)
     else:
         sa = A.Assist(OBJECTS, mode=a.assist, level=a.level, keep=(a.mode == 'keys'), shelves=SHELVES,
                       zone=(a.zone if a.zone > 0 else None))
     rng = np.random.default_rng(a.seed)
     dec = S.Decoder(S.SET5, a.error, rng)
-    poll, restore = keyreader() if a.mode == 'keys' else (None, None)
+    poll, restore = keyreader() if a.mode == 'keys' else \
+        boardreader(a.listen, a.grip, a.events) if a.mode == 'board' else (None, None)
     if a.limit is None:
-        a.limit = 300.0 if a.mode == 'keys' else 60.0
-    if a.mode == 'keys':
+        a.limit = 300.0 if live else 60.0
+    if live:
         print('ready. Click this terminal first (not the RViz window), then: w up, s down, a left, d right,')
         print('space = relax (stop), h = back to the start (keeps control), q = quit. A key keeps moving until another key. Seen from behind the arm: '
               'object 0 left-low, 1 right-high, 2 middle-low.', flush=True)
@@ -400,6 +502,9 @@ def main():
         labf = open(a.labels, 'w', encoding='utf-8')
         labf.write('step,t,label,x,y,z\n')
     lab_x = {}
+    lab_w = {}                                          # 35.83: labeler step -> board window
+    CLS9 = {'up': 0, 'down': 1, 'left': 2, 'right': 3, 'rest': 8}
+    n_ranges = 0
     log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z\n')
     try:
         for k in range(int(a.limit / A.DT)):
@@ -439,24 +544,45 @@ def main():
             if lab is not None:
                 lab.before(cmd if cmd != 'rest' else 'rest', x)
                 lab_x[lab.k] = (k * A.DT, x.copy())
+                if a.mode == 'board':
+                    lab_w[lab.k] = poll.window_now()
             v = sa.step(cmd if cmd != 'rest' else None, x)
             if lab is not None:
                 new = lab.after()
+                if a.mode == 'board' and a.send_labels and new:
+                    # consecutive labelled steps of one class with consecutive windows -> one range label
+                    runs = []
+                    for st, lb in sorted(new):
+                        w_ = lab_w.get(st)
+                        if w_ is None:
+                            continue
+                        if runs and runs[-1][2] == lb and w_ == runs[-1][1] + 1:
+                            runs[-1][1] = w_
+                        elif not (runs and runs[-1][2] == lb and w_ == runs[-1][1]):
+                            runs.append([w_, w_, lb])
+                    for w0_, w1_, lb in runs:
+                        if poll.send(f'range,{w0_},{w1_},{CLS9[lb]}'):
+                            n_ranges += 1
+                    if runs:
+                        print(f'  [標籤→板子] {len(runs)} 段：' + '、'.join(f'{lb} {w1_ - w0_ + 1}' for w0_, w1_, lb in runs),
+                              flush=True)
                 for st, lb in new:
                     t_, xx = lab_x.pop(st, (np.nan, np.full(3, np.nan)))
+                    lab_w.pop(st, None)
                     if labf:
                         labf.write(f'{st},{t_:.1f},{lb},{xx[0]:.4f},{xx[1]:.4f},{xx[2]:.4f}\n')
                 if labf:
                     labf.flush()
-                if new and a.mode == 'keys':
+                if new and live:
                     c = {q_: sum(1 for _, l_ in new if l_ == q_) for q_ in ('up', 'down', 'left', 'right', 'rest')}
                     print('  [標籤] ' + f'這次確認 {len(new)} 個視窗：' + '、'.join(f'{q_} {n_}' for q_, n_ in c.items() if n_),
                           flush=True)
-                elif lab.last and lab.last.get('why') and a.mode == 'keys':
+                elif lab.last and lab.last.get('why') and live:
                     print(f'  [標籤] 這次不標：{lab.last["why"]}', flush=True)
                     lab.last = None
                 for st in [s_ for s_ in lab_x if s_ < lab.k - LB.BUF - 50]:
                     lab_x.pop(st)
+                    lab_w.pop(st, None)
             if bool(sa.grip) != gripped:
                 n.gripper(float(sa.grip))
                 gripped = bool(sa.grip)
@@ -471,21 +597,21 @@ def main():
             log.write(f'{k * A.DT:.1f},{want},{cmd},{sa.state},{sa.goal},{P[0]:.3f},{P[1]:.3f},{P[2]:.3f},'
                       f'{x[0]:.4f},{x[1]:.4f},{x[2]:.4f}\n')
             log.flush()
-            if a.mode == 'keys' and isinstance(sa, M.ModeAssist):
+            if live and isinstance(sa, M.ModeAssist):
                 if (code, hg, sa.hint_zh) != last_hint:
                     last_hint = (code, hg, sa.hint_zh)
                     print('  >> ' + sa.hint_zh, flush=True)
-            elif a.mode == 'keys' and (code, hg) != last_hint:
+            elif live and (code, hg) != last_hint:
                 last_hint = (code, hg)
                 if code in HINT_ZH:
                     k = KEY.get(sa.lock_cmd, '?')
                     o = KEY.get(A.OPPOSITE.get(sa.lock_cmd, ''), '?')
                     print('  >> ' + HINT_ZH[code].format(g=hg, k=k, o=o), flush=True)
-            if a.mode == 'keys' and isinstance(sa, M.ModeAssist) and sa.m != last_mode:
+            if live and isinstance(sa, M.ModeAssist) and sa.m != last_mode:
                 last_mode = sa.m
                 print('\a' + ('  ===== 模式 2：W 前進、S 後退 =====' if sa.m == 2 else '  ===== 模式 1：上下左右 ====='),
                       flush=True)
-            if a.mode == 'keys' and (sa.state, sa.goal) != last_state:
+            if live and (sa.state, sa.goal) != last_state:
                 last_state = (sa.state, sa.goal)
                 print(f'\r  assist: {sa.state}' + (f', goal object {sa.goal}' if sa.goal is not None else ''), flush=True)
             if sa.state == 'done':

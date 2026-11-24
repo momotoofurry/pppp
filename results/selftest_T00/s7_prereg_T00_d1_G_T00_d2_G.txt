@@ -1,0 +1,18 @@
+S7 confirmation (report 35.81, draft rules): the board's real-time commands as TaskScreen logged them
+
+== T00_d1_G  (NOT an S7 recording: no preset s7 in ops)
+M1 task success         71.2 %  (80 trials)
+M2 task-rest commands  34.70 / min  (119 in 3.43 min)
+M3 probe cues (S7)     right 35, wrong 19, none 0 of 54  (64.8 % right)
+M4 latency (success)   973 ms (873-1076)
+M5 labelled-rest cmds  27.96 / min  (122 in 4.36 min)
+
+== T00_d2_G  (NOT an S7 recording: no preset s7 in ops)
+M1 task success         61.3 %  (80 trials)
+M2 task-rest commands  39.65 / min  (136 in 3.43 min)
+M3 probe cues (S7)     right 41, wrong 12, none 1 of 54  (75.9 % right)
+M4 latency (success)   1006 ms (883-1187)
+M5 labelled-rest cmds  22.23 / min  (97 in 4.36 min)
+
+mean over 2 donning(s): M1 66.2 % (P1 needs >= 80), M2 37.18 / min (P2 needs <= 2)
+(not a decision: not all days are S7 recordings) P1 fail, P2 fail

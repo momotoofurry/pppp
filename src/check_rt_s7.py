@@ -40,6 +40,7 @@ import selftest9_analysis as S9  # noqa: E402
 LIB9 = os.path.join(P.ROOT, 'build', 'c', 'librtl9.so')
 FLAGS9 = ['-DLD_CLASSES=9', '-DDC_CLASSES=9', '-DRTL_LABEL_MAX=810']
 SET_GATE, SET_CLASSES, EV_GATE_THR, EV_FIT = 13, 14, 20, 1
+LABEL_RANGE, EV_RANGE, HIST = 15, 21, 256         # 35.83: hindsight range labels, ring of the last 256 windows
 CL = S9.SETS['S7']
 MASK = sum(1 << c for c in CL)                    # 0x1CF
 K, K_REST, GATE_K100, GATE_MODE = 5, 2, 50, 2
@@ -98,7 +99,7 @@ def spans(name, t0, nw):
 def ref_decision(top):
     """decision.c with all-or-nothing votes (every window accepted): list of (window index, class) commands and the
     latched class after every window"""
-    out, last, run, latched, lat = [], -1, 0, -1, np.empty(len(top), int)
+    out, stops, last, run, latched, lat = [], [], -1, 0, -1, np.empty(len(top), int)
     for i, p in enumerate(top):
         run = min(run + 1, max(K, K_REST)) if p == last else 1
         last = p
@@ -106,7 +107,10 @@ def ref_decision(top):
             latched = p
             if p != REST:
                 out.append((i, p))
+            else:
+                stops.append(i)
         lat[i] = latched
+    ref_decision.stops = stops
     return out, lat
 
 
@@ -131,7 +135,7 @@ def run_day(name, lib):
     top_py[gated_py] = REST
     # C, as the board
     dec = PR.Decoder()
-    preds, cmds, status = {}, [], []
+    preds, cmds, stops, status = {}, [], [], []
 
     def tx(ptr, n):
         for t, _, p in dec.feed(ctypes.string_at(ptr, n)):
@@ -140,7 +144,10 @@ def run_day(name, lib):
                 preds[w - 1] = (cls, gt)
             elif t == PR.COMMAND:
                 w, _, cmd, cls, _ = struct.unpack('<IIBBH', p[:12])
-                cmds.append((w - 1, cls))
+                if cmd == 0:
+                    stops.append(w - 1)                   # 35.82: report bit 1, Rest established
+                else:
+                    cmds.append((w - 1, cls))
             else:
                 status.append(struct.unpack('<B3xi', p[:8]))
     txcb = R.TX(tx)
@@ -152,7 +159,7 @@ def run_day(name, lib):
         lib.rtl_rx(ctypes.c_char_p(b), len(b))
     send(R.ctl(enc, SET_CLASSES, bytes([MASK & 0xFF, MASK >> 8])) + R.ctl(enc, SET_GATE, bytes([GATE_K100, 0, GATE_MODE]))
          + R.ctl(enc, R.SET_REJECT, bytes([0, 0, 0, 0, K, K_REST]))
-         + R.ctl(enc, R.SET_REPORT, bytes([1])) + R.ctl(enc, PR.STREAM_RESET))
+         + R.ctl(enc, R.SET_REPORT, bytes([3])) + R.ctl(enc, PR.STREAM_RESET))
     # label runs: (first window, last window, class), contiguous cued windows of one cue
     rows, lab = day['cal_rows'], day['cal_lab']
     order = np.argsort(rows)
@@ -168,6 +175,19 @@ def run_day(name, lib):
     before = {(a * SA.STEP + SA.WIN) // FPP - 1: g for a, _, g in runs}
     after = {(b * SA.STEP + SA.WIN) // FPP - 1 for _, b, _ in runs}
     fit_after = max(after)
+    # 35.83 range-label test: right after the first probe, its S7 cues (cue_on..cue_off, the cued class) as range
+    # labels; only the windows still in the ring of the last HIST classified windows count
+    cues0, _, _ = spans(name, t0, nw)
+    first = sorted(cues0, key=lambda c: c[2])[:18]
+    w_end = max(int(SA.inside(t0, nw, ton, ton + 2000)[-1]) for _, _, ton in first)
+    k_label = (w_end * SA.STEP + SA.WIN) // FPP - 1 + 5
+    w_done = ((k_label + 1) * FPP - SA.WIN) // SA.STEP            # last window complete after packet k_label
+    rng_msgs = []
+    if not A.range_test:
+        k_label = -1
+    for _, g, ton in (first if A.range_test else []):
+        ww = SA.inside(t0, nw, ton, ton + 2000)
+        rng_msgs.append((int(ww[0]), int(ww[-1]), g))
     for k in range(n_pk):
         b = b''
         if k in before:
@@ -180,7 +200,31 @@ def run_day(name, lib):
         send(b)
         if k == fit_after:
             lib.rtl_idle()
+        if k == k_label:
+            for a_, b_, g_ in rng_msgs:                    # board window numbers = index + 1
+                send(R.ctl(enc, LABEL_RANGE, struct.pack('<IIB', a_ + 1, b_ + 1, g_)))
+                lib.rtl_idle()
     c = lib.rtl_counters().contents
+    # Python: the same windows into the model (ring = the last HIST run-mode windows complete at the label), refit
+    run_all = np.array(sorted(preds))
+    ring = run_all[(run_all <= w_done) & (run_all > w_done - HIST)]
+    in_ring = set(ring.tolist())
+    added_py = []
+    for a_, b_, g_ in rng_msgs:
+        rows = [w for w in range(a_, b_ + 1) if w in in_ring and (g_ == REST or not gated_py[w])]
+        if rows:
+            Zq = mdl.z(Fq[rows])
+            idx = mdl.classes.index(g_)
+            mdl.G = mdl.G + Zq.T @ Zq
+            mdl.s[idx] += Zq.sum(0)
+            mdl.n[idx] += len(rows)
+            mdl.fit()
+        added_py.append(len(rows))
+    after_w = np.arange(w_done + 1, nw)
+    top_after = mdl.predict(Fq[after_w])
+    top_after[gated_py[after_w]] = REST
+    top_py[after_w] = top_after
+    rng_c = [v for e, v in status if e == EV_RANGE]
     thr_c = [v for e, v in status if e == EV_GATE_THR]
     fit_c = [v for e, v in status if e == EV_FIT]
     run_w = np.array(sorted(preds))
@@ -189,6 +233,7 @@ def run_day(name, lib):
     # decision.c on the MCU's own windows, and on Python's
     want, _ = ref_decision(top_c)
     want = [(int(run_w[i]), p) for i, p in want]
+    want_stops = [int(run_w[i]) for i in ref_decision.stops]
     ref_py, _ = ref_decision(top_py[run_w])
     lines = [f'== {name}: {nw} windows, cued runs {len(runs)}, label windows {c.label_windows}, fit {fit_c}, '
              f'lost {c.lost_packets}, skipped busy {c.skipped_busy}',
@@ -196,7 +241,12 @@ def run_day(name, lib):
              f'run-mode windows {len(run_w)}: class agree {np.mean(top_c == top_py[run_w]) * 100:.3f} %, '
              f'gate flag agree {np.mean(gt_c == gated_py[run_w]) * 100:.3f} %, gated {gt_c.mean() * 100:.1f} %',
              f'commands: C {len(cmds)}, decision.c on the C windows {len(want)}, identical {cmds == want}; '
-             f'on the Python windows {len(ref_py)}']
+             f'on the Python windows {len(ref_py)}',
+             f'stops (report bit 1, 35.82): C {len(stops)}, Rest established in decision.c {len(want_stops)}, '
+             f'identical {stops == want_stops}'] + ([
+             f'range labels (35.83) after window {w_done + 1}: {len(rng_msgs)} cues of the first probe; windows added '
+             f'C {rng_c}, Python {added_py} (identical {rng_c == [x if x else -1 for x in added_py]}); '
+             f'windows after the labels: class agree {np.mean(top_c[run_w > w_done] == top_py[run_w[run_w > w_done]]) * 100:.3f} %'] if A.range_test else [])
     # metrics on the MCU's commands
     cues, rests, full = spans(name, t0, nw)
     cw = np.array([w for w, _ in cmds])
@@ -251,5 +301,6 @@ def main():
 ap = argparse.ArgumentParser()
 ap.add_argument('--dir', required=True)
 ap.add_argument('--days', nargs='+', default=['T00_d1_G', 'T00_d2_G'])
+ap.add_argument('--range-test', action='store_true', help='35.83: range labels after the first probe (changes M3 of the later probes)')
 A = ap.parse_args()
 main()

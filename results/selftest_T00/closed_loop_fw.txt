@@ -1,0 +1,14 @@
+closed loop with rt_lda.c (S7, gate 0.5, k 5, stop k 2) and hindsight range labels; 5 sessions x 40 trials; first half pool A, second half pool B (held out)
+  donning  labels  half   success   time median s   wrong locks/trial   wrong-direction steps   ranges/trial   windows added/trial   label error (vs intent)
+  d1       off     A     100.0 %     49.4           0.34                26.8 %                 0.00             0.0                0.6 %
+  d1       off     B     100.0 %     38.9           0.93                 4.3 %                 0.00             0.0                0.6 %
+  d1       on      A      95.0 %     39.5           2.39                 4.9 %                10.47           187.2                0.6 %
+  d1       on      B     100.0 %     40.1           1.50                 5.1 %                10.03           183.1                0.5 %
+  d2       off     A     100.0 %     38.9           0.66                 5.1 %                 0.00             0.0                0.5 %
+  d2       off     B     100.0 %     46.0           0.30                19.6 %                 0.00             0.0                1.1 %
+  d2       on      A     100.0 %     38.2           0.71                 4.6 %                10.95           194.3                0.3 %
+  d2       on      B     100.0 %     39.3           0.23                 6.9 %                11.11           207.8                0.7 %
+
+pool B (held out), labels on - off, mean over sessions (paired by seed):
+  d1: success +0.0 points, wrong-direction steps +0.78 points, time median +1.4 s (sessions 5)
+  d2: success +0.0 points, wrong-direction steps -12.63 points, time median -6.5 s (sessions 5)
