@@ -58,6 +58,7 @@ NAME = {0: 'up', 1: 'down', 2: 'left', 3: 'right', 6: 'grip_open', 7: 'grip_clos
 CLS = {'up': 0, 'down': 1, 'left': 2, 'right': 3, 'rest': 8, 'grip_open': 6, 'grip_close': 7}
 GRIP_CMDS = False
 LOCK_DWELL = 'none'
+LOCK_RULE = 'none'
 PRIOR, PRIOR_MASS = None, 0.8
 DIRS = ('up', 'down', 'left', 'right')
 LSB = np.float32(2.5e-7)
@@ -261,7 +262,8 @@ def prior_vec(rng, n, target):
 
 
 def trial(board, player, rng, labels_on, st, prng=None):
-    ma = M.ModeAssist(MS.OBJ, MS.SHELVES, rule='mix', grip_cmds=GRIP_CMDS, lock_dwell=LOCK_DWELL)
+    ma = M.ModeAssist(MS.OBJ, MS.SHELVES, rule='mix', grip_cmds=GRIP_CMDS, lock_dwell=LOCK_DWELL,
+                      lock_rule=LOCK_RULE)
     lab = LB.Labeler(ma)
     t_obj = int(rng.integers(3))
     free = [k for k in range(len(MS.SHELVES))
@@ -329,6 +331,10 @@ def trial(board, player, rng, labels_on, st, prng=None):
             if (lock[0] == 'pick' and lock[1] != t_obj) or (lock[0] == 'place' and lock[2] != t_shelf):
                 wrong_lock += 1
                 st['wl_' + lock[0]] += 1                    # 35.88: wrong object (pick) or wrong shelf (place)
+                if lock[0] == 'place' and not ma.has_room(lock[2]):
+                    st['wl_full'] += 1                      # 35.89: a shelf with no free spot
+        if lock is not None and ((lock[0] == 'pick' and lock[1] != t_obj) or (lock[0] == 'place' and lock[2] != t_shelf)):
+            st['wrong_s'] += M.DT                           # 35.89: time spent in a wrong lock
         last_lock = lock
         x = x + v * M.DT
         hist.append(x.copy())
@@ -356,7 +362,7 @@ def session(lib, d, seed, n, labels_on):
         player = Player(d, P[half], rng)
         for i in range(n // 2):
             st = dict(dir_steps=0, dir_wrong=0, ranges=0, added=0, lab_n=0, lab_ok=0, grip_ok=0, grip_refused=0,
-                      prior_right=0, prior_n=0, wl_pick=0, wl_place=0)
+                      prior_right=0, prior_n=0, wl_pick=0, wl_place=0, wl_full=0, wrong_s=0.0)
             ok, tm, wl = trial(board, player, rng, labels_on, st, prng)
             rows.append(dict(half=half, ok=ok, time=tm, wrong_locks=wl, **st))
     return pd.DataFrame(rows)
@@ -377,9 +383,12 @@ def main():
     ap.add_argument('--labels', default='both', choices=['both', 'off', 'on'])
     ap.add_argument('--scene', default='3obj', choices=['3obj', 'crowded'])
     ap.add_argument('--lock-dwell', default='none', choices=['none', 'context', 'place', 'all'])
+    ap.add_argument('--lock-rule', default='none', choices=['none', 'room', 'intent'])
     a = ap.parse_args()
     global LOCK_DWELL
     LOCK_DWELL = a.lock_dwell
+    global LOCK_RULE
+    LOCK_RULE = a.lock_rule
     if a.scene == 'crowded':
         MS.OBJ, MS.SHELVES = CROWD_OBJ.copy(), CROWD_SHELVES.copy()
     global GRIP_CMDS, PRIOR, PRIOR_MASS
@@ -396,7 +405,7 @@ def main():
     p(f'closed loop with rt_lda.c (S7, gate 0.5, k 5, stop k 2) and hindsight range labels ({a.label_classes}); '
       f'{a.sessions} sessions x {a.trials} trials; first half pool A, second half pool B (held out); grip commands '
       f'{a.grip_cmds}; goal prior ' + ('off' if a.prior is None else f'P {a.prior} mass {a.prior_mass}')
-      + f'; scene {a.scene} ({len(MS.OBJ)} objects, {len(MS.SHELVES)} shelves); lock dwell {a.lock_dwell}')
+      + f'; scene {a.scene} ({len(MS.OBJ)} objects, {len(MS.SHELVES)} shelves); lock dwell {a.lock_dwell}; lock rule {a.lock_rule}')
     p('  donning  labels  half   success   time median s   wrong locks/trial   wrong-direction steps   '
       'ranges/trial   windows added/trial   label error (vs intent)')
     allres = []
@@ -415,7 +424,8 @@ def main():
                   f'{r.added.mean():6.1f}              {100 * (1 - r.lab_ok.sum() / max(r.lab_n.sum(), 1)):5.1f} %'
                   + (f'   grips ok {r.grip_ok.mean():.2f} refused {r.grip_refused.mean():.2f}/trial' if a.grip_cmds else '')
                   + (f'   prior right {100 * r.prior_right.sum() / max(r.prior_n.sum(), 1):.0f} %' if a.prior is not None else '')
-                  + f'   wrong locks: object {r.wl_pick.mean():.2f}, shelf {r.wl_place.mean():.2f}')
+                  + f'   wrong locks: object {r.wl_pick.mean():.2f}, shelf {r.wl_place.mean():.2f} '
+                  + f'(full {r.wl_full.mean():.2f}); in wrong lock {r.wrong_s.mean():.1f} s/trial')
     df = pd.concat(allres)
     df.to_csv(os.path.join(a.out, f'closed_loop_fw_trials{a.tag}.csv'), index=False)
     # paired: pool B, labels on - off, per session

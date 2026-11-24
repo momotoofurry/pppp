@@ -464,6 +464,9 @@ def main():
     ap.add_argument('--events', default='board_events.csv', help='board: every board event with its arrival times')
     ap.add_argument('--send-labels', type=int, default=1, help='board: 1 = hindsight labels back to the board (35.83)')
     ap.add_argument('--deadman', type=float, default=0.5, help='board: s without heartbeat / event -> stop (35.85)')
+    ap.add_argument('--lock-rule', default='intent', choices=['none', 'room', 'intent'],
+                    help='modes: shelf locking while carrying (35.89): intent = a shelf the carry motion does not point '
+                         'at, or one with no free spot, needs a 1 s stop / is refused; none = stop locks (before 35.89)')
     ap.add_argument('--label-classes', choices=['dirs', 'all'], default='dirs',
                     help='board: which hindsight labels go to the board; dirs (default, 35.85: the Rest labels made the '
                          'closed-loop sim worse on donning 1) or all')
@@ -542,7 +545,7 @@ def main():
     live = a.mode in ('keys', 'board')                 # 35.82: the board drives the same control as the keys
     if live and a.modes:
         sa = M.ModeAssist(OBJECTS, SHELVES, level=a.level, zone=(a.zone if a.zone > 0 else None), rule=a.rule,
-                          grip_cmds=(a.mode == 'board' and a.grip == 'gripper'))
+                          grip_cmds=(a.mode == 'board' and a.grip == 'gripper'), lock_rule=a.lock_rule)
     else:
         sa = A.Assist(OBJECTS, mode=a.assist, level=a.level, keep=(a.mode == 'keys'), shelves=SHELVES,
                       zone=(a.zone if a.zone > 0 else None))

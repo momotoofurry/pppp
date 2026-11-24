@@ -67,6 +67,12 @@ PRIOR_LOW = 0.2
 # y-z is crowded; there a stop locks only after CONFIRM_STEPS (35.87: the dwell removed most wrong locks in a crowded
 # scene but cost 2-4 s per trial when applied everywhere)
 NEAR_LOCK = 0.10
+# 35.89: shelf locking while carrying (lock_rule). 35.88: 85-95 % of the wrong locks were shelves passed on the way
+# (an L-shaped path: the user stops at the corner). 'room': only shelves with a free spot for the held object are
+# candidates (cf. feasible goal sets); 'intent': a shelf locks at once only when it is the most likely one from the
+# carry motion (same recursive goal scores as the objects, Jain & Argall 2020; Javdani et al. 2018) with P >= P_LOCK
+# (0.8: passing a shelf on the way to the next one in line splits P about evenly), else only after a 1 s stop. SHELF_AIM: height above the shelf top the user lines the object up at.
+SHELF_AIM = OBJ_H / 2 + 0.04
 ARRIVE = 0.02
 MISMATCH_STEPS, MISMATCH_COS = 10, -0.2
 
@@ -77,11 +83,15 @@ def unit(v):
 
 
 class ModeAssist:
-    def __init__(self, objects, shelves, level=0.6, zone=0.12, rule='mix', grip_cmds=False, lock_dwell='none'):
+    def __init__(self, objects, shelves, level=0.6, zone=0.12, rule='mix', grip_cmds=False, lock_dwell='none',
+                 lock_rule='none'):
         """objects: (n, 3) object centres; shelves: (m, 3) centres of the shelf tops; rule: 'mix' | 'lead' (mode-1
         steering, see MIX_ON); grip_cmds: explicit gripper commands (35.86, see GRIPS)"""
         self.grip_cmds = grip_cmds
         self.lock_dwell = lock_dwell                # 35.88: 'none' | 'context' | 'place' | 'all'
+        self.lock_rule = lock_rule                  # 35.89: 'none' | 'room' | 'intent' (shelves while carrying)
+        self.ss = np.zeros(len(shelves))            # 35.89: shelf goal scores while carrying
+        self.n_no_room = 0                          # 35.89: stops at a full shelf (refused locks)
         self.n_grip_ok = self.n_grip_refused = 0
         self._prev_cmd = None                       # 35.86: a held Fist / HandOpen counts once
         self.shelf_prior = None                     # 35.86: prior over the shelves (None: off); objects: self.base.prior
@@ -141,6 +151,23 @@ class ModeAssist:
             if j != k and o[2] > sh[2] and abs(o[1] - sh[1]) < 2 * SHELF_HY and abs(o[0] - sh[0]) < 2 * SHELF_HX:
                 z = min(z, o[2] - 0.02 - OBJ_H / 2 - 0.01)
         return z
+
+    def has_room(self, k):
+        """35.89: is there a spot on shelf k where the held object may be put down (spot_ok over the shelf)"""
+        sh = self.shelves[k]
+        for dy in np.linspace(-(SHELF_HY - EDGE), SHELF_HY - EDGE, 9):
+            for dx in np.linspace(-(SHELF_HX - EDGE), SHELF_HX - EDGE, 5):
+                if self.spot_ok(np.array([sh[0] + dx, sh[1] + dy, sh[2] + OBJ_H / 2]), k)[0]:
+                    return True
+        return False
+
+    def shelf_probs(self):
+        """35.89: P(shelf) from the carry motion (softmax of the decayed scores), full shelves excluded, x prior"""
+        ok = np.array([self.has_room(k) for k in range(len(self.shelves))])
+        e = np.where(ok, np.exp(A.BETA * (self.ss - self.ss.max())), 0.0)
+        if self.shelf_prior is not None:
+            e = e * np.asarray(self.shelf_prior, float)
+        return e / e.sum() if e.sum() > 0 else e
 
     def spot_ok(self, x, k):
         """(ok, reason) for putting the held object down with its centre at x on shelf k"""
@@ -240,7 +267,16 @@ class ModeAssist:
             if k is not None and self.at_travel(x):
                 bottom = x[2] - OBJ_H / 2 - self.shelves[k][2]
                 if abs(x[1] - self.shelves[k][1]) <= SHELF_HY - EDGE and -0.02 <= bottom <= 0.10:
-                    if not self._prior_ok(self.shelf_prior, k, self.shelves, shelf=True):
+                    if self.lock_rule in ('room', 'intent') and not self.has_room(k):
+                        if self.rest_n == 1:
+                            self.n_no_room += 1
+                        self.msg = '這個架子沒有空位'
+                        return
+                    if self.lock_rule == 'intent':
+                        P = self.shelf_probs()
+                        if P[k] < A.P_LOCK and self.rest_n < CONFIRM_STEPS:
+                            return                      # not clearly this shelf: a 1 s stop locks it
+                    elif not self._prior_ok(self.shelf_prior, k, self.shelves, shelf=True):
                         return
                     self.m, self.phase, self.shelf = 2, 'place', k
                     return
@@ -290,6 +326,7 @@ class ModeAssist:
             self.obj[self.held] = [x[0], x[1], self.lowering]
             self.released = self.last_put = self.held
             self.held, self.lowering, self.phase, self.armed = None, None, 'out', False
+            self.ss[:] = 0.0
             return np.zeros(3)
         if self.grip_cmds and cmd in GRIPS:
             return self._grip(cmd, x)
@@ -301,6 +338,10 @@ class ModeAssist:
             if self.held is None:
                 v = self._steer(cmd, u, x)
             else:
+                # 35.89: shelf goal scores from the carry motion (y, z), as Assist._score does for the objects
+                aim = self.shelves + np.array([0.0, 0.0, SHELF_AIM]) - x
+                aim[:, 0] = 0.0
+                self.ss = A.LAMBDA * self.ss + np.array([u @ unit(p) for p in aim])
                 v = V_MAX * u
             v[0] = (self.x_travel - x[0]) / DT if abs(self.x_travel - x[0]) > 1e-4 else 0.0   # stay in the plane
             return v * slow
