@@ -62,6 +62,7 @@ LOCK_RULE = 'none'
 DUMP = None                  # 35.94: per-step rows (list) when --dump-steps is given
 CONF = None                  # 35.94: (s_min, m_full) of the EMG-confidence speed, or None (off)
 CONF_INFER = None            # 35.94c: m_full of the confidence-weighted goal inference, or None (off)
+FAST = (0, 0)                # 35.95: (k_fast, margin x100) of the firmware fast switch; (0, 0) = off
 CUR = {}                     # 35.94: donning / session / half / trial of the running trial, for the dump
 PRIOR, PRIOR_MASS = None, 0.8
 DIRS = ('up', 'down', 'left', 'right')
@@ -158,7 +159,7 @@ class Board:
         lib.rtl_init(ctypes.byref(R.Config(self.txcb, R.NOW(0), 0, 0, 0, 5)))
         self._ctl(14, bytes([MASK & 0xFF, MASK >> 8]))
         self._ctl(13, bytes([50, 0, 2]))
-        self._ctl(5, bytes([0, 0, 0, 0, 5, 2]))
+        self._ctl(5, bytes([0, 0, 0, 0, 5, 2, FAST[0], FAST[1] & 0xFF, FAST[1] >> 8]))   # 35.95: fast switch
         self._ctl(6, bytes([3 if (DUMP is not None or CONF is not None or CONF_INFER is not None) else 2]))
         self._ctl(1)
         q = d['q']
@@ -419,6 +420,7 @@ def main():
     ap.add_argument('--dump-steps', default=None, help='35.94: per-step CSV (want, command, PRED) for the EMG confidence')
     ap.add_argument('--conf-speed', default=None, help='35.94: S_MIN,M_FULL: direction speed x decoder confidence')
     ap.add_argument('--conf-infer', type=float, default=None, help='35.94c: M_FULL: goal inference weighted by confidence')
+    ap.add_argument('--fast', default='0,0', help='35.95: K_FAST,MARGIN_X100 firmware fast switch (0,0 = off)')
     a = ap.parse_args()
     global LOCK_DWELL
     LOCK_DWELL = a.lock_dwell
@@ -429,8 +431,9 @@ def main():
         DUMP = []
     if a.conf_speed:
         CONF = tuple(float(v) for v in a.conf_speed.split(','))
-    global CONF_INFER
+    global CONF_INFER, FAST
     CONF_INFER = a.conf_infer
+    FAST = tuple(int(v) for v in a.fast.split(','))
     if a.scene == 'crowded':
         MS.OBJ, MS.SHELVES = CROWD_OBJ.copy(), CROWD_SHELVES.copy()
     global GRIP_CMDS, PRIOR, PRIOR_MASS

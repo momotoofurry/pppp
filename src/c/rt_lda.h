@@ -18,7 +18,9 @@
  *                                     after a fit (or after reset) starts a new session buffer
  *   RTL_LABEL_END (3)
  *   RTL_FIT (4)                       session statistics + add the session's windows + refit, then run mode
- *   RTL_SET_REJECT (5) margin_x100 u16, dist2 u16 (0 = off), k u8 [, k_rest u8]
+ *   RTL_SET_REJECT (5) margin_x100 u16, dist2 u16 (0 = off), k u8 [, k_rest u8 [, k_fast u8, fast_m100 u16]]
+ *                                     35.95: k_fast > 0: a non-Rest class is also established after k_fast
+ *                                     consecutive accepted windows with margin x100 >= fast_m100 (default off)
  *                                     k_rest (report 35.79): windows that establish Rest (stop); 0 or absent = k
  *   RTL_SET_REPORT (6) flags u8       bit 0: PK_PRED for every classified window
  *                                     bit 1 (report 35.82): a PK_COMMAND with command 0 (none) and class Rest every

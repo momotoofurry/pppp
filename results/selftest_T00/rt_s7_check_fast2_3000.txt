@@ -1,0 +1,13 @@
+S7 firmware rule through rt_lda.c (9-class build -DLD_CLASSES=9 -DDC_CLASSES=9 -DRTL_LABEL_MAX=810): classes 0x1CF, gate 0.5 x median gesture activity (mode 2), k 5, k_rest 2, fast switch k_fast 2 margin x100 >= 3000 (35.95)
+== T00_d1_G: 8662 windows, cued runs 18, label windows 540, fit [0], lost 0, skipped busy 0
+gate threshold: C [91546] nV, Python 91546.2 nV
+run-mode windows 7459: class agree 100.000 %, gate flag agree 100.000 %, gated 55.6 %
+commands: C 126, decision.c on the C windows 126, identical True; on the Python windows 118
+stops (report bit 1, 35.82): C 114, Rest established in decision.c 114, identical True
+probe cues 54: right 94.4 %, wrong 3.7 %, none 1.9 %, latency median 1095 ms (quartiles 963-1240); rest 4.74 min: 3 commands = 0.63 / min
+== T00_d2_G: 8754 windows, cued runs 18, label windows 540, fit [0], lost 0, skipped busy 0
+gate threshold: C [90449] nV, Python 90449.4 nV
+run-mode windows 7554: class agree 100.000 %, gate flag agree 100.000 %, gated 67.7 %
+commands: C 119, decision.c on the C windows 119, identical True; on the Python windows 113
+stops (report bit 1, 35.82): C 109, Rest established in decision.c 109, identical True
+probe cues 54: right 83.3 %, wrong 9.3 %, none 7.4 %, latency median 1100 ms (quartiles 917-1356); rest 4.67 min: 7 commands = 1.50 / min

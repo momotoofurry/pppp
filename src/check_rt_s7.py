@@ -96,14 +96,18 @@ def spans(name, t0, nw):
     return cues, [w for w in rests if len(w)], [(w, g) for w, g in full if len(w)]
 
 
-def ref_decision(top):
+def ref_decision(top, strong=None):
     """decision.c with all-or-nothing votes (every window accepted): list of (window index, class) commands and the
     latched class after every window"""
     out, stops, last, run, latched, lat = [], [], -1, 0, -1, np.empty(len(top), int)
+    fr = 0
     for i, p in enumerate(top):
+        st_ = bool(strong[i]) if strong is not None else False
+        fr = (fr + 1 if st_ else 0) if p == last else (1 if st_ else 0)
         run = min(run + 1, max(K, K_REST)) if p == last else 1
         last = p
-        if run >= (K_REST if p == REST else K) and p != latched:
+        fast = FAST[0] > 0 and p != REST and fr >= FAST[0]                 # 35.95
+        if (run >= (K_REST if p == REST else K) or fast) and p != latched:
             latched = p
             if p != REST:
                 out.append((i, p))
@@ -141,7 +145,7 @@ def run_day(name, lib):
         for t, _, p in dec.feed(ctypes.string_at(ptr, n)):
             if t == PR.PRED:
                 w, _, cls, acc, mg, gt = struct.unpack('<IIBBHB', p[:13])
-                preds[w - 1] = (cls, gt)
+                preds[w - 1] = (cls, gt, mg)
             elif t == PR.COMMAND:
                 w, _, cmd, cls, _ = struct.unpack('<IIBBH', p[:12])
                 if cmd == 0:
@@ -158,7 +162,7 @@ def run_day(name, lib):
     def send(b):
         lib.rtl_rx(ctypes.c_char_p(b), len(b))
     send(R.ctl(enc, SET_CLASSES, bytes([MASK & 0xFF, MASK >> 8])) + R.ctl(enc, SET_GATE, bytes([GATE_K100, 0, GATE_MODE]))
-         + R.ctl(enc, R.SET_REJECT, bytes([0, 0, 0, 0, K, K_REST]))
+         + R.ctl(enc, R.SET_REJECT, bytes([0, 0, 0, 0, K, K_REST, FAST[0], FAST[1] & 0xFF, FAST[1] >> 8]))
          + R.ctl(enc, R.SET_REPORT, bytes([3])) + R.ctl(enc, PR.STREAM_RESET))
     # label runs: (first window, last window, class), contiguous cued windows of one cue
     rows, lab = day['cal_rows'], day['cal_lab']
@@ -231,7 +235,8 @@ def run_day(name, lib):
     top_c = np.array([preds[w][0] for w in run_w])
     gt_c = np.array([preds[w][1] for w in run_w]).astype(bool)
     # decision.c on the MCU's own windows, and on Python's
-    want, _ = ref_decision(top_c)
+    mg_c = np.array([preds[w][2] for w in run_w])
+    want, _ = ref_decision(top_c, mg_c >= FAST[1] if FAST[0] else None)
     want = [(int(run_w[i]), p) for i, p in want]
     want_stops = [int(run_w[i]) for i in ref_decision.stops]
     ref_py, _ = ref_decision(top_py[run_w])
@@ -276,6 +281,8 @@ def run_day(name, lib):
     labw[run_w] = top_c
     raw = np.full(nw, -1, int)                    # the same LDA without the gate (Python; = C, agree 100 %)
     raw[run_w] = mdl.predict(Fq[run_w])
+    if FAST[0]:
+        return lines                                  # 35.95: the fast-switch sweep leaves the sim labels alone
     np.savez(os.path.join(OUT, f'rt_s7_labels_{name}.npz'), lab=labw, lab_raw=raw, act_ratio=act / thr,
              rest_starts=np.array([w[0] for w in rests]), rest_lens=np.array([len(w) for w in rests]),
              rel_starts=np.array([w[0] for w, _ in full]), rel_lens=np.array([len(w) for w, _ in full]),
@@ -289,18 +296,22 @@ def main():
     lib = build9()
     os.makedirs(OUT, exist_ok=True)
     lines = [f'S7 firmware rule through rt_lda.c (9-class build {" ".join(FLAGS9)}): classes 0x{MASK:03X}, '
-             f'gate {GATE_K100 / 100} x median gesture activity (mode {GATE_MODE}), k {K}, k_rest {K_REST}']
+             f'gate {GATE_K100 / 100} x median gesture activity (mode {GATE_MODE}), k {K}, k_rest {K_REST}'
+             + (f', fast switch k_fast {FAST[0]} margin x100 >= {FAST[1]} (35.95)' if FAST[0] else '')]
     for name in A.days:
         day_lines = run_day(name, lib)
         lines += day_lines
         print('\n'.join(day_lines), flush=True)
-    with open(os.path.join(OUT, 'rt_s7_check.txt'), 'w', encoding='utf-8') as f:
+    out_name = f'rt_s7_check_fast{FAST[0]}_{FAST[1]}.txt' if FAST[0] else 'rt_s7_check.txt'
+    with open(os.path.join(OUT, out_name), 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines) + '\n')
 
 
 ap = argparse.ArgumentParser()
 ap.add_argument('--dir', required=True)
 ap.add_argument('--days', nargs='+', default=['T00_d1_G', 'T00_d2_G'])
+ap.add_argument('--fast', default='0,0', help='35.95: K_FAST,MARGIN_X100 fast switch (0,0 = off, as on the board)')
 ap.add_argument('--range-test', action='store_true', help='35.83: range labels after the first probe (changes M3 of the later probes)')
 A = ap.parse_args()
+FAST = tuple(int(v) for v in A.fast.split(','))          # 35.95
 main()

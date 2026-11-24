@@ -17,6 +17,7 @@ void dc_init(dc_state_t *s, uint16_t tau_permille, uint8_t k)
     s->tau_permille = tau_permille;
     s->k = k ? k : 1;
     s->k_rest = s->k;
+    s->k_fast = 0;
     dc_reset(s);
 }
 
@@ -25,14 +26,25 @@ void dc_set_rest_k(dc_state_t *s, uint8_t k_rest)
     s->k_rest = k_rest ? k_rest : s->k;
 }
 
+void dc_set_fast(dc_state_t *s, uint8_t k_fast)
+{
+    s->k_fast = k_fast;
+}
+
 void dc_reset(dc_state_t *s)
 {
     s->last = -1;
     s->run = 0;
     s->latched = -1;
+    s->fast_run = 0;
 }
 
 int dc_step(dc_state_t *s, const uint16_t *votes, int total, dc_out_t *out)
+{
+    return dc_step_m(s, votes, total, 0, out);
+}
+
+int dc_step_m(dc_state_t *s, const uint16_t *votes, int total, int strong, dc_out_t *out)
 {
     int top = 0;
     for (int c = 1; c < DC_CLASSES; c++)
@@ -45,6 +57,7 @@ int dc_step(dc_state_t *s, const uint16_t *votes, int total, dc_out_t *out)
     if (!out->accepted) {
         s->last = -1;
         s->run = 0;
+        s->fast_run = 0;
         return DC_NONE;
     }
     const uint8_t need = top == DC_CLASSES - 1 ? s->k_rest : s->k;
@@ -52,11 +65,14 @@ int dc_step(dc_state_t *s, const uint16_t *votes, int total, dc_out_t *out)
     if (top == s->last) {
         if (s->run < cap)
             s->run++;
+        s->fast_run = strong ? (uint8_t)(s->fast_run < 255 ? s->fast_run + 1 : 255) : 0;
     } else {
         s->last = (int8_t)top;
         s->run = 1;
+        s->fast_run = strong ? 1 : 0;
     }
-    if (s->run < need || top == s->latched)
+    const int fast = s->k_fast && top != DC_CLASSES - 1 && s->fast_run >= s->k_fast;   /* 35.95 */
+    if ((s->run < need && !fast) || top == s->latched)
         return DC_NONE;
     s->latched = (int8_t)top;
     out->established = (int8_t)top;

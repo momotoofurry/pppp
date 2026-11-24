@@ -34,6 +34,8 @@ typedef struct {
     int8_t last;                /* top class of the current run of accepted windows, -1 none */
     uint8_t run;                /* length of that run (saturates at k) */
     int8_t latched;             /* last established class, -1 none */
+    uint8_t k_fast;             /* 35.95: a non-Rest class is also established after k_fast strong windows (0 off) */
+    uint8_t fast_run;           /* 35.95: consecutive accepted strong windows of the current top class */
 } dc_state_t;
 
 typedef struct {
@@ -51,5 +53,9 @@ void dc_reset(dc_state_t *s);   /* forget the run and the latch (e.g. after a ga
 /* report 35.79: Rest (stop) may need fewer agreeing windows than a command (start): stopping fast is the safe side.
  * 0 = the same as k. Call after dc_init. */
 void dc_set_rest_k(dc_state_t *s, uint8_t k_rest);
+/* 35.95: fast switch, k_fast windows (0 = off; dc_init: off). Call after dc_init. */
+void dc_set_fast(dc_state_t *s, uint8_t k_fast);
+/* dc_step with a per-window 'strong' flag (e.g. LDA margin over a threshold) for the fast switch */
+int dc_step_m(dc_state_t *s, const uint16_t *votes, int total, int strong, dc_out_t *out);
 /* one window; votes: DC_CLASSES counts summing to total. Returns the command to send (DC_NONE: nothing). */
 int dc_step(dc_state_t *s, const uint16_t *votes, int total, dc_out_t *out);

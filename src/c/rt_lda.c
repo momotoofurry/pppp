@@ -14,6 +14,7 @@ static rtl_config_t s_cfg;
 static pk_parser_t s_pk;
 static rtl_counters_t s_cnt;
 static dc_state_t s_dc;
+static uint16_t s_fast_m100;                        /* 35.95: margin x100 of a 'strong' window (fast switch) */
 static volatile int s_mode;
 static volatile uint8_t s_fit_request;
 static float s_lab_x[RTL_LABEL_MAX][FE_DIM];    /* start-up windows of this session, raw features */
@@ -285,7 +286,7 @@ static void on_window(void)
     if (accepted)
         votes[top] = 1000;
     dc_out_t o;
-    int cmd = dc_step(&s_dc, votes, 1000, &o);
+    int cmd = dc_step_m(&s_dc, votes, 1000, accepted && margin >= s_fast_m100, &o);   /* 35.95 */
     uint32_t t = now();
     if (s_report & 1u) {
         uint8_t p[14];
@@ -380,6 +381,8 @@ static void on_control(const uint8_t *p, uint16_t len)
             s_cfg.k = p[5];
             dc_init(&s_dc, 500, p[5]);
             dc_set_rest_k(&s_dc, len >= 7 ? p[6] : 0);
+            dc_set_fast(&s_dc, len >= 10 ? p[7] : 0);                  /* 35.95: fast switch, off by default */
+            s_fast_m100 = len >= 10 ? (uint16_t)(p[8] | (p[9] << 8)) : 0;
         }
         break;
     case RTL_SET_REPORT:
