@@ -15,7 +15,9 @@
 //       largest |value| and the RMS; warns when a channel comes near the +-8.19 mV the MCU encoding can carry.
 //   TrignoBridge run    --port COM5 [--tcu 127.0.0.1] [--rate 2000] [--emg-csv emg.csv] [--mcu-csv mcu.csv]
 //                       [--ops-csv ops.csv] [--udp 50555] [--gate 1] [--script commands.txt] [--slots 1-8]
-//                       [--firmware lda [--classes 9 [--preset s7]]]
+//                       [--firmware lda [--classes 9 [--preset s7]]] [--fwd-pred 1]
+//       --fwd-pred 1 (report 35.85): every PRED of the board (one per 100 ms window with 'report 1' / 'report 3') is
+//                       forwarded over UDP too: the arm side's heartbeat (assist_ros.py board stops when it stops)
 //       --slots: which 8 TCU sensor slots become channels 1-8, in that order (default 1-8). Ranges a-b and lists
 //       joined with ':' (no commas: cmd.exe splits on them), e.g. --slots 4-11 or --slots 1-4:9-12; a slot may repeat
 //       (4 sensors: --slots 5:11:15:16:5:11:15:16). emg.csv, the
@@ -702,6 +704,7 @@ static class Program
             try { udp.Send(b, b.Length, "127.0.0.1", up); } catch (SocketException) { }   // nobody listening: fine
     }
     static int mcuPackets, preds;
+    static bool fwdPred;                                          // 35.85: PRED over UDP as the arm's heartbeat
     // alignment gate: commands reach TaskScreen / the robot only after a usable start-up alignment
     static bool gateOn = true;
     static volatile bool gateOpen = true, adaptOn = true;
@@ -942,7 +945,11 @@ static class Program
                 string line = Describe(pk.Key, pk.Value);
                 double ms = UnixMs();
                 lock (mcuCsv) mcuCsv.WriteLine(ms.ToString("F1", IC) + "," + line);
-                if (pk.Key == Proto.PRED) { preds++; if (pk.Value.Length >= 13) VerifyPred(pk.Value[8]); }
+                if (pk.Key == Proto.PRED) {
+                    preds++;
+                    if (pk.Value.Length >= 13) VerifyPred(pk.Value[8]);
+                    if (fwdPred) Forward(ms, line);
+                }
                 else {
                     if (pk.Key == Proto.COMMAND && !gateOpen) {
                         heldCommands++;
@@ -1024,6 +1031,8 @@ static class Program
         lock (opsCsv) { opsCsv.WriteLine(UnixMs().ToString("F1", IC) + ",note classes " + Proto.K + " " + string.Join(" ", Proto.GESTURES) + ",1"); opsCsv.Flush(); }
         gateOn = !lda && Get(a, "gate", "1") != "0";
         if (lda) Console.WriteLine("firmware lda: LDA main line (rt_lda.c); no alignment gate; extra commands forget | gate | classes | reject | preset | task");
+        fwdPred = Get(a, "fwd-pred", "0") == "1";
+        if (fwdPred) Console.WriteLine("--fwd-pred 1: every PRED goes to the UDP ports too (heartbeat; needs 'report 1' or 'report 3')");
         string preset = Get(a, "preset", "");
         if (preset != "" && (preset != "s7" || !lda || Proto.K != 9)) { Console.WriteLine("--preset: only s7, with --firmware lda --classes 9"); return 1; }
         Console.WriteLine(gateOn ? "alignment gate on: board commands are forwarded only after a good 'align' (--gate 0: off)"

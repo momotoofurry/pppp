@@ -16,6 +16,9 @@ Measured per half: success, time, wrong locks, wrong-direction steps (the arm mo
 direction), stopped-while-held steps after 1.5 s, range labels sent and windows the firmware added.
 
 usage (container): python src/assist/closed_loop_fw.py --dir /sd/T00 [--days T00_d1_G T00_d2_G] [--sessions 5] [--trials 40]
+       [--label-classes all|dirs] [--tag x]
+  --label-classes dirs (report 35.85): only the direction labels go to the firmware, no Rest labels (is the loss on
+  donning 1 from the many Rest windows?)
 """
 import argparse
 import ctypes
@@ -229,6 +232,9 @@ class Player:
         return f
 
 
+LABEL_CLASSES = ('up', 'down', 'left', 'right', 'rest')
+
+
 def trial(board, player, rng, labels_on, st):
     ma = M.ModeAssist(MS.OBJ, MS.SHELVES, rule='mix')
     lab = LB.Labeler(ma)
@@ -268,7 +274,7 @@ def trial(board, player, rng, labels_on, st):
             runs = []
             for k_, lb in sorted(new):
                 w_ = lab_w.get(k_)
-                if w_ is None:
+                if w_ is None or lb not in LABEL_CLASSES:
                     continue
                 if runs and runs[-1][2] == lb and w_ == runs[-1][1] + 1:
                     runs[-1][1] = w_
@@ -319,15 +325,20 @@ def main():
     ap.add_argument('--sessions', type=int, default=5)
     ap.add_argument('--trials', type=int, default=40)
     ap.add_argument('--out', default='/work/results/selftest_T00')
+    ap.add_argument('--label-classes', default='all', choices=['all', 'dirs'])
+    ap.add_argument('--tag', default='')
     a = ap.parse_args()
+    global LABEL_CLASSES
+    if a.label_classes == 'dirs':
+        LABEL_CLASSES = ('up', 'down', 'left', 'right')
     lib = build9()
     lines = []
 
     def p(s=''):
         print(s, flush=True)
         lines.append(s)
-    p(f'closed loop with rt_lda.c (S7, gate 0.5, k 5, stop k 2) and hindsight range labels; {a.sessions} sessions x '
-      f'{a.trials} trials; first half pool A, second half pool B (held out)')
+    p(f'closed loop with rt_lda.c (S7, gate 0.5, k 5, stop k 2) and hindsight range labels ({a.label_classes}); '
+      f'{a.sessions} sessions x {a.trials} trials; first half pool A, second half pool B (held out)')
     p('  donning  labels  half   success   time median s   wrong locks/trial   wrong-direction steps   '
       'ranges/trial   windows added/trial   label error (vs intent)')
     allres = []
@@ -345,7 +356,7 @@ def main():
                   f'{100 * r.dir_wrong.sum() / max(r.dir_steps.sum(), 1):5.1f} %                {r.ranges.mean():5.2f}          '
                   f'{r.added.mean():6.1f}              {100 * (1 - r.lab_ok.sum() / max(r.lab_n.sum(), 1)):5.1f} %')
     df = pd.concat(allres)
-    df.to_csv(os.path.join(a.out, 'closed_loop_fw_trials.csv'), index=False)
+    df.to_csv(os.path.join(a.out, f'closed_loop_fw_trials{a.tag}.csv'), index=False)
     # paired: pool B, labels on - off, per session
     p('\npool B (held out), labels on - off, mean over sessions (paired by seed):')
     for name in a.days:
@@ -357,7 +368,7 @@ def main():
         p(f'  {name[4:6]}: success {100 * (succ[True] - succ[False]).mean():+.1f} points, wrong-direction steps '
           f'{100 * (wd[True] - wd[False]).mean():+.2f} points, time median {(tm[True] - tm[False]).mean():+.1f} s '
           f'(sessions {len(succ)})')
-    with open(os.path.join(a.out, 'closed_loop_fw.txt'), 'w', encoding='utf-8') as f:
+    with open(os.path.join(a.out, f'closed_loop_fw{a.tag}.txt'), 'w', encoding='utf-8') as f:
         f.write('\n'.join(lines) + '\n')
 
 

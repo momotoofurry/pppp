@@ -26,6 +26,7 @@ def main():
     out = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     rtt = open(a.rtt, 'w', encoding='ascii')
     rtt.write('relay_unix_ms,rtt_ms\n')
+    rtt.flush()
     back = {'labels': 0, 'acks': 0}
 
     def reader(conn):
@@ -34,15 +35,15 @@ def main():
                 f = line.strip().split(',')
                 if f[0] == 'ack' and len(f) == 2:
                     now = time.time() * 1000
-                    rtt.write(f'{f[1]},{now - float(f[1]):.2f}\n')
+                    rtt.write(f'{f[1]},{now - float(f[1]):.2f}\n')        # f[1]: the relay time it sent
                     rtt.flush()
                     back['acks'] += 1
                 elif f[0] == 'range' and len(f) == 4:
                     out.sendto(line.strip().encode('ascii'), ('127.0.0.1', a.task))
                     back['labels'] += 1
                     print('label -> bridge: ' + line.strip(), flush=True)
-        except OSError:
-            pass
+        except OSError as e:
+            print(f'reader stopped: {e}', flush=True)
     host, port = a.to.rsplit(':', 1)
     u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     u.bind(('127.0.0.1', a.udp))
@@ -55,6 +56,9 @@ def main():
                 last_try = time.time()
                 try:
                     t = socket.create_connection((host, int(port)), timeout=1.0)
+                    # 35.85: the 1 s connect timeout stayed on the socket, so the reader thread hit a timeout after
+                    # 1 s without acks / labels and ended quietly: nothing came back any more
+                    t.settimeout(None)
                     t.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
                     threading.Thread(target=reader, args=(t,), daemon=True).start()
                     print('connected to assist_ros', flush=True)

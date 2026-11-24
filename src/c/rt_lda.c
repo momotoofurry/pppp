@@ -40,6 +40,11 @@ static float s_prior[LD_CLASSES];
 /* activity gate */
 static float s_gate_k, s_gate_thr = -1.0f;
 static uint8_t s_gate_mode;
+
+static uint32_t now(void)
+{
+    return s_cfg.now_us ? s_cfg.now_us() : 0;
+}
 static float s_act[RTL_LABEL_MAX];
 /* 35.83: ring of the last classified windows for hindsight range labels */
 static int16_t s_hist_q[RTL_HIST][FE_DIM];
@@ -59,10 +64,6 @@ unsigned rtl_static_bytes(void)
                       sizeof s_hist_g);
 }
 
-static uint32_t now(void)
-{
-    return s_cfg.now_us ? s_cfg.now_us() : 0;
-}
 
 static void put32(uint8_t *b, uint32_t v)
 {
@@ -87,8 +88,25 @@ static void status(uint8_t ev, int32_t value)
     send(PK_STATUS, 2, p, 8);
 }
 
+/* report bit 1: a PK_COMMAND with command 0 (none) and class Rest = stop (35.82; also on a stream reset, 35.85) */
+static void send_stop(void)
+{
+    uint8_t p[12];
+    put32(p, s_cnt.windows);
+    put32(p + 4, now());
+    p[8] = 0;
+    p[9] = (uint8_t)(LD_CLASSES - 1);
+    p[10] = 0;
+    p[11] = 0;
+    send(PK_COMMAND, 0, p, 12);
+}
+
+static void send_stop(void);
+
 static void stream_reset(void)
 {
+    if (s_mode == RTL_MODE_RUN && (s_report & 2u))
+        send_stop();                            /* 35.85: the latch is reset below; the arm must not keep moving */
     fe_reset();
     dc_reset(&s_dc);
     s_win_since_reset = 0;
@@ -105,6 +123,8 @@ void rtl_init(const rtl_config_t *cfg)
     memset(s_tx_seq, 0, sizeof s_tx_seq);
     dc_init(&s_dc, 500, cfg->k);                /* the votes given to dc_step are all-or-nothing, see on_window */
     fe_init();
+    s_mode = RTL_MODE_IDLE;                     /* 35.85: before stream_reset, so that init never sends a stop */
+    s_report = 0;
     stream_reset();
     ld_reset();
     s_mode = RTL_MODE_IDLE;

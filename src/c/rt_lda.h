@@ -24,7 +24,9 @@
  *                                     bit 1 (report 35.82): a PK_COMMAND with command 0 (none) and class Rest every
  *                                     time Rest is established (k_rest agreeing Rest / gated windows): the 'stop' of
  *                                     continuous arm control (hold = move, relax = stop). Not a command: no task-label
- *                                     windows, not counted in commands. Off by default.
+ *                                     windows, not counted in commands. Off by default. Also sent when the stream
+ *                                     is reset while running (packets lost / RTL_STREAM_RESET; 35.85), because
+ *                                     the reset drops the latched class.
  *   RTL_FORGET (11)                   drop all accumulated labels (ld_reset), e.g. after the band was moved
  *   RTL_TASK_LABEL (12) expected u8, valid u8 [, window u32]
  *                                     task label for the last command (report 35.18, 35.24): the robot side

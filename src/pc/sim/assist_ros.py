@@ -30,6 +30,10 @@ displays) shows both: rviz2 -d src/pc/sim/assist.rviz
       35.83: every event is acked (the relay measures the round trip), and the hindsight labels of labeler.py go back
       as 'range,<first>,<last>,<class>' (board window numbers: the last event's window + the control steps since it)
       -> udp_tcp_relay.py -> TrignoBridge --task-udp -> RTL_LABEL_RANGE (firmware rtl_task_s7d). --send-labels 0: off.
+      35.85 safety: with TrignoBridge --fwd-pred 1 and 'report 3' every 100 ms window arrives as a heartbeat; no
+      heartbeat / event for --deadman s (default 0.5) = stop until the next command event; a 'packets lost' status =
+      stop; the board's window numbers come from the heartbeat when there is one (no estimate). Every velocity sent
+      to the arm (all modes) passes the workspace box WORKSPACE: a component that would leave it is set to 0.
   python3 src/pc/sim/assist_ros.py scene           shelves + objects + numbers, until Ctrl-C
   python3 src/pc/sim/assist_ros.py home            the arm folded back to Kinova's home pose (poses_sim.json 'home'),
                                                    gripper open
@@ -302,7 +306,21 @@ def keyreader():
     return poll, lambda: termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
-def boardreader(listen, grip, events_path):
+# 35.85: Cartesian workspace of the tool point (base frame, m): the scene (shelves y +-0.25, tops 0.05-0.30) with margins;
+# below z 0.06 the tool would reach the table, beyond it the shelves' sides / the robot's reach
+WORKSPACE = np.array([[0.45, 0.92], [-0.38, 0.38], [0.06, 0.58]])
+
+
+def guard(v, x, dt):
+    """zero every velocity component that would take the tool point out of WORKSPACE within this step"""
+    v = np.array(v, float)
+    nxt = np.asarray(x, float) + v * dt
+    hit = (nxt < WORKSPACE[:, 0]) & (v < 0) | (nxt > WORKSPACE[:, 1]) & (v > 0)
+    v[hit] = 0.0
+    return v, bool(hit.any())
+
+
+def boardreader(listen, grip, events_path, deadman):
     """(report 35.82) the board's commands over TCP from udp_tcp_relay.py: lines '<relay_ms>,<bridge_ms>,command,
     <window>,<t_us>,<gesture>,<command>,...'. Returns poll() like keyreader: the latched command ('up' .. 'rest'), or
     'toggle' / 'home' once (--grip toggle-home)."""
@@ -311,7 +329,8 @@ def boardreader(listen, grip, events_path):
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.bind((host, int(port)))
     srv.listen(1)
-    state = {'cmd': 'rest', 'n': 0, 'conn': False, 'w': None, 't': None, 'sock': None}
+    state = {'cmd': 'rest', 'n': 0, 'conn': False, 'w': None, 't': None, 'sock': None, 'alive': None, 'hb': False,
+             'pw': None, 'dead': 0}
     lock = threading.Lock()
     ev = open(events_path, 'w', encoding='utf-8')
     ev.write('recv_unix_ms,relay_unix_ms,bridge_unix_ms,window,command,gesture,applied\n')
@@ -325,6 +344,16 @@ def boardreader(listen, grip, events_path):
             print('  board connected (udp_tcp_relay.py)', flush=True)
             for line in c.makefile('r', encoding='ascii', errors='replace'):
                 f = line.strip().split(',')
+                if len(f) >= 4 and f[2] == 'pred':              # 35.85 heartbeat: one per board window
+                    with lock:
+                        state['alive'], state['hb'], state['pw'] = time.time(), True, int(f[3])
+                    continue
+                if len(f) >= 10 and f[2] == 'status' and 'packets lost' in line:
+                    with lock:
+                        state['cmd'] = 'rest'                    # 35.85: the board reset its latch
+                    ev.write(f'{time.time() * 1000:.1f},{f[0]},{f[1]},,status,packets lost,rest\n')
+                    print('  board: packets lost -> stop', flush=True)
+                    continue
                 if len(f) < 7 or f[2] != 'command':
                     continue
                 cmd, ges = f[6], f[5]
@@ -349,6 +378,7 @@ def boardreader(listen, grip, events_path):
                         state['cmd'] = applied
                     state['n'] += 1
                     state['w'], state['t'] = int(f[3]), time.time()
+                    state['alive'] = time.time()
                 ev.write(f'{time.time() * 1000:.1f},{f[0]},{f[1]},{f[3]},{cmd},{ges},{applied}\n')
                 ev.flush()
                 print(f'\r  board: {cmd:10s} -> {applied}', flush=True)
@@ -363,11 +393,24 @@ def boardreader(listen, grip, events_path):
                 return 'toggle'
             if state.pop('home', False):
                 return 'home'
-            return state['cmd'] if state['conn'] else 'rest'
+            if not state['conn']:
+                return 'rest'
+            # 35.85 deadman: the board / bridge / EMG stream went quiet while a direction was held -> stop and stay
+            # stopped until the next command event (a new gesture), never resume on the heartbeat alone
+            if state['hb'] and state['cmd'] != 'rest' and time.time() - (state['alive'] or 0) > deadman:
+                state['cmd'] = 'rest'
+                state['dead'] += 1
+                ev.write(f'{time.time() * 1000:.1f},,,,deadman,,rest\n')
+                ev.flush()
+                print(f'  board: no heartbeat for {deadman:.1f} s -> stop', flush=True)
+            return state['cmd']
 
     def window_now():
-        """the board window of now: the last event's window + the 100 ms windows since it (WSL clock only)"""
+        """the board window of now: the last heartbeat's window (35.85), else the last event's window + the 100 ms
+        windows since it (WSL clock only)"""
         with lock:
+            if state['pw'] is not None:
+                return state['pw']
             if state['w'] is None:
                 return None
             return state['w'] + int(round((time.time() - state['t']) / A.DT))
@@ -383,6 +426,7 @@ def boardreader(listen, grip, events_path):
         except OSError:
             return False
     poll.window_now, poll.send = window_now, send
+    poll.deadman_count = lambda: state['dead']
     return poll, ev.close
 
 
@@ -393,6 +437,10 @@ def main():
     ap.add_argument('--grip', choices=['stop', 'toggle-home'], default='stop', help='board: what S7 HandOpen / Fist do')
     ap.add_argument('--events', default='board_events.csv', help='board: every board event with its arrival times')
     ap.add_argument('--send-labels', type=int, default=1, help='board: 1 = hindsight labels back to the board (35.83)')
+    ap.add_argument('--deadman', type=float, default=0.5, help='board: s without heartbeat / event -> stop (35.85)')
+    ap.add_argument('--label-classes', choices=['dirs', 'all'], default='dirs',
+                    help='board: which hindsight labels go to the board; dirs (default, 35.85: the Rest labels made the '
+                         'closed-loop sim worse on donning 1) or all')
     ap.add_argument('--target', type=int, default=0)
     ap.add_argument('--error', type=float, default=0.12)
     ap.add_argument('--seed', type=int, default=1)
@@ -474,7 +522,7 @@ def main():
     rng = np.random.default_rng(a.seed)
     dec = S.Decoder(S.SET5, a.error, rng)
     poll, restore = keyreader() if a.mode == 'keys' else \
-        boardreader(a.listen, a.grip, a.events) if a.mode == 'board' else (None, None)
+        boardreader(a.listen, a.grip, a.events, a.deadman) if a.mode == 'board' else (None, None)
     if a.limit is None:
         a.limit = 300.0 if live else 60.0
     if live:
@@ -505,6 +553,7 @@ def main():
     lab_w = {}                                          # 35.83: labeler step -> board window
     CLS9 = {'up': 0, 'down': 1, 'left': 2, 'right': 3, 'rest': 8}
     n_ranges = 0
+    n_guard = 0
     log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z\n')
     try:
         for k in range(int(a.limit / A.DT)):
@@ -554,7 +603,7 @@ def main():
                     runs = []
                     for st, lb in sorted(new):
                         w_ = lab_w.get(st)
-                        if w_ is None:
+                        if w_ is None or (a.label_classes == 'dirs' and lb == 'rest'):
                             continue
                         if runs and runs[-1][2] == lb and w_ == runs[-1][1] + 1:
                             runs[-1][1] = w_
@@ -586,6 +635,9 @@ def main():
             if bool(sa.grip) != gripped:
                 n.gripper(float(sa.grip))
                 gripped = bool(sa.grip)
+            v, hit = guard(v, kin.fk(q)[:3, 3], A.DT)           # 35.85: workspace box on everything sent to the arm
+            if hit:
+                n_guard += 1
             q_prev = q.copy()
             q = kin.ik_step(q, v, RD, A.DT, posture=True, q_rest=q_rest)
             qd = (q - q_prev) / A.DT if a.vel else None
@@ -634,6 +686,8 @@ def main():
         rclpy.spin_once(n, timeout_sec=0.05)
     qs = n.joints()
     print('commanded vs simulator joints, max diff deg:', round(float(np.degrees(np.abs(qs - q)).max()), 2))
+    print(f'workspace box stops: {n_guard} steps' + (f'; deadman stops: {poll.deadman_count()}' if a.mode == 'board' else '')
+          + (f'; range labels sent: {n_ranges}' if a.mode == 'board' else ''))
     print('tool now (fk of simulator joints):', np.round(kin.fk(qs)[:3, 3], 3).tolist())
     rclpy.shutdown()
 
