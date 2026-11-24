@@ -1,0 +1,6 @@
+closed loop with rt_lda.c (S7, gate 0.5, k 5, stop k 2) and hindsight range labels (all); 5 sessions x 40 trials; first half pool A, second half pool B (held out); grip commands True; goal prior off
+  donning  labels  half   success   time median s   wrong locks/trial   wrong-direction steps   ranges/trial   windows added/trial   label error (vs intent)
+  d1       off     A     100.0 %     46.4           0.39                24.8 %                 0.00             0.0                4.2 %   grips ok 2.00 refused 0.00/trial
+  d1       off     B      99.0 %     37.0           1.25                 4.1 %                 0.00             0.0                2.9 %   grips ok 1.83 refused 0.00/trial
+  d2       off     A     100.0 %     38.5           1.21                 4.1 %                 0.00             0.0                4.6 %   grips ok 2.00 refused 0.00/trial
+  d2       off     B     100.0 %     44.0           0.22                18.5 %                 0.00             0.0                5.0 %   grips ok 2.00 refused 0.44/trial

@@ -56,6 +56,13 @@ LIFT_IN = 0.02                     # max lift of a held object while still insid
 #   'mix' never pushes against the command (the opposing part of its direction is dropped), and each object's pull
 #   fades out within ARRIVE of its pre-grasp point (modes_test.py: at an object, W was cancelled by the pull back).
 MIX_ON, MIX_FULL = 0.3, 0.8
+# 35.86: explicit gripper commands (S7 Fist = close, HandOpen = open), only where they mean something: Fist at the
+# locked object in mode 2 'pick' (within GRASP_TOL) grasps at once, HandOpen inside the shelf in 'place' puts down
+# (same spot check as the relax); anywhere else they are a stop and are counted as refused. The 1 s relax still works.
+GRIPS = ('grip_close', 'grip_open')
+# 35.86: goal prior (speech / LLM): an object or shelf whose prior is below PRIOR_LOW is locked only after the user
+# stays stopped CONFIRM_STEPS in front of it (a deliberate choice overrides the prior); the others lock at once
+PRIOR_LOW = 0.2
 ARRIVE = 0.02
 MISMATCH_STEPS, MISMATCH_COS = 10, -0.2
 
@@ -66,9 +73,13 @@ def unit(v):
 
 
 class ModeAssist:
-    def __init__(self, objects, shelves, level=0.6, zone=0.12, rule='mix'):
+    def __init__(self, objects, shelves, level=0.6, zone=0.12, rule='mix', grip_cmds=False):
         """objects: (n, 3) object centres; shelves: (m, 3) centres of the shelf tops; rule: 'mix' | 'lead' (mode-1
-        steering, see MIX_ON)"""
+        steering, see MIX_ON); grip_cmds: explicit gripper commands (35.86, see GRIPS)"""
+        self.grip_cmds = grip_cmds
+        self.n_grip_ok = self.n_grip_refused = 0
+        self._prev_cmd = None                       # 35.86: a held Fist / HandOpen counts once
+        self.shelf_prior = None                     # 35.86: prior over the shelves (None: off); objects: self.base.prior
         self.base = A.Assist(objects, mode='blend', level=level, zone=zone)   # steering assist (mode 1, empty hand)
         self.rule, self.level = rule, level
         self.assist_off = False                     # switched off by mismatching input until the next relax
@@ -168,13 +179,43 @@ class ModeAssist:
             self.last_put = None
         self.m, self.phase, self.goal, self.shelf = 1, None, None, None
 
+    def _grip(self, cmd, x):
+        """35.86: Fist / HandOpen as gripper commands where they mean something, else a stop (counted as refused)"""
+        if (cmd == 'grip_close' and self.m == 2 and self.phase == 'pick' and self.armed and self.goal is not None
+                and np.linalg.norm(self.obj[self.goal] - x) < GRASP_TOL):
+            self.held, self.phase, self.lift_from, self.rest_n, self.armed = self.goal, 'out', x[2], 0, False
+            self.goal = None
+            self.n_grip_ok += 1
+        elif cmd == 'grip_open' and self.m == 2 and self.phase == 'place' and self.armed and self.inside(x):
+            self.rest_n = 0
+            ok, why = self.spot_ok(x, self.shelf)
+            if ok:
+                self.lowering = self.shelves[self.shelf][2] + OBJ_H / 2
+                self.n_grip_ok += 1
+            else:
+                self.msg, self.armed = why, False
+                if self._prev_cmd != cmd:
+                    self.n_grip_refused += 1
+        else:
+            if self._prev_cmd != cmd:                   # a held Fist / HandOpen counts once
+                self.n_grip_refused += 1
+            return self._rest(x)                        # a stop, as a relax (the relax rules still apply)
+        return np.zeros(3)
+
+    def _prior_ok(self, prior, k):
+        """35.86: lock k now? Always without a prior; with one, a low-prior target needs a deliberate 1 s stop"""
+        return prior is None or prior[k] >= PRIOR_LOW or self.rest_n >= CONFIRM_STEPS
+
     def _lock(self, x, manual=False):
         """mode 1 -> 2 when stopped in front of an object (empty hand) or a shelf (holding)"""
         if self.held is None:
             pre = self.obj + PRE
             d = np.linalg.norm((pre - x)[:, 1:], axis=1)
+            prior = getattr(self.base, 'prior', None)
             for g in np.argsort(d):
                 if d[g] < LOCK_ALIGN and self.at_travel(x) and g != self.block and not self._on_hold(g):
+                    if not self._prior_ok(prior, g):
+                        return                          # wait: a longer stop locks it anyway
                     self.m, self.phase, self.goal = 2, 'pick', int(g)
                     return
         else:
@@ -184,6 +225,8 @@ class ModeAssist:
             if k is not None and self.at_travel(x):
                 bottom = x[2] - OBJ_H / 2 - self.shelves[k][2]
                 if abs(x[1] - self.shelves[k][1]) <= SHELF_HY - EDGE and -0.02 <= bottom <= 0.10:
+                    if not self._prior_ok(self.shelf_prior, k):
+                        return
                     self.m, self.phase, self.shelf = 2, 'place', k
                     return
                 if True:
@@ -197,6 +240,7 @@ class ModeAssist:
     def step(self, cmd, x):
         m0 = self.m
         v = self._step(cmd, x)
+        self._prev_cmd = cmd
         if self.m != m0:
             self.switches += 1
             self.assist_off, self.mis_n = False, 0
@@ -232,6 +276,8 @@ class ModeAssist:
             self.released = self.last_put = self.held
             self.held, self.lowering, self.phase, self.armed = None, None, 'out', False
             return np.zeros(3)
+        if self.grip_cmds and cmd in GRIPS:
+            return self._grip(cmd, x)
         if not moving:
             return self._rest(x)
         self.rest_n, self.armed = 0, True

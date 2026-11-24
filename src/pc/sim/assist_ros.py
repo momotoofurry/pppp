@@ -30,6 +30,11 @@ displays) shows both: rviz2 -d src/pc/sim/assist.rviz
       35.83: every event is acked (the relay measures the round trip), and the hindsight labels of labeler.py go back
       as 'range,<first>,<last>,<class>' (board window numbers: the last event's window + the control steps since it)
       -> udp_tcp_relay.py -> TrignoBridge --task-udp -> RTL_LABEL_RANGE (firmware rtl_task_s7d). --send-labels 0: off.
+      35.86: --grip gripper = Fist closes / HandOpen opens the gripper where it means something (modes.py grip_cmds:
+      Fist at the locked object grasps, HandOpen inside the shelf puts down; elsewhere a stop). Goal prior from a
+      speech / LLM process: a UDP datagram 'prior,obj,<p0>,<p1>,<p2>' or 'prior,shelf,<p0>,...,<p4>' to
+      udp_tcp_relay.py's UDP port reaches here like the board's lines; the object prior is cleared at the grasp, the
+      shelf prior at the put-down. Only P(g) and the lock rule change, never a velocity.
       35.85 safety: with TrignoBridge --fwd-pred 1 and 'report 3' every 100 ms window arrives as a heartbeat; no
       heartbeat / event for --deadman s (default 0.5) = stop until the next command event; a 'packets lost' status =
       stop; the board's window numbers come from the heartbeat when there is one (no estimate). Every velocity sent
@@ -342,46 +347,63 @@ def boardreader(listen, grip, events_path, deadman):
             with lock:
                 state['conn'], state['sock'] = True, c
             print('  board connected (udp_tcp_relay.py)', flush=True)
-            for line in c.makefile('r', encoding='ascii', errors='replace'):
-                f = line.strip().split(',')
-                if len(f) >= 4 and f[2] == 'pred':              # 35.85 heartbeat: one per board window
-                    with lock:
-                        state['alive'], state['hb'], state['pw'] = time.time(), True, int(f[3])
-                    continue
-                if len(f) >= 10 and f[2] == 'status' and 'packets lost' in line:
-                    with lock:
-                        state['cmd'] = 'rest'                    # 35.85: the board reset its latch
-                    ev.write(f'{time.time() * 1000:.1f},{f[0]},{f[1]},,status,packets lost,rest\n')
-                    print('  board: packets lost -> stop', flush=True)
-                    continue
-                if len(f) < 7 or f[2] != 'command':
-                    continue
-                cmd, ges = f[6], f[5]
-                try:
-                    c.sendall(f'ack,{f[0]}\n'.encode('ascii'))
-                except OSError:
-                    pass
-                if cmd in ('up', 'down', 'left', 'right'):
-                    applied = cmd
-                elif cmd == 'none':
-                    applied = 'rest'
-                elif grip == 'toggle-home' and cmd == 'grip_close':
-                    applied = 'toggle'
-                elif grip == 'toggle-home' and cmd == 'grip_open':
-                    applied = 'home'
-                else:
-                    applied = 'rest'
-                with lock:
-                    if applied in ('toggle', 'home'):
-                        state[applied], state['cmd'] = True, 'rest'
+            try:
+                for line in c.makefile('r', encoding='ascii', errors='replace'):
+                    f = line.strip().split(',')
+                    if len(f) >= 5 and f[1] == 'prior' and f[2] in ('obj', 'shelf'):   # 35.86: goal prior (speech / LLM)
+                        try:
+                            pv = np.array([float(v) for v in f[3:]])
+                        except ValueError:
+                            continue
+                        if len(pv) and (pv >= 0).all() and pv.sum() > 0:
+                            with lock:
+                                state['prior_' + f[2]] = pv / pv.sum()
+                            ev.write(f'{time.time() * 1000:.1f},{f[0]},,,prior {f[2]},{" ".join(f[3:])},\n')
+                            ev.flush()
+                            print(f'  prior {f[2]}: {np.round(pv / pv.sum(), 2).tolist()}', flush=True)
+                        continue
+                    if len(f) >= 4 and f[2] == 'pred':              # 35.85 heartbeat: one per board window
+                        with lock:
+                            state['alive'], state['hb'], state['pw'] = time.time(), True, int(f[3])
+                        continue
+                    if len(f) >= 10 and f[2] == 'status' and 'packets lost' in line:
+                        with lock:
+                            state['cmd'] = 'rest'                    # 35.85: the board reset its latch
+                        ev.write(f'{time.time() * 1000:.1f},{f[0]},{f[1]},,status,packets lost,rest\n')
+                        print('  board: packets lost -> stop', flush=True)
+                        continue
+                    if len(f) < 7 or f[2] != 'command':
+                        continue
+                    cmd, ges = f[6], f[5]
+                    try:
+                        c.sendall(f'ack,{f[0]}\n'.encode('ascii'))
+                    except OSError:
+                        pass
+                    if cmd in ('up', 'down', 'left', 'right'):
+                        applied = cmd
+                    elif cmd == 'none':
+                        applied = 'rest'
+                    elif grip == 'gripper' and cmd in ('grip_close', 'grip_open'):
+                        applied = cmd
+                    elif grip == 'toggle-home' and cmd == 'grip_close':
+                        applied = 'toggle'
+                    elif grip == 'toggle-home' and cmd == 'grip_open':
+                        applied = 'home'
                     else:
-                        state['cmd'] = applied
-                    state['n'] += 1
-                    state['w'], state['t'] = int(f[3]), time.time()
-                    state['alive'] = time.time()
-                ev.write(f'{time.time() * 1000:.1f},{f[0]},{f[1]},{f[3]},{cmd},{ges},{applied}\n')
-                ev.flush()
-                print(f'\r  board: {cmd:10s} -> {applied}', flush=True)
+                        applied = 'rest'
+                    with lock:
+                        if applied in ('toggle', 'home'):
+                            state[applied], state['cmd'] = True, 'rest'
+                        else:
+                            state['cmd'] = applied
+                        state['n'] += 1
+                        state['w'], state['t'] = int(f[3]), time.time()
+                        state['alive'] = time.time()
+                    ev.write(f'{time.time() * 1000:.1f},{f[0]},{f[1]},{f[3]},{cmd},{ges},{applied}\n')
+                    ev.flush()
+                    print(f'\r  board: {cmd:10s} -> {applied}', flush=True)
+            except OSError as e:                        # 35.86: a reset ended the thread; now it is a disconnect
+                print(f'  board connection error: {e}', flush=True)
             with lock:
                 state['conn'], state['cmd'], state['sock'] = False, 'rest', None
             print('  board connection closed: stop', flush=True)
@@ -425,7 +447,10 @@ def boardreader(listen, grip, events_path, deadman):
             return True
         except OSError:
             return False
-    poll.window_now, poll.send = window_now, send
+    def take_prior(kind):
+        with lock:
+            return state.pop('prior_' + kind, None)
+    poll.window_now, poll.send, poll.take_prior = window_now, send, take_prior
     poll.deadman_count = lambda: state['dead']
     return poll, ev.close
 
@@ -434,7 +459,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('mode', choices=['demo', 'keys', 'board', 'scene', 'home', 'start'])
     ap.add_argument('--listen', default='127.0.0.1:50560', help='board: TCP address for udp_tcp_relay.py (35.82)')
-    ap.add_argument('--grip', choices=['stop', 'toggle-home'], default='stop', help='board: what S7 HandOpen / Fist do')
+    ap.add_argument('--grip', choices=['stop', 'toggle-home', 'gripper'], default='stop',
+                    help='board: what S7 HandOpen / Fist do (gripper: open / close where it means something, 35.86)')
     ap.add_argument('--events', default='board_events.csv', help='board: every board event with its arrival times')
     ap.add_argument('--send-labels', type=int, default=1, help='board: 1 = hindsight labels back to the board (35.83)')
     ap.add_argument('--deadman', type=float, default=0.5, help='board: s without heartbeat / event -> stop (35.85)')
@@ -515,7 +541,8 @@ def main():
         return
     live = a.mode in ('keys', 'board')                 # 35.82: the board drives the same control as the keys
     if live and a.modes:
-        sa = M.ModeAssist(OBJECTS, SHELVES, level=a.level, zone=(a.zone if a.zone > 0 else None), rule=a.rule)
+        sa = M.ModeAssist(OBJECTS, SHELVES, level=a.level, zone=(a.zone if a.zone > 0 else None), rule=a.rule,
+                          grip_cmds=(a.mode == 'board' and a.grip == 'gripper'))
     else:
         sa = A.Assist(OBJECTS, mode=a.assist, level=a.level, keep=(a.mode == 'keys'), shelves=SHELVES,
                       zone=(a.zone if a.zone > 0 else None))
@@ -567,6 +594,13 @@ def main():
                 cmd = dec(want)
             else:
                 want = cmd = poll()
+                if a.mode == 'board' and isinstance(sa, M.ModeAssist):     # 35.86: goal priors from speech / LLM
+                    po, ps = poll.take_prior('obj'), poll.take_prior('shelf')
+                    if po is not None and len(po) == len(sa.obj):
+                        sa.base.prior = po
+                    if ps is not None and len(ps) == len(sa.shelves):
+                        sa.shelf_prior = ps
+                    held0 = sa.held
             if cmd == 'toggle':                         # e: switch the mode by hand
                 print('  >> ' + sa.toggle(x), flush=True)
                 continue
@@ -596,6 +630,11 @@ def main():
                 if a.mode == 'board':
                     lab_w[lab.k] = poll.window_now()
             v = sa.step(cmd if cmd != 'rest' else None, x)
+            if a.mode == 'board' and isinstance(sa, M.ModeAssist):
+                if held0 is None and sa.held is not None:
+                    sa.base.prior = None                    # 35.86: the object prior is used up at the grasp
+                if held0 is not None and sa.held is None:
+                    sa.shelf_prior = None                   # ... and the shelf prior at the put-down
             if lab is not None:
                 new = lab.after()
                 if a.mode == 'board' and a.send_labels and new:

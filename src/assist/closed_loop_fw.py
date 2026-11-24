@@ -19,6 +19,11 @@ usage (container): python src/assist/closed_loop_fw.py --dir /sd/T00 [--days T00
        [--label-classes all|dirs] [--tag x]
   --label-classes dirs (report 35.85): only the direction labels go to the firmware, no Rest labels (is the loss on
   donning 1 from the many Rest windows?)
+  --grip-cmds (35.86): the user grasps with Fist at the object and puts down with HandOpen in the shelf (modes.py
+  grip_cmds) instead of relaxing 1 s; Fist / HandOpen recordings are played for them.
+  --prior P (35.86): a goal prior from speech / an LLM at the start of every trial: with probability P it names the
+  target object (and, separately, the target shelf), else a random other one; the named one gets --prior-mass, the
+  rest share the remainder. modes.py: P(g) x prior; a low-prior object / shelf locks only after a 1 s stop.
 """
 import argparse
 import ctypes
@@ -45,8 +50,10 @@ import selftest9_analysis as S9  # noqa: E402
 CL = S9.SETS['S7']
 MASK = sum(1 << c for c in CL)
 REST = S9.REST
-NAME = {0: 'up', 1: 'down', 2: 'left', 3: 'right', 6: 'grip', 7: 'grip', 8: 'rest'}
-CLS = {'up': 0, 'down': 1, 'left': 2, 'right': 3, 'rest': 8}
+NAME = {0: 'up', 1: 'down', 2: 'left', 3: 'right', 6: 'grip_open', 7: 'grip_close', 8: 'rest'}
+CLS = {'up': 0, 'down': 1, 'left': 2, 'right': 3, 'rest': 8, 'grip_open': 6, 'grip_close': 7}
+GRIP_CMDS = False
+PRIOR, PRIOR_MASS = None, 0.8
 DIRS = ('up', 'down', 'left', 'right')
 LSB = np.float32(2.5e-7)
 FPP = 20
@@ -84,7 +91,7 @@ def load(d, name):
     for r in task.itertuples():
         if r.segment == 'labelled' and r.event == 'cue_on':
             if last is not None:
-                rel.append((fr(last[0]), fr(r.t), last[1]))
+                rel.append((fr(last[0]), fr(r.t), last[1])) if last[1] in (0, 1, 2, 3) else None
                 rest.append((fr(last[0] + 500), fr(r.t)))
                 last = None
             on[('c', r.step)] = r
@@ -98,7 +105,7 @@ def load(d, name):
                 i = np.flatnonzero(act[w] >= 0.5 * thr)
                 st = int(w[max(int(i[0]) - 1, 0)]) * SA.STEP if len(i) else fr(a.t)
                 cues.append((st, fr(r.t), g))
-                if g in (0, 1, 2, 3):
+                if g in (0, 1, 2, 3, 6, 7):
                     last = (r.t, g)
         elif r.event == 'seg_end':
             last = None
@@ -112,10 +119,10 @@ def load(d, name):
 
 def pools(d):
     """two disjoint pools by alternation within each class"""
-    P = [dict(dir={c: [] for c in range(4)}, rel={c: [] for c in range(4)}, rest=[]) for _ in range(2)]
+    P = [dict(dir={c: [] for c in (0, 1, 2, 3, 6, 7)}, rel={c: [] for c in range(4)}, rest=[]) for _ in range(2)]
     cnt = {}
     for st, en, g in d['cues']:
-        if g in range(4):
+        if g in (0, 1, 2, 3, 6, 7):
             k = cnt.get(g, 0)
             P[k % 2]['dir'][g].append((st, en))
             cnt[g] = k + 1
@@ -235,34 +242,52 @@ class Player:
 LABEL_CLASSES = ('up', 'down', 'left', 'right', 'rest')
 
 
+def prior_vec(rng, n, target):
+    named = target if rng.random() < PRIOR else int(rng.choice([k for k in range(n) if k != target]))
+    v = np.full(n, (1 - PRIOR_MASS) / (n - 1))
+    v[named] = PRIOR_MASS
+    return v, named == target
+
+
 def trial(board, player, rng, labels_on, st):
-    ma = M.ModeAssist(MS.OBJ, MS.SHELVES, rule='mix')
+    ma = M.ModeAssist(MS.OBJ, MS.SHELVES, rule='mix', grip_cmds=GRIP_CMDS)
     lab = LB.Labeler(ma)
     t_obj = int(rng.integers(3))
     free = [k for k in range(len(MS.SHELVES))
             if all(np.linalg.norm(o[:2] - MS.SHELVES[k][:2]) > 0.06 or abs(o[2] - (MS.SHELVES[k][2] + M.OBJ_H / 2)) > 0.03
                    for o in MS.OBJ)]
     t_shelf = int(rng.choice(free))
+    if PRIOR is not None:
+        ma.base.prior, ok_o = prior_vec(rng, len(MS.OBJ), t_obj)
+        sp, ok_s = prior_vec(rng, len(MS.SHELVES), t_shelf)
+        ma.shelf_prior = sp
+        st['prior_right'] += ok_o + ok_s
+        st['prior_n'] += 2
     x = MS.X0.copy()
     hist = [x.copy()] * (S.REACT + 1)
     last_lock, wrong_lock, held = None, 0, 0
     lab_w, lab_want = {}, {}
     for t in range(MS.T_MAX):
         want = MS.user(ma, hist[-1 - S.REACT], t_obj, t_shelf, board.est)
+        if GRIP_CMDS and want == 'rest' and ma.m == 2 and ma.lowering is None and not ma.wait_release:
+            # the user's grasp / put-down is a Fist / HandOpen instead of a relax (the user policy's relax there)
+            if ma.phase == 'pick' and ma.goal == t_obj and np.linalg.norm(ma.obj[t_obj] - hist[-1 - S.REACT]) < M.GRASP_TOL:
+                want = 'grip_close'
+            elif ma.phase == 'place' and ma.shelf == t_shelf and ma.inside(hist[-1 - S.REACT]):
+                want = 'grip_open'
         n0 = len(board.events)
         board.feed(player.frames(want))
         for w, cls in board.events[n0:]:
             board.est = NAME[cls]
             board.last_w, board.last_step = w, board.step
         board.step += 1
-        cmd = board.est if board.est in DIRS else 'rest'
+        cmd = board.est if board.est in DIRS or (GRIP_CMDS and board.est in M.GRIPS) else 'rest'
         # 35.83 window of this step, as assist_ros.py board estimates it
         w_now = None if board.last_w is None else board.last_w + (board.step - 1 - board.last_step)
-        lab.before(cmd, x)
+        lab.before(cmd if cmd in DIRS else 'rest', x)
         lab_w[lab.k] = w_now
         lab_want[lab.k] = want
         if want in DIRS:
-            held = held + 1 if cmd != 'rest' or held else 1
             st['dir_steps'] += 1
             st['dir_wrong'] += cmd in DIRS and cmd != want
         v = ma.step(cmd if cmd != 'rest' else None, x)
@@ -299,7 +324,11 @@ def trial(board, player, rng, labels_on, st):
               and abs(ma.obj[t_obj][1] - MS.SHELVES[t_shelf][1]) <= M.SHELF_HY - M.EDGE + 1e-6)
         if on and ma.m == 1:
             # the backing-out labels come when the arm is back in mode 1: one more labeler step
+            st['grip_ok'] += ma.n_grip_ok
+            st['grip_refused'] += ma.n_grip_refused
             return True, (t + 1) * M.DT, wrong_lock
+    st['grip_ok'] += ma.n_grip_ok
+    st['grip_refused'] += ma.n_grip_refused
     return False, MS.T_MAX * M.DT, wrong_lock
 
 
@@ -312,7 +341,8 @@ def session(lib, d, seed, n, labels_on):
     for half in (0, 1):
         player = Player(d, P[half], rng)
         for i in range(n // 2):
-            st = dict(dir_steps=0, dir_wrong=0, ranges=0, added=0, lab_n=0, lab_ok=0)
+            st = dict(dir_steps=0, dir_wrong=0, ranges=0, added=0, lab_n=0, lab_ok=0, grip_ok=0, grip_refused=0,
+                      prior_right=0, prior_n=0)
             ok, tm, wl = trial(board, player, rng, labels_on, st)
             rows.append(dict(half=half, ok=ok, time=tm, wrong_locks=wl, **st))
     return pd.DataFrame(rows)
@@ -327,7 +357,13 @@ def main():
     ap.add_argument('--out', default='/work/results/selftest_T00')
     ap.add_argument('--label-classes', default='all', choices=['all', 'dirs'])
     ap.add_argument('--tag', default='')
+    ap.add_argument('--grip-cmds', action='store_true')
+    ap.add_argument('--prior', type=float, default=None)
+    ap.add_argument('--prior-mass', type=float, default=0.8)
+    ap.add_argument('--labels', default='both', choices=['both', 'off', 'on'])
     a = ap.parse_args()
+    global GRIP_CMDS, PRIOR, PRIOR_MASS
+    GRIP_CMDS, PRIOR, PRIOR_MASS = a.grip_cmds, a.prior, a.prior_mass
     global LABEL_CLASSES
     if a.label_classes == 'dirs':
         LABEL_CLASSES = ('up', 'down', 'left', 'right')
@@ -338,13 +374,14 @@ def main():
         print(s, flush=True)
         lines.append(s)
     p(f'closed loop with rt_lda.c (S7, gate 0.5, k 5, stop k 2) and hindsight range labels ({a.label_classes}); '
-      f'{a.sessions} sessions x {a.trials} trials; first half pool A, second half pool B (held out)')
+      f'{a.sessions} sessions x {a.trials} trials; first half pool A, second half pool B (held out); grip commands '
+      f'{a.grip_cmds}; goal prior ' + ('off' if a.prior is None else f'P {a.prior} mass {a.prior_mass}'))
     p('  donning  labels  half   success   time median s   wrong locks/trial   wrong-direction steps   '
       'ranges/trial   windows added/trial   label error (vs intent)')
     allres = []
     for name in a.days:
         d = load(a.dir, name)
-        for on in (False, True):
+        for on in {'both': (False, True), 'off': (False,), 'on': (True,)}[a.labels]:
             res = pd.concat([session(lib, d, 100 + s, a.trials, on).assign(session=s) for s in range(a.sessions)])
             res['labels'], res['donning'] = on, name
             allres.append(res)
@@ -354,10 +391,16 @@ def main():
                 p(f'  {name[4:6]}       {"on " if on else "off"}     {"A" if h == 0 else "B"}     {100 * r.ok.mean():5.1f} %   '
                   f'{np.median(tm) if len(tm) else float("nan"):6.1f}          {r.wrong_locks.mean():5.2f}               '
                   f'{100 * r.dir_wrong.sum() / max(r.dir_steps.sum(), 1):5.1f} %                {r.ranges.mean():5.2f}          '
-                  f'{r.added.mean():6.1f}              {100 * (1 - r.lab_ok.sum() / max(r.lab_n.sum(), 1)):5.1f} %')
+                  f'{r.added.mean():6.1f}              {100 * (1 - r.lab_ok.sum() / max(r.lab_n.sum(), 1)):5.1f} %'
+                  + (f'   grips ok {r.grip_ok.mean():.2f} refused {r.grip_refused.mean():.2f}/trial' if a.grip_cmds else '')
+                  + (f'   prior right {100 * r.prior_right.sum() / max(r.prior_n.sum(), 1):.0f} %' if a.prior is not None else ''))
     df = pd.concat(allres)
     df.to_csv(os.path.join(a.out, f'closed_loop_fw_trials{a.tag}.csv'), index=False)
     # paired: pool B, labels on - off, per session
+    if a.labels != 'both':
+        with open(os.path.join(a.out, f'closed_loop_fw{a.tag}.txt'), 'w', encoding='utf-8') as f:
+            f.write('\n'.join(lines) + '\n')
+        return
     p('\npool B (held out), labels on - off, mean over sessions (paired by seed):')
     for name in a.days:
         b = df[(df.donning == name) & (df.half == 1)]

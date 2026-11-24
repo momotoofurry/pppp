@@ -1,4 +1,5 @@
-"""S7 confirmation recordings (report 35.81, DRAFT rules until the user confirms them before the first S7 recording):
+"""S7 confirmation recordings (report 35.81; rules FROZEN on 2026-11-24, report 35.86: the user asked Claude to decide
+the thresholds; 80 % and 2.0 / min kept after re-checking them on the two 9-gesture donnings):
 the board's REAL-TIME commands as TaskScreen logged them (firmware rtl_task_s7b with TrignoBridge --preset s7, panel
 set S7, files <subj>_d<day>_S_*). No offline re-decoding: what the arm would have received.
 
@@ -9,7 +10,7 @@ Per donning (from <name>_task.csv):
                       right / wrong / none
   M4 latency          cue -> command of the successful task trials (median, quartiles)
   M5 labelled rest    commands while resting in the labelled segments (phase 'rest', and Rest cues) per minute
-Decision (draft, see report 35.81): over all donnings,
+Decision (frozen 2026-11-24, report 35.86): over all donnings (two, on different days),
   P1  mean M1 >= 80 %      and   P2  mean M2 <= 2.0 per minute   ->  GO to the Kinova closed loop with S7
   otherwise                                                     ->  revise (placement / gestures / gate) first
   reported only: M3, M4, M5; per-donning values; the soft-label and accumulation numbers of
@@ -100,7 +101,7 @@ def main():
         lines.append(s)
 
     ds = [day(a.dir, n) for n in a.days]
-    p('S7 confirmation (report 35.81, draft rules): the board\'s real-time commands as TaskScreen logged them')
+    p('S7 confirmation (report 35.81 / 35.86, rules frozen 2026-11-24): the board\'s real-time commands as TaskScreen logged them')
     for d in ds:
         q = (f'{np.median(d["lat"]):.0f} ms ({np.percentile(d["lat"], 25):.0f}-{np.percentile(d["lat"], 75):.0f})'
              if len(d['lat']) else '-')
@@ -118,7 +119,7 @@ def main():
     p(f'\nmean over {len(ds)} donning(s): M1 {m1:.1f} % (P1 needs >= {P1_MIN:g}), M2 {m2:.2f} / min (P2 needs <= {P2_MAX:g})')
     verdict = 'GO to the Kinova closed loop with S7' if ok1 and ok2 else 'revise placement / gestures / gate first'
     if allS7:
-        p(f'DECISION (rules of 35.81): P1 {"pass" if ok1 else "fail"}, P2 {"pass" if ok2 else "fail"} -> {verdict}')
+        p(f'DECISION (frozen rules, 35.86): P1 {"pass" if ok1 else "fail"}, P2 {"pass" if ok2 else "fail"} -> {verdict}')
     else:
         p(f'(not a decision: not all days are S7 recordings) P1 {"pass" if ok1 else "fail"}, P2 {"pass" if ok2 else "fail"}')
     if a.out:

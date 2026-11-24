@@ -123,6 +123,9 @@ class Assist:
 
     def probs(self):
         e = np.exp(BETA * (self.s - self.s.max()))
+        if getattr(self, 'prior', None) is not None:
+            # 35.86: goal prior from outside the EMG (speech / LLM): P(g) ~ softmax(BETA s) x prior(g)
+            e = e * np.asarray(self.prior, float)
         return e / e.sum()
 
     def _score(self, u, x):
