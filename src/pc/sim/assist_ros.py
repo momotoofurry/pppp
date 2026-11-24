@@ -340,6 +340,7 @@ def guard(v, x, dt):
 
 
 def boardreader(listen, grip, events_path, deadman):
+    # 35.93: heartbeat age / deadman / window estimate on time.monotonic() (a wall-clock step must not fire them)
     """(report 35.82) the board's commands over TCP from udp_tcp_relay.py: lines '<relay_ms>,<bridge_ms>,command,
     <window>,<t_us>,<gesture>,<command>,...'. Returns poll() like keyreader: the latched command ('up' .. 'rest'), or
     'toggle' / 'home' once (--grip toggle-home)."""
@@ -378,7 +379,7 @@ def boardreader(listen, grip, events_path, deadman):
                         continue
                     if len(f) >= 4 and f[2] == 'pred':              # 35.85 heartbeat: one per board window
                         with lock:
-                            state['alive'], state['hb'], state['pw'] = time.time(), True, int(f[3])
+                            state['alive'], state['hb'], state['pw'] = time.monotonic(), True, int(f[3])
                         continue
                     if len(f) >= 10 and f[2] == 'status' and 'packets lost' in line:
                         with lock:
@@ -411,8 +412,8 @@ def boardreader(listen, grip, events_path, deadman):
                         else:
                             state['cmd'] = applied
                         state['n'] += 1
-                        state['w'], state['t'] = int(f[3]), time.time()
-                        state['alive'] = time.time()
+                        state['w'], state['t'] = int(f[3]), time.monotonic()
+                        state['alive'] = time.monotonic()
                     ev.write(f'{time.time() * 1000:.1f},{f[0]},{f[1]},{f[3]},{cmd},{ges},{applied}\n')
                     ev.flush()
                     print(f'\r  board: {cmd:10s} -> {applied}', flush=True)
@@ -433,7 +434,7 @@ def boardreader(listen, grip, events_path, deadman):
                 return 'rest'
             # 35.85 deadman: the board / bridge / EMG stream went quiet while a direction was held -> stop and stay
             # stopped until the next command event (a new gesture), never resume on the heartbeat alone
-            if state['hb'] and state['cmd'] != 'rest' and time.time() - (state['alive'] or 0) > deadman:
+            if state['hb'] and state['cmd'] != 'rest' and time.monotonic() - (state['alive'] or 0) > deadman:
                 state['cmd'] = 'rest'
                 state['dead'] += 1
                 ev.write(f'{time.time() * 1000:.1f},,,,deadman,,rest\n')
@@ -449,7 +450,7 @@ def boardreader(listen, grip, events_path, deadman):
                 return state['pw']
             if state['w'] is None:
                 return None
-            return state['w'] + int(round((time.time() - state['t']) / A.DT))
+            return state['w'] + int(round((time.monotonic() - state['t']) / A.DT))
 
     def send(line):
         with lock:
@@ -509,22 +510,22 @@ def main():
     if a.mode == 'scene':
         print('publishing the scene on /assist_scene (Ctrl-C to stop)')
         idle = A.Assist(OBJECTS)
-        t1 = time.time()
-        while time.time() - t1 < 1.0:
+        t1 = time.monotonic()
+        while time.monotonic() - t1 < 1.0:
             rclpy.spin_once(n, timeout_sec=0.05)
         n.markers(OBJECTS, idle.probs() * 0, idle, -1, X0)   # objects + numbers at the start positions, once
         try:
             while True:
                 n.sc.publish(scene_markers(OBJECTS))
-                t1 = time.time()
-                while time.time() - t1 < 0.5:
+                t1 = time.monotonic()
+                while time.monotonic() - t1 < 0.5:
                     rclpy.spin_once(n, timeout_sec=0.05)
         except KeyboardInterrupt:
             pass
         rclpy.shutdown()
         return
-    t0 = time.time()
-    while not all(j in n.q for j in JOINTS) and time.time() - t0 < 10:
+    t0 = time.monotonic()
+    while not all(j in n.q for j in JOINTS) and time.monotonic() - t0 < 10:
         rclpy.spin_once(n, timeout_sec=0.1)
     if not all(j in n.q for j in JOINTS) and a.mode != 'scene':
         print('no /joint_states for all 7 joints within 10 s: not moving (is the driver up?)', flush=True)
@@ -536,8 +537,8 @@ def main():
         print('moving to the home pose', np.round(np.degrees(home)).tolist(), 'deg (4 s)')
         n.gripper(0.0)
         n.send(home, 4.0)
-        t1 = time.time()
-        while time.time() - t1 < 4.5:
+        t1 = time.monotonic()
+        while time.monotonic() - t1 < 4.5:
             rclpy.spin_once(n, timeout_sec=0.05)
         print('at home, joints', np.round(np.degrees(n.joints()), 1).tolist(), 'deg; tool',
               np.round(kin.fk(n.joints())[:3, 3], 3).tolist(), ', gripper open')
@@ -562,8 +563,8 @@ def main():
           f'change {np.degrees(np.abs(q - q_now).max()):.0f} deg in {t_start:.1f} s')
     n.gripper(0.0)
     n.send(q, t_start)
-    t1 = time.time()
-    while time.time() - t1 < t_start + 0.5:
+    t1 = time.monotonic()
+    while time.monotonic() - t1 < t_start + 0.5:
         rclpy.spin_once(n, timeout_sec=0.05)
     e_start = float(np.linalg.norm(kin.fk(n.joints())[:3, 3] - kin.fk(q)[:3, 3]))
     print(f'at the start pose: measured tool {1000 * e_start:.1f} mm from the commanded one', flush=True)
@@ -618,7 +619,7 @@ def main():
     log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z,shelf,track_err,wall\n')
     try:
         for k in range(int(a.limit / A.DT)):
-            tk = time.time()
+            tk = time.monotonic()
             x = kin.fk(q)[:3, 3]
             if a.mode == 'demo':
                 if a.assist == 'blend':
@@ -644,8 +645,8 @@ def main():
             if cmd == 'home':                           # h: back to the start pose, control continues
                 print('  >> 回到起點（3 秒），之後繼續控制' + ('；物體還夾著' if sa.grip else ''), flush=True)
                 n.send(rebase(q_rest, n.joints()), 3.0)
-                t2 = time.time()
-                while time.time() - t2 < 3.2:
+                t2 = time.monotonic()
+                while time.monotonic() - t2 < 3.2:
                     rclpy.spin_once(n, timeout_sec=0.05)
                 q = q_rest.copy()
                 if isinstance(sa, M.ModeAssist):
@@ -732,7 +733,7 @@ def main():
             code, hg = n.markers(sa.obj, P, sa, a.target if a.mode == 'demo' else -1, kin.fk(q)[:3, 3])
             hist.append(kin.fk(q)[:3, 3])
             log.write(f'{k * A.DT:.1f},{want},{cmd},{sa.state},{sa.goal},{P[0]:.3f},{P[1]:.3f},{P[2]:.3f},'
-                      f'{x[0]:.4f},{x[1]:.4f},{x[2]:.4f},{getattr(sa, "shelf", None)},{e_tr:.4f},{tk:.3f}\n')
+                      f'{x[0]:.4f},{x[1]:.4f},{x[2]:.4f},{getattr(sa, "shelf", None)},{e_tr:.4f},{time.time():.3f}\n')
             log.flush()
             if live and isinstance(sa, M.ModeAssist):
                 if (code, hg, sa.hint_zh) != last_hint:
@@ -754,7 +755,7 @@ def main():
             if sa.state == 'done':
                 print(f'done at {k * A.DT:.1f} s: grasped object {sa.goal}' + (f' (target {a.target})' if a.mode == 'demo' else ''))
                 break
-            while time.time() - tk < A.DT:
+            while time.monotonic() - tk < A.DT:
                 rclpy.spin_once(n, timeout_sec=0.01)
         else:
             print('time limit reached, state', sa.state)
@@ -766,8 +767,8 @@ def main():
         log.close()
         if labf:
             labf.close()
-    t2 = time.time()
-    while time.time() - t2 < 1.0:
+    t2 = time.monotonic()
+    while time.monotonic() - t2 < 1.0:
         rclpy.spin_once(n, timeout_sec=0.05)
     qs = n.joints()
     print('commanded vs simulator joints, max diff deg:', round(float(np.degrees(np.abs(qs - q)).max()), 2))

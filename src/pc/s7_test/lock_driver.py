@@ -42,7 +42,7 @@ def send(cmd):
     global w, cur, t_send, n_err
     w += 1
     g = GEST[cmd]
-    now = time.time()
+    now = time.monotonic()
     if t_send is not None and now - t_send > 0.3:
         say(f'  driver send gap {now - t_send:.2f} s (window {w})')
     t_send = now
@@ -88,11 +88,11 @@ def axis(dy, dz, tol=0.012):
     return 'up' if dz > 0 else 'down'
 
 
-phase, rest_until, paused, t0 = 'to_obj', 0.0, False, time.time()
+phase, rest_until, paused, t0 = 'to_obj', 0.0, False, time.monotonic()
 wrong, locks, prev_state = 0, [], None
 still, last_pos = 0, None
-while time.time() - t0 < LIMIT:
-    tick = time.time()
+while time.monotonic() - t0 < LIMIT:
+    tick = time.monotonic()
     r = last()
     if r is None:
         send('rest'); time.sleep(0.1); continue
@@ -150,8 +150,8 @@ while time.time() - t0 < LIMIT:
         say(f'{tick - t0:6.1f} s  no motion on {cmd}: relax 0.3 s, then the gesture again')
         cmd = 'rest'
     send(cmd)
-    time.sleep(max(0.0, 0.1 - (time.time() - tick)))
-say(f'RESULT locks {locks} wrong {wrong} time {time.time() - t0:.1f} s phase {phase} '
+    time.sleep(max(0.0, 0.1 - (time.monotonic() - tick)))
+say(f'RESULT locks {locks} wrong {wrong} time {time.monotonic() - t0:.1f} s phase {phase} '
     f'stuck {globals().get("n_stuck", 0)} send errors {n_err}')
 for _ in range(20):
     send('rest'); time.sleep(0.1)

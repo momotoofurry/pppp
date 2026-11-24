@@ -59,6 +59,10 @@ CLS = {'up': 0, 'down': 1, 'left': 2, 'right': 3, 'rest': 8, 'grip_open': 6, 'gr
 GRIP_CMDS = False
 LOCK_DWELL = 'none'
 LOCK_RULE = 'none'
+DUMP = None                  # 35.94: per-step rows (list) when --dump-steps is given
+CONF = None                  # 35.94: (s_min, m_full) of the EMG-confidence speed, or None (off)
+CONF_INFER = None            # 35.94c: m_full of the confidence-weighted goal inference, or None (off)
+CUR = {}                     # 35.94: donning / session / half / trial of the running trial, for the dump
 PRIOR, PRIOR_MASS = None, 0.8
 DIRS = ('up', 'down', 'left', 'right')
 LSB = np.float32(2.5e-7)
@@ -149,12 +153,13 @@ class Board:
         self.lib, self.d = lib, d
         self.enc, self.dec = PR.Encoder(), PR.Decoder()
         self.events, self.status = [], []
+        self.preds = []                                        # 35.94: (window, top, accepted, margin_x100, gated)
         self.txcb = R.TX(self._tx)
         lib.rtl_init(ctypes.byref(R.Config(self.txcb, R.NOW(0), 0, 0, 0, 5)))
         self._ctl(14, bytes([MASK & 0xFF, MASK >> 8]))
         self._ctl(13, bytes([50, 0, 2]))
         self._ctl(5, bytes([0, 0, 0, 0, 5, 2]))
-        self._ctl(6, bytes([2]))
+        self._ctl(6, bytes([3 if (DUMP is not None or CONF is not None or CONF_INFER is not None) else 2]))
         self._ctl(1)
         q = d['q']
         day = d['day']
@@ -192,6 +197,9 @@ class Board:
                 self.events.append((w, cls))
             elif t == PR.STATUS:
                 self.status.append(struct.unpack('<B3xi', p[:8]))
+            elif t == PR.PRED and len(p) >= 13:
+                w, _, top, acc, mg, gated = struct.unpack('<IIBBHB', p[:13])
+                self.preds.append((w, top, acc, mg, gated))
 
     def _send(self, b):
         self.lib.rtl_rx(ctypes.c_char_p(b), len(b))
@@ -290,12 +298,18 @@ def trial(board, player, rng, labels_on, st, prng=None):
             elif ma.phase == 'place' and ma.shelf == t_shelf and ma.inside(hist[-1 - S.REACT]):
                 want = 'grip_open'
         n0 = len(board.events)
+        p0 = len(board.preds)
         board.feed(player.frames(want))
         for w, cls in board.events[n0:]:
             board.est = NAME[cls]
             board.last_w, board.last_step = w, board.step
         board.step += 1
         cmd = board.est if board.est in DIRS or (GRIP_CMDS and board.est in M.GRIPS) else 'rest'
+        if DUMP is not None:
+            pr = board.preds[p0:]
+            w_, top, acc, mg, gated = pr[-1] if pr else (-1, -1, 0, 0, 0)
+            DUMP.append(dict(CUR, t=t, want=want, cmd=cmd, top=NAME.get(top, top), acc=acc, margin=mg, gated=gated,
+                             n_pred=len(pr), m=ma.m, held=ma.held is not None))
         # 35.83 window of this step, as assist_ros.py board estimates it
         w_now = None if board.last_w is None else board.last_w + (board.step - 1 - board.last_step)
         lab.before(cmd if cmd in DIRS else 'rest', x)
@@ -304,7 +318,24 @@ def trial(board, player, rng, labels_on, st, prng=None):
         if want in DIRS:
             st['dir_steps'] += 1
             st['dir_wrong'] += cmd in DIRS and cmd != want
+        if CONF_INFER is not None:
+            pr_ = board.preds[p0:]
+            if pr_ and cmd in DIRS:
+                _, top_, acc_, mg_, _ = pr_[-1]
+                ma.conf = M.conf_scale(acc_ == 1 and NAME.get(top_) == cmd, mg_, 0.0, CONF_INFER)
+            else:
+                ma.conf = 1.0
         v = ma.step(cmd if cmd != 'rest' else None, x)
+        if CONF is not None and cmd in DIRS:
+            pr_ = board.preds[p0:]
+            if pr_:
+                _, top_, acc_, mg_, _ = pr_[-1]
+                own_ = acc_ == 1 and NAME.get(top_) == cmd
+                oth_ = acc_ == 1 and NAME.get(top_) != cmd
+                sc_ = M.conf_scale(own_, mg_, *CONF, other=oth_)
+                v = v * sc_
+                st['conf_scale'] += sc_
+                st['conf_n'] += 1
         new = lab.after()
         for k_, lb in new:                                 # label vs what the simulated user meant at that step
             st['lab_n'] += 1
@@ -362,7 +393,8 @@ def session(lib, d, seed, n, labels_on):
         player = Player(d, P[half], rng)
         for i in range(n // 2):
             st = dict(dir_steps=0, dir_wrong=0, ranges=0, added=0, lab_n=0, lab_ok=0, grip_ok=0, grip_refused=0,
-                      prior_right=0, prior_n=0, wl_pick=0, wl_place=0, wl_full=0, wrong_s=0.0)
+                      prior_right=0, prior_n=0, wl_pick=0, wl_place=0, wl_full=0, wrong_s=0.0, conf_scale=0.0, conf_n=0)
+            CUR.update(half=half, trial=i, seed=seed)
             ok, tm, wl = trial(board, player, rng, labels_on, st, prng)
             rows.append(dict(half=half, ok=ok, time=tm, wrong_locks=wl, **st))
     return pd.DataFrame(rows)
@@ -384,11 +416,21 @@ def main():
     ap.add_argument('--scene', default='3obj', choices=['3obj', 'crowded'])
     ap.add_argument('--lock-dwell', default='none', choices=['none', 'context', 'place', 'all'])
     ap.add_argument('--lock-rule', default='none', choices=['none', 'room', 'intent'])
+    ap.add_argument('--dump-steps', default=None, help='35.94: per-step CSV (want, command, PRED) for the EMG confidence')
+    ap.add_argument('--conf-speed', default=None, help='35.94: S_MIN,M_FULL: direction speed x decoder confidence')
+    ap.add_argument('--conf-infer', type=float, default=None, help='35.94c: M_FULL: goal inference weighted by confidence')
     a = ap.parse_args()
     global LOCK_DWELL
     LOCK_DWELL = a.lock_dwell
     global LOCK_RULE
     LOCK_RULE = a.lock_rule
+    global DUMP, CONF
+    if a.dump_steps:
+        DUMP = []
+    if a.conf_speed:
+        CONF = tuple(float(v) for v in a.conf_speed.split(','))
+    global CONF_INFER
+    CONF_INFER = a.conf_infer
     if a.scene == 'crowded':
         MS.OBJ, MS.SHELVES = CROWD_OBJ.copy(), CROWD_SHELVES.copy()
     global GRIP_CMDS, PRIOR, PRIOR_MASS
@@ -411,6 +453,7 @@ def main():
     allres = []
     for name in a.days:
         d = load(a.dir, name)
+        CUR['donning'] = name
         for on in {'both': (False, True), 'off': (False,), 'on': (True,)}[a.labels]:
             res = pd.concat([session(lib, d, 100 + s, a.trials, on).assign(session=s) for s in range(a.sessions)])
             res['labels'], res['donning'] = on, name
@@ -449,3 +492,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+    if DUMP is not None:
+        pd.DataFrame(DUMP).to_csv(sys.argv[sys.argv.index('--dump-steps') + 1], index=False)

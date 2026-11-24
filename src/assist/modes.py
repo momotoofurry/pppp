@@ -77,6 +77,19 @@ ARRIVE = 0.02
 MISMATCH_STEPS, MISMATCH_COS = 10, -0.2
 
 
+def conf_scale(own, margin_x100, s_min=0.4, m_full=10.0, other=False):
+    """35.94: speed factor from the decoder's confidence in the latched command: the newest 100 ms window's accepted
+    top class is that command (own) and its LDA margin (board PK_PRED, x100) -> s_min + (1 - s_min) * clip(margin /
+    m_full); a window of another class (the decoder is already leaving the command, before the k-window latch
+    follows) -> s_min. 35.94: on recorded EMG the margin told right from wrong motion with AUC 0.83; 52 % of the wrong
+    steps had a newest window of another class."""
+    if m_full <= 0:                     # 35.94b 'switch': slow only when the newest window is accepted for another class
+        return s_min if other else 1.0
+    if not own:
+        return s_min
+    return s_min + (1.0 - s_min) * float(np.clip(margin_x100 / 100.0 / m_full, 0.0, 1.0))
+
+
 def unit(v):
     n = np.linalg.norm(v)
     return v / n if n > 1e-9 else np.zeros_like(v)
@@ -92,6 +105,7 @@ class ModeAssist:
         self.lock_rule = lock_rule                  # 35.89: 'none' | 'room' | 'intent' (shelves while carrying)
         self.ss = np.zeros(len(shelves))            # 35.89: shelf goal scores while carrying
         self.n_no_room = 0                          # 35.89: stops at a full shelf (refused locks)
+        self.conf = 1.0                             # 35.94c: weight of this step's command in the goal scores
         self.n_grip_ok = self.n_grip_refused = 0
         self._prev_cmd = None                       # 35.86: a held Fist / HandOpen counts once
         self.shelf_prior = None                     # 35.86: prior over the shelves (None: off); objects: self.base.prior
@@ -345,7 +359,7 @@ class ModeAssist:
                 # 35.89: shelf goal scores from the carry motion (y, z), as Assist._score does for the objects
                 aim = self.shelves + np.array([0.0, 0.0, SHELF_AIM]) - x
                 aim[:, 0] = 0.0
-                self.ss = A.LAMBDA * self.ss + np.array([u @ unit(p) for p in aim])
+                self.ss = A.LAMBDA * self.ss + self.conf * np.array([u @ unit(p) for p in aim])
                 v = V_MAX * u
             v[0] = (self.x_travel - x[0]) / DT if abs(self.x_travel - x[0]) > 1e-4 else 0.0   # stay in the plane
             return v * slow
@@ -423,7 +437,7 @@ class ModeAssist:
             a = self.level * np.clip((P[g] - A.P_ON) / (A.P_FINAL - A.P_ON), 0, 1) * zones[g]
             dirn = D[g]
         else:
-            self.base._score(u, x)
+            self.base._score(u * self.conf, x)          # 35.94c: a low-confidence command counts less
             P = self.base.probs()
             w = P * zones
             m = (w[:, None] * D).sum(0)

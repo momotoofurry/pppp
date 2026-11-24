@@ -8,16 +8,36 @@
 1. **急停一直在手邊**：實機的急停按鈕（或 Kinova 手把）放在伸手就能按的位置。
    - 【待確認】你一個人當受試者兼操作者時，是否需要第二個人在場、負責按急停。建議要，請和老師確認實驗室規定。
 2. **由慢到快、由空到滿**：每一步都通過了，才做下一步。任何一步失敗就停下，回到前一步。
-3. **控制電腦先過時間檢查**（第 1 節）。這是 35.92 的發現：WSL2 每 30 s 會整個暫停約 0.7 s（測過最長 3.4 s），Windows 原生沒有這個問題。
+3. **控制電腦先過時間檢查**（第 1 節）。
+   - 35.92 在 WSL2 看到每 30 s 約 0.7 s 的中斷，最長 3.4 s。
+   - 35.93 查證：
+     - 原因沒有完全確定：可能是系統時鐘被校時跳動，也可能是虛擬機真的暫停；
+     - 筆電待機喚醒之後就沒有再出現；
+     - `assist_ros.py` 已改用 monotonic 時鐘，時鐘跳動不會再誤觸 deadman。
+   - 但 Kortex 驅動用的是系統時鐘，所以**正式實驗建議用原生 Linux**（見第 1.5 節）。
 
 ## 1. 上機前（不開手臂電源，在自己電腦就能做）
 
 | # | 檢查 | 指令 | 通過條件 | ☐ |
 |---|---|---|---|---|
-| 1.1 | 控制電腦的時間穩定性 | `python3 src/pc/s7_test/loop_jitter.py 90` | **90 s 內沒有 > 0.1 s 的空檔**。WSL2 不通過（11/25：3 次 0.7 s），要換原生 Linux 或先解決 | ☐ |
+| 1.1 | 控制電腦的時間穩定性 | `python3 src/pc/s7_test/loop_jitter.py 90` | **PASS**：90 s 內行程沒有停住超過 0.1 s，系統時鐘也沒有跳動超過 0.05 s。用 WSL 的話：先 `wsl --shutdown` 重開、關掉待機，再測 | ☐ |
 | 1.2 | 程式測試 | `modes_test`、`modes_assist_test`、`labeler_test`、`lockrule_test`、`rebase_test` | 都是 ALL OK | ☐ |
 | 1.3 | 實機 launch 的假硬體測試 | `bash src/pc/s7_test/kortex_mock.sh /tmp/kortex_mock` | 介面都在；起始移動走短路；關掉控制器時出現「holding」；任務完成 | ☐ |
 | 1.4 | Gazebo 預演 | `bash src/pc/s7_test/gz_lock.sh intent /tmp/gz` | 放到目標架子，追蹤誤差最大 < 1 cm | ☐ |
+
+### 1.5 用原生 Linux 時的架構（35.93）
+
+- **兩台電腦**：Trigno 的 TCU 只有 Windows 版，所以不能只用 Linux，也不能用同一台筆電雙系統開機。
+  - **Windows**：TCU、TrignoBridge、TaskScreen、ExperimentPanel、板子（USB）、`udp_tcp_relay.py --udp 50556 --to <Linux IP>:50560`。
+  - **Linux**（Ubuntu 22.04＋ROS 2 Humble，和測過的版本相同）：Kortex 驅動、`assist_ros.py board --listen 0.0.0.0:50560`。
+- **網路**：手臂一條有線網路，Windows 和 Linux 之間一條；不要用 Wi-Fi。防火牆開 TCP 50560（Windows 出、Linux 進）。
+- **Linux 設定**：
+  - 插電；
+  - 關掉睡眠和待機；
+  - CPU 調速器設成 performance；
+  - 校時用 chrony（漸進調整，不跳動）；
+  - 開機後 `loop_jitter.py` 90 s 要 PASS。
+- 兩台電腦的時間戳記不能直接相減。延遲用 relay 的 ack 來回時間量；紀錄結束後收在一起。
 
 ## 2. 手臂設定（開機，還不跑程式）
 
