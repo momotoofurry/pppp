@@ -1,0 +1,12 @@
+   0.0 s  mode1        shelf None  x=(0.580,0.000,0.350)  phase to_obj
+   6.1 s  mode2-pick   shelf None  x=(0.580,0.243,0.103)  phase to_obj
+  11.1 s  mode2-out    shelf None  x=(0.743,0.249,0.101)  phase grasp
+  15.0 s  mode1        shelf None  x=(0.584,0.249,0.102)  phase out
+  18.8 s  hesitate 0.4 s in front of shelf 2 (y 0.003)
+  18.9 s  mode2-place  shelf 2  x=(0.580,-0.005,0.102)  phase carry
+  19.3 s  mode1        shelf None  x=(0.580,-0.005,0.102)  phase carry
+  driver send gap 3.37 s (window 1219)
+  27.1 s  mode2-place  shelf 3  x=(0.580,-0.244,0.102)  phase carry
+  33.8 s  mode2-out    shelf 3  x=(0.727,-0.243,0.100)  phase in
+  33.8 s  put down -> mode2-out
+RESULT locks ['2', '3'] wrong 1 time 33.8 s phase in stuck 0 send errors 0

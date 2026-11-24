@@ -55,10 +55,12 @@ check('S: backs out -> mode 1 by itself', run('down', lambda: ma.m == 1) and ma.
 z0 = x[2]
 run('down', limit=10)
 check('S still held after the switch: no move down, hint says relax', abs(x[2] - z0) < 1e-9 and ma.describe(x)[0] == 'wait')
+y0 = x[1]
 run('right', limit=3)
-check('D before relaxing: still no move', abs(x[2] - z0) < 1e-9 and ma.wait_release)
+check('D right after the switch: moves sideways at once, wait ended (35.91)',
+      x[1] < y0 - 0.005 and abs(x[2] - z0) < 1e-9 and not ma.wait_release)
 run(None, limit=1)
-check('relax once: free again', not ma.wait_release)
+check('relax: still free', not ma.wait_release)
 check('carry right to the empty right-low shelf lane', run('right', lambda: x[1] <= -0.25))
 check('down a bit too far: bottom 1 cm below the top', run('down', lambda: x[2] <= 0.09))
 run(None, limit=2)

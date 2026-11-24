@@ -299,7 +299,9 @@ class ModeAssist:
             self.assist_off, self.mis_n = False, 0
             # 35.68 (user): S backs out, the mode switches to 1 at the travel plane, and the same held S would now mean
             # DOWN and drop the arm at once. W / S change meaning between the modes, so after a switch made while W / S
-            # is held the arm waits until the user relaxes once (A / D at the plane mean the same in both: no wait)
+            # is held the arm waits until the user relaxes once (A / D at the plane mean the same in both: no wait).
+            # 35.91 (user): during that wait A / D move at once and end it; only W / S wait for the relax (Gazebo
+            # 35.90: backed out of a wrong shelf with S, then held D: the arm stood still until a relax)
             if cmd in ('up', 'down'):
                 self.wait_release = True
         return v
@@ -307,9 +309,9 @@ class ModeAssist:
     def _step(self, cmd, x):
         x = np.asarray(x, float)
         if self.wait_release:
-            if cmd in A.DIRS:
-                return np.zeros(3)                      # hold still until a relax
-            self.wait_release = False
+            if cmd in A.DIRS and cmd not in ('left', 'right'):
+                return np.zeros(3)                      # W / S: hold still until a relax
+            self.wait_release = False                   # a relax, or A / D (35.91)
         u =np.array(A.DIRS[cmd], float) if cmd in A.DIRS else np.zeros(3)
         moving = np.linalg.norm(u) > 0
         slow = SLOW if (self.near_shelf(x) or self.inside(x)) else 1.0
@@ -496,7 +498,7 @@ class ModeAssist:
         """(code, short English text for RViz, Chinese hint, object index for the marker) of the current state"""
         x = np.asarray(x, float)
         if self.wait_release:
-            return ('wait', 'RELAX first', f'已切到模式 {self.m}：先放鬆（空白鍵），再重新出力',
+            return ('wait', 'RELAX first', f'已切到模式 {self.m}：W／S 要先放鬆（空白鍵）再出力；A／D 可以直接動',
                     self.held if self.held is not None else self.goal)
         if self.msg:
             return 'msg', 'X', self.msg, self.held if self.held is not None else self.goal
