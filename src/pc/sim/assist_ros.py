@@ -86,6 +86,20 @@ SEEDS = ([-3, 29, -2, 137, -5, -75, 92], [0, 15, 180, 230, 0, 55, 90], [0, 30, 0
 # start point of the demo (35.61): at (0.50, 0, 0.30) the horizontal tool needs the elbow 0.5 deg from its limit; here the
 # best posture keeps every limited joint >= 17 deg from its limit
 X0 = np.array([0.58, 0.0, 0.35])
+CONT = (0, 2, 4, 6)          # 35.92: Gen3 joints 1, 3, 5, 7 turn without limits: the start move takes the short way
+TRACK_STEPS = 5              # 35.92: steps in a row over --track-max before the tracking hold
+
+
+def rebase(q, meas):
+    """35.92: every target sent to the arm, its continuous joints written within half a turn of the measured angle.
+    The Kortex URDF declares joints 1, 3, 5, 7 continuous and its joint_trajectory_controller (Humble 2.54) sets no
+    angle wraparound: if the hardware reports wrapped angles while the command model keeps counting past +-pi, the
+    controller would interpolate the long way round (a full turn). Rebased, each step is the short move either way
+    (Gazebo / mock hardware: no change, their angles are not wrapped and the model follows them)."""
+    r = np.array(q, float).copy()
+    for i in CONT:
+        r[i] = meas[i] + kin.wrap(r[i] - meas[i])
+    return r
 
 
 class Demo(Node):
@@ -484,6 +498,10 @@ def main():
                     help='mode-1 steering: mix (35.67, weighted over the candidates, exits on mismatch) or lead (35.63)')
     ap.add_argument('--zone', type=float, default=0.12, help='m; assist only this close (y-z) to an object; 0 = off')
     ap.add_argument('--log', default='assist_ros.csv')
+    ap.add_argument('--start-rate', type=float, default=20.0,
+                    help='deg/s: the move to the start pose is slow enough that no joint turns faster (35.92)')
+    ap.add_argument('--track-max', type=float, default=0.04,
+                    help='m: measured vs commanded tool point; over it for 5 steps -> hold until a relax (35.92)')
     ap.add_argument('--limit', type=float, default=None, help='s (default: demo 60, keys 300)')
     a = ap.parse_args()
     rclpy.init()
@@ -508,6 +526,10 @@ def main():
     t0 = time.time()
     while not all(j in n.q for j in JOINTS) and time.time() - t0 < 10:
         rclpy.spin_once(n, timeout_sec=0.1)
+    if not all(j in n.q for j in JOINTS) and a.mode != 'scene':
+        print('no /joint_states for all 7 joints within 10 s: not moving (is the driver up?)', flush=True)
+        rclpy.shutdown()
+        return
     if a.mode == 'home':
         import json
         home = np.radians(json.load(open(os.path.join(HERE, 'poses_sim.json'), encoding='utf-8'))['home'])
@@ -528,16 +550,23 @@ def main():
         q = min(safe, key=NS.lateral)
     else:
         q = max(good, key=kin.margin) if good else min(sols, key=lambda qq: np.linalg.norm(kin.fk(qq)[:3, 3] - X0))
+    q_now = n.joints()
+    for i in CONT:                                      # 35.92: the short way for the continuous joints
+        q[i] = q_now[i] + kin.wrap(q[i] - q_now[i])
+    t_start = max(4.0, float(np.abs(q - q_now).max()) / np.radians(a.start_rate))
     q_rest = q.copy()                                   # the posture task pulls back toward the start posture
     err0 = np.linalg.norm(kin.fk(q)[:3, 3] - X0)
     print(f'start pose solved: tool error {1000 * err0:.1f} mm, joints >= {np.degrees(kin.margin(q)):.0f} deg from their '
           f'limits, elbow + wrist {100 * NS.lateral(q):.1f} cm off the base-tool plane, joints '
-          f'{np.round(np.degrees([kin.wrap(v) for v in q])).astype(int).tolist()} deg; moving there (4 s)')
+          f'{np.round(np.degrees([kin.wrap(v) for v in q])).astype(int).tolist()} deg; moving there: largest joint '
+          f'change {np.degrees(np.abs(q - q_now).max()):.0f} deg in {t_start:.1f} s')
     n.gripper(0.0)
-    n.send(q, 4.0)
+    n.send(q, t_start)
     t1 = time.time()
-    while time.time() - t1 < 4.5:
+    while time.time() - t1 < t_start + 0.5:
         rclpy.spin_once(n, timeout_sec=0.05)
+    e_start = float(np.linalg.norm(kin.fk(n.joints())[:3, 3] - kin.fk(q)[:3, 3]))
+    print(f'at the start pose: measured tool {1000 * e_start:.1f} mm from the commanded one', flush=True)
     if a.mode == 'start':
         print('at the start pose, tool', np.round(kin.fk(n.joints())[:3, 3], 3).tolist(), ', gripper open')
         rclpy.shutdown()
@@ -584,7 +613,9 @@ def main():
     CLS9 = {'up': 0, 'down': 1, 'left': 2, 'right': 3, 'rest': 8}
     n_ranges = 0
     n_guard = 0
-    log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z,shelf\n')     # 35.89: + locked shelf (modes)
+    n_track, track_n, track_hold, e_max = 0, 0, False, 0.0      # 35.92 tracking check
+    # 35.89: + shelf; 35.92: + track_err, wall (unix s at the step start: loop stalls show as gaps)
+    log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z,shelf,track_err,wall\n')
     try:
         for k in range(int(a.limit / A.DT)):
             tk = time.time()
@@ -612,7 +643,7 @@ def main():
                 continue
             if cmd == 'home':                           # h: back to the start pose, control continues
                 print('  >> 回到起點（3 秒），之後繼續控制' + ('；物體還夾著' if sa.grip else ''), flush=True)
-                n.send(q_rest, 3.0)
+                n.send(rebase(q_rest, n.joints()), 3.0)
                 t2 = time.time()
                 while time.time() - t2 < 3.2:
                     rclpy.spin_once(n, timeout_sec=0.05)
@@ -677,19 +708,31 @@ def main():
             if bool(sa.grip) != gripped:
                 n.gripper(float(sa.grip))
                 gripped = bool(sa.grip)
+            # 35.92: tracking check: the arm must follow the commands (blocked, faulted or stopped by hand -> hold)
+            e_tr = float(np.linalg.norm(kin.fk(n.joints())[:3, 3] - kin.fk(q)[:3, 3]))
+            e_max = max(e_max, e_tr)
+            track_n = track_n + 1 if e_tr > a.track_max else 0
+            if track_n >= TRACK_STEPS and not track_hold:
+                track_hold, n_track = True, n_track + 1
+                q = n.joints().copy()                   # resync the command model to where the arm really is
+                print(f'  !! the arm is {100 * e_tr:.1f} cm from where it was sent: holding; relax to go on', flush=True)
+            if track_hold:
+                if cmd in ('rest', None):
+                    track_hold, track_n = False, 0
+                v = np.zeros(3)
             v, hit = guard(v, kin.fk(q)[:3, 3], A.DT)           # 35.85: workspace box on everything sent to the arm
             if hit:
                 n_guard += 1
             q_prev = q.copy()
             q = kin.ik_step(q, v, RD, A.DT, posture=True, q_rest=q_rest)
             qd = (q - q_prev) / A.DT if a.vel else None
-            n.send(q, A.DT * a.seg, qd)
+            n.send(rebase(q, n.joints()), A.DT * a.seg, qd)     # 35.92: continuous joints the short way
             q_prev = q.copy()
             P = sa.probs()
             code, hg = n.markers(sa.obj, P, sa, a.target if a.mode == 'demo' else -1, kin.fk(q)[:3, 3])
             hist.append(kin.fk(q)[:3, 3])
             log.write(f'{k * A.DT:.1f},{want},{cmd},{sa.state},{sa.goal},{P[0]:.3f},{P[1]:.3f},{P[2]:.3f},'
-                      f'{x[0]:.4f},{x[1]:.4f},{x[2]:.4f},{getattr(sa, "shelf", None)}\n')
+                      f'{x[0]:.4f},{x[1]:.4f},{x[2]:.4f},{getattr(sa, "shelf", None)},{e_tr:.4f},{tk:.3f}\n')
             log.flush()
             if live and isinstance(sa, M.ModeAssist):
                 if (code, hg, sa.hint_zh) != last_hint:
@@ -728,6 +771,7 @@ def main():
         rclpy.spin_once(n, timeout_sec=0.05)
     qs = n.joints()
     print('commanded vs simulator joints, max diff deg:', round(float(np.degrees(np.abs(qs - q)).max()), 2))
+    print(f'tracking: largest measured-commanded distance {1000 * e_max:.1f} mm; holds {n_track}', flush=True)
     print(f'workspace box stops: {n_guard} steps' + (f'; deadman stops: {poll.deadman_count()}' if a.mode == 'board' else '')
           + (f'; range labels sent: {n_ranges}' if a.mode == 'board' else ''))
     print('tool now (fk of simulator joints):', np.round(kin.fk(qs)[:3, 3], 3).tolist())

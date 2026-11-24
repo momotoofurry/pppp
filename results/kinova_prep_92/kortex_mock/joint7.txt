@@ -1,0 +1,1 @@
+joint_7 in the first 40 s: first -2.90 min -4.66 max -2.90 last -4.62 rad

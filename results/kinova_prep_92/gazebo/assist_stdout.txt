@@ -1,0 +1,78 @@
+start pose solved: tool error 0.0 mm, joints >= 16 deg from their limits, elbow + wrist 0.6 cm off the base-tool plane, joints [-3, 29, -2, 137, -5, -75, 92] deg; moving there: largest joint change 137 deg in 6.8 s
+at the start pose: measured tool 1.6 mm from the commanded one
+ready. Click this terminal first (not the RViz window), then: w up, s down, a left, d right,
+space = relax (stop), h = back to the start (keeps control), q = quit. A key keeps moving until another key. Seen from behind the arm: object 0 left-low, 1 right-high, 2 middle-low.
+two modes: MODE 1 = free (W/S/A/D up/down/left/right in front of the shelves); stop in front of an object or a shelf -> MODE 2 = W in / S out (A/D do nothing inside a shelf); back out with S -> MODE 1. At an object / a spot on a shelf: space 1 s = grasp / put down. E = switch mode by hand, H = back to the start (mode 1 only).
+  >> 模式 1：自由控制（W／S／A／D 上下左右）
+  assist: mode1
+  board connected (udp_tcp_relay.py)
+  board: left       -> left
+  board: down       -> down
+  board: left       -> left
+  board: down       -> down
+  board: left       -> left
+  board: down       -> down
+  board: left       -> left
+  board: down       -> down
+  board: left       -> left
+  board: down       -> down
+  board: left       -> left
+  board: down       -> down
+  board: left       -> left
+  board: down       -> down
+  board: left       -> left
+  >> 模式 1：系統猜是物體 0，在它前面停下就切到模式 2
+  board: down       -> down
+  board: left       -> left
+  board: down       -> down
+  board: left       -> left
+  board: down       -> down
+  board: none       -> rest
+  >> 模式 2：鎖定物體 0，W 接近、S 退出
+  ===== 模式 2：W 前進、S 後退 =====
+  assist: mode2-pick, goal object 0
+  board: up         -> up
+  >> 模式 2：到了物體 0，空白鍵放鬆 1 秒夾起
+  board: none       -> rest
+  >> 模式 2：按 S 退回前方平面，退回後自動回模式 1
+  assist: mode2-out
+  board: down       -> down
+  >> 已切到模式 1：W／S 要先放鬆（空白鍵）再出力；A／D 可以直接動
+  ===== 模式 1：上下左右 =====
+  assist: mode1
+  board: none       -> rest
+  >> 模式 1：夾著物體 0，自由移動；在架子前方停下就切到模式 2 放置
+  board: right      -> right
+  board: none       -> rest
+  board: right      -> right
+  board: none       -> rest
+  >> 模式 2：放到架子 3，W 放進去、S 退出
+  ===== 模式 2：W 前進、S 後退 =====
+  assist: mode2-place
+  board: up         -> up
+  board: no heartbeat for 0.5 s -> stop
+  board: none       -> rest
+  board: up         -> up
+  >> 模式 2：W／S 調整深度，空白鍵放鬆 1 秒放下
+  board: none       -> rest
+  >> 正在把物體放到架面上
+  [標籤] 這次確認 179 個視窗：up 60、down 30、right 64、rest 25
+  >> 模式 2：按 S 退回前方平面，退回後自動回模式 1
+  assist: mode2-out
+  board connection closed: stop
+Traceback (most recent call last):
+  File "/home/momo1234/model-leaf/src/pc/sim/assist_ros.py", line 782, in <module>
+    main()
+  File "/home/momo1234/model-leaf/src/pc/sim/assist_ros.py", line 758, in main
+    rclpy.spin_once(n, timeout_sec=0.01)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/__init__.py", line 206, in spin_once
+    executor.spin_once(timeout_sec=timeout_sec)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 751, in spin_once
+    self._spin_once_impl(timeout_sec)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 740, in _spin_once_impl
+    handler, entity, node = self.wait_for_ready_callbacks(timeout_sec=timeout_sec)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 723, in wait_for_ready_callbacks
+    return next(self._cb_iter)
+  File "/opt/ros/humble/local/lib/python3.10/dist-packages/rclpy/executors.py", line 624, in _wait_for_ready_callbacks
+    raise ExternalShutdownException()
+rclpy.executors.ExternalShutdownException
