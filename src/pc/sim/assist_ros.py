@@ -584,7 +584,7 @@ def main():
     CLS9 = {'up': 0, 'down': 1, 'left': 2, 'right': 3, 'rest': 8}
     n_ranges = 0
     n_guard = 0
-    log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z\n')
+    log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z,shelf\n')     # 35.89: + locked shelf (modes)
     try:
         for k in range(int(a.limit / A.DT)):
             tk = time.time()
@@ -689,7 +689,7 @@ def main():
             code, hg = n.markers(sa.obj, P, sa, a.target if a.mode == 'demo' else -1, kin.fk(q)[:3, 3])
             hist.append(kin.fk(q)[:3, 3])
             log.write(f'{k * A.DT:.1f},{want},{cmd},{sa.state},{sa.goal},{P[0]:.3f},{P[1]:.3f},{P[2]:.3f},'
-                      f'{x[0]:.4f},{x[1]:.4f},{x[2]:.4f}\n')
+                      f'{x[0]:.4f},{x[1]:.4f},{x[2]:.4f},{getattr(sa, "shelf", None)}\n')
             log.flush()
             if live and isinstance(sa, M.ModeAssist):
                 if (code, hg, sa.hint_zh) != last_hint:

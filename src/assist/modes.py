@@ -155,8 +155,10 @@ class ModeAssist:
     def has_room(self, k):
         """35.89: is there a spot on shelf k where the held object may be put down (spot_ok over the shelf)"""
         sh = self.shelves[k]
-        for dy in np.linspace(-(SHELF_HY - EDGE), SHELF_HY - EDGE, 9):
-            for dx in np.linspace(-(SHELF_HX - EDGE), SHELF_HX - EDGE, 5):
+        # 1 mm inside the edge limit: exactly on it, rounding made spot_ok refuse (Gazebo rehearsal 35.89: a shelf
+        # with one object in the middle came out full although its corners fit another one)
+        for dy in np.linspace(-(SHELF_HY - EDGE - 0.001), SHELF_HY - EDGE - 0.001, 9):
+            for dx in np.linspace(-(SHELF_HX - EDGE - 0.001), SHELF_HX - EDGE - 0.001, 5):
                 if self.spot_ok(np.array([sh[0] + dx, sh[1] + dy, sh[2] + OBJ_H / 2]), k)[0]:
                     return True
         return False

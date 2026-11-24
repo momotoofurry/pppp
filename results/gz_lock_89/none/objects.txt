@@ -1,0 +1,10 @@
+== objects at start
+object_0: x 0.750 y 0.250 z 0.099  tilt 0.0 deg  (ok)
+object_1: x 0.700 y -0.250 z 0.299  tilt 0.0 deg  (ok)
+object_2: x 0.770 y -0.000 z 0.099  tilt 0.0 deg  (ok)
+== objects after
+object_0: x 0.732 y -0.244 z 0.099  tilt 0.0 deg  (ok)
+object_1: x 0.700 y -0.250 z 0.299  tilt 0.0 deg  (ok)
+object_2: x 0.770 y -0.000 z 0.099  tilt 0.0 deg  (ok)
+attached object_0 (centre 6 mm from the tool)
+released object_0 at [0.732, -0.244, 0.098]
