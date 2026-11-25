@@ -6,6 +6,35 @@
 
 > 第一次來？先讀 [`docs/接手指南.md`](docs/接手指南.md)：研究做到哪裡、先跑什麼、哪些試過沒用、哪些坑要避開。
 
+```mermaid
+flowchart LR
+    T["Delsys Trigno<br/>4 sEMG sensors, 2 kHz"] -->|TCP| B["PC: TrignoBridge<br/>forwards raw samples only"]
+    B -->|"UART 921600"| M["STM32H753<br/>features, z-score,<br/>shrinkage LDA, decision"]
+    M -->|"commands + heartbeat"| B
+    B -->|UDP| R["udp_tcp_relay"]
+    R -->|TCP| A["ROS 2: assist_ros<br/>two modes, intent lock,<br/>safety layer"]
+    A -->|"joint trajectory"| K["Kinova Gen3<br/>+ Robotiq 2F-85"]
+    A -.->|"task-confirmed labels"| R
+    R -.-> B
+    B -.->|"label ranges"| M
+    B -.->|"MQTT (tools/emg-iot)"| G["TimescaleDB + Grafana<br/>signal-quality alerts"]
+```
+
+## 實測指標
+
+| 指標 | 數值 | 怎麼量的 | report |
+|---|---|---|---|
+| PC 送出視窗 → 收到板子的分類結果 | P50 6.70 ms、P95 7.20 ms、P99 7.38 ms | 板子實測（FreeRTOS 版，含學習 task 滿載的壓力測試），PC 時鐘，含 UART 傳輸 | 35.37 |
+| 用標籤更新模型（收縮 LDA 重解） | 3.9 ms（任務標籤一次 4.7 ms，在低優先 task，分類延遲不變） | 板子實測，480 MHz | 35.23、35.37 |
+| 板子和 PC 參考實作 | 預測**逐視窗相同** | 同一份 C 程式、同一份資料 | 35.13–35.14、35.39 |
+| 韌體 | Flash 映像 26,056 bytes；靜態 RAM 370,220 bytes（512 KB 的 70.6 %，含 256 個視窗的標籤緩衝） | linker 輸出，可從 `firmware/` 逐位元重建 | 35.102 |
+| 每次配戴一輪短校正的效果 | 下一次配戴 47.4 %，不校正 37.2 %（8 類，10 人） | NinaPro DB6，公開資料 | 35.38 |
+| S7 手勢組（作者本人，兩次配戴） | 離線視窗準確率 82.6 %（取對數的前端 86.2 %，待確認） | 自我測試 | 35.80、35.97 |
+| 控制層轉送 | 來回 1.0 ms | relay 的 ack | 35.85 |
+| 閉迴路拿取放置（模擬：真韌體＋真實錄音） | 成功 99.8 %、每次約 54 s（擁擠場景） | 400 個試驗 | 35.100 |
+
+實機 Kinova 還沒做（設計和工具已就緒，見 `lab_kit/實驗設計_Kinova實機.md`）。
+
 ## 研究問題
 
 | | 問題 | 主要結果在 |
@@ -56,6 +85,10 @@ python3 ../pc/sim/kinova_trials_test.py | tail -1
 ```
 
 輔助控制的測試只需要 numpy。要跑閉迴路模擬或分析，需要資料（[`docs/資料.md`](docs/資料.md)）。
+
+## 訊號品質監控（tools/emg-iot）
+
+邊緣節點每 100 ms 送一筆訊號品質（各通道 RMS、60 Hz 干擾量、預測、標籤）到 MQTT；後端驗證格式、偵測掉包，寫進 TimescaleDB，Grafana 顯示漂移並發出告警。告警規則來自研究發現：60 Hz 市電干擾是間歇的，常在受試者「放鬆」時出現，整段平均看不出來，但會讓模型把干擾學成「放鬆」（report 35.97）。用 Docker Compose 一行啟動，見 [`tools/emg-iot/README.md`](tools/emg-iot/README.md)。
 
 ## 研究的方法慣例
 
