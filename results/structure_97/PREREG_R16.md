@@ -33,3 +33,11 @@ A condition is a CANDIDATE for the next firmware if mean dA >= +2 points over th
 Otherwise it is not adopted. n = 1 person, 2 days: a candidate is CONFIRMED only if the same holds on next week's S7
 recording (T00_d1_S, T00_d2_S), analysed offline with this exact code; the frozen board firmware (rtl_task_s7f) and the
 frozen P1/P2 rules for next week are NOT changed either way.
+
+## Addendum R16b (written after the self-test result, BEFORE running it): does L generalise to other people?
+Self-test result: L and N+U+L are candidates (r16_S7.txt); N, U, N+U are not.
+Test L on NinaPro DB6 (10 people, 9 later sessions each, db6_sim.py protocol, features precomputed, so N cannot be
+tested and U does not apply: DB6 has 8 distinct channels). Same transform: log of RMS, WL, MAV of every channel, before
+the day-1 z-score. Methods: fixed, cue1 (one cued pass per session, accumulated; this study's method), within.
+R16b: L generalises if cue1(L) - cue1(B0) >= +1 point with the paired 95 % t CI over the 10 people above 0.
+Reported, not decided: fixed and within.
