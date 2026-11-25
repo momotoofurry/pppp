@@ -71,6 +71,7 @@ flowchart LR
 | `src/pc/s7_test/` | 演練和檢查腳本（Gazebo 彩排、故障注入、時間穩定性） |
 | `lab_kit/` | 實驗室用的操作程序：`SOP_自我測試.md`、`SOP_Kinova實機.md`、`實驗設計_Kinova實機.md` |
 | `tools/emg-iot/` | 副專案：MQTT → TimescaleDB → Grafana 的訊號品質監控 |
+| `tools/local-monitor/` | 本地 AI 監看：規則偵測異常，本機 LLM（Ollama）寫成中文說明；只讀紀錄、不送指令 |
 | `docs/` | 接手指南、論文初稿、計畫書、設計筆記、文獻、資料取得方式、report 索引、早期路線的文件 |
 | `report.md` | **研究紀錄的正本**：每個實驗的做法、判準、數字、結果檔，依時間排列（第 35 節是現在的主線） |
 | `results/` | 每個 report 節次的輸出（CSV、文字報告） |
