@@ -6930,3 +6930,17 @@ PC 上，探索性。要回答口試或審稿常問的問題：為什麼用 LDA�
 2. `wsl --shutdown` 重開；
 3. `loop_jitter.py 300`：要 PASS，速率 < 0.1 %、tick 10000；
 4. 隔一段時間（例如筆電睡眠喚醒之後）再跑一次，看 tick 會不會再被改。
+
+**35.109 補充：修正與驗證（2026-11-25 晚）**：
+- 使用者執行了 `wsl --shutdown`。第一次的 `sudo systemctl disable --now systemd-timesyncd` 透過 `wsl -- sudo` 沒有生效（非互動模式不能輸入密碼），之後在 WSL 終端機手動執行才成功（inactive、disabled）。
+- **重開後 3 分鐘內 tick 又變成 9596**：timesyncd 被關掉前就已經在改；而且 tick 改了之後不會自己恢復。
+- 那段時間的 300 s 檢查：速率 −2.18 %，牆上時鐘跳動 10 次，真的停住 0 次（結束時 tick 已被拉回 10000、freq −99.7 ppm）。
+- **關掉 timesyncd 之後**（`tick_watch.py`，180 s，每 2 s 讀一次）：
+  - tick 9998–10003，freq ±150 ppm 以內；
+  - 每 2 s 的速率 0.00–0.02 %；
+  - 牆上時鐘沒有跳動。
+  - 只剩 WSL 自己的時間同步在做小幅調整，這是正常的。
+- **`loop_jitter.py 300`：PASS**（真的停住 0、時鐘跳動 0、速率 +0.006 %、tick 10000）。
+- **判斷**：tick 被改成約 9470、單調時鐘慢 5 %，是 WSL 的時間同步（hv_utils）和 systemd-timesyncd 互相拉扯造成的。這只是根據「關掉 timesyncd 就消失」的推論，沒有直接看到是誰呼叫了 adjtimex。
+- **還要確認的**：筆電睡眠或休眠喚醒之後再跑一次 `loop_jitter.py 300`（35.93 曾經在喚醒前後看到不同的結果）。
+- 副作用：`wsl --shutdown` 會中斷 Docker Desktop 的 WSL 整合，要在 Docker Desktop 按「Restart the WSL integration」或重開 Docker Desktop。
