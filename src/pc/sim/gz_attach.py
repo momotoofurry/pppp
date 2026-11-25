@@ -26,7 +26,7 @@ from sensor_msgs.msg import JointState
 
 import kin
 
-N_OBJ = 3
+N_OBJ = int(os.environ.get('ASSIST_N_OBJ', '3'))   # 35.101: 6 for the crowded scene
 ATTACH, DETACH = 0.05, 0.03            # rad, left knuckle (0 = open, 0.8 = closed)
 REACH = 0.03                           # m, object centre to tool point when the gripper starts closing
 SETTLE = 0.5                           # s the object is still held where it was put after the gripper has opened

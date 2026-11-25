@@ -74,6 +74,7 @@ import kin  # noqa: E402
 import modes as M
 import natural_start as NS
 import labeler as LB  # noqa: E402
+import scenes as SC  # noqa: E402
 
 JOINTS = [f'joint_{i}' for i in range(1, 8)]
 RD = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]], float)      # tool z forward (+x); tool x (the 2F-85 finger axis) horizontal, so the fingers close sideways on an upright object (35.64)
@@ -471,6 +472,7 @@ def boardreader(listen, grip, events_path, deadman):
 
 
 def main():
+    global OBJECTS, SHELVES
     ap = argparse.ArgumentParser()
     ap.add_argument('mode', choices=['demo', 'keys', 'board', 'scene', 'home', 'start'])
     ap.add_argument('--listen', default='127.0.0.1:50560', help='board: TCP address for udp_tcp_relay.py (35.82)')
@@ -504,7 +506,13 @@ def main():
     ap.add_argument('--track-max', type=float, default=0.04,
                     help='m: measured vs commanded tool point; over it for 5 steps -> hold until a relax (35.92)')
     ap.add_argument('--limit', type=float, default=None, help='s (default: demo 60, keys 300)')
+    ap.add_argument('--scene', default='3obj', help='35.101: 3obj | crowded | <layout>.json (scenes.py)')
+    ap.add_argument('--trial-port', type=int, default=0,
+                    help='35.101: UDP port on 127.0.0.1 for the trial logger (reset,<id>[,force]); 0 = off')
+    ap.add_argument('--task-events', default='task_events.csv',
+                    help='35.101: grasp / put-down / lock / reset events for the trial logger')
     a = ap.parse_args()
+    OBJECTS, SHELVES = SC.load(a.scene)
     rclpy.init()
     n = Demo()
     if a.mode == 'scene':
@@ -574,8 +582,11 @@ def main():
         return
     live = a.mode in ('keys', 'board')                 # 35.82: the board drives the same control as the keys
     if live and a.modes:
-        sa = M.ModeAssist(OBJECTS, SHELVES, level=a.level, zone=(a.zone if a.zone > 0 else None), rule=a.rule,
-                          grip_cmds=(a.mode == 'board' and a.grip == 'gripper'), lock_rule=a.lock_rule)
+        def make_sa():                              # 35.101: a fresh assist (objects back at the start) per trial
+            return M.ModeAssist(OBJECTS.copy(), SHELVES, level=a.level, zone=(a.zone if a.zone > 0 else None),
+                                rule=a.rule, grip_cmds=(a.mode == 'board' and a.grip == 'gripper'),
+                                lock_rule=a.lock_rule)
+        sa = make_sa()
     else:
         sa = A.Assist(OBJECTS, mode=a.assist, level=a.level, keep=(a.mode == 'keys'), shelves=SHELVES,
                       zone=(a.zone if a.zone > 0 else None))
@@ -617,10 +628,58 @@ def main():
     n_track, track_n, track_hold, e_max = 0, 0, False, 0.0      # 35.92 tracking check
     # 35.89: + shelf; 35.92: + track_err, wall (unix s at the step start: loop stalls show as gaps)
     log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z,shelf,track_err,wall\n')
+    # 35.101: task events for the trial logger (kinova_trials.py) and its reset channel
+    tev = open(a.task_events, 'w', encoding='utf-8')
+    tev.write('unix_ms,step,event,a,b,detail\n')
+
+    def tevent(step, ev, v1='', v2='', detail=''):
+        tev.write(f'{time.time() * 1000:.1f},{step},{ev},{"" if v1 is None else v1},{"" if v2 is None else v2},{detail}\n')
+        tev.flush()
+    tsock = None
+    if a.trial_port and isinstance(sa, M.ModeAssist):
+        tsock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        tsock.bind(('127.0.0.1', a.trial_port))
+        tsock.setblocking(False)
+        print(f'trial channel: UDP 127.0.0.1:{a.trial_port}; events -> {a.task_events}', flush=True)
+    tevent(0, 'ready', len(OBJECTS), len(SHELVES), a.scene)
     try:
         for k in range(int(a.limit / A.DT)):
             tk = time.monotonic()
             x = kin.fk(q)[:3, 3]
+            msg = None
+            if tsock is not None:                       # 35.101: the trial logger asks for a new trial
+                try:
+                    msg = tsock.recv(256).decode('ascii', 'replace').strip().split(',')
+                except (BlockingIOError, OSError):
+                    msg = None
+            if msg and msg[0] == 'reset':
+                tid = msg[1] if len(msg) > 1 else ''
+                force = len(msg) > 2 and msg[2] == 'force'
+                if sa.m != 1:
+                    tevent(k, 'reset_refused', tid, '', 'mode2')
+                    print('  >> 新試驗：先用 S 退回前方平面（模式 1）', flush=True)
+                elif sa.held is not None and not force:
+                    tevent(k, 'reset_refused', tid, '', 'holding')
+                    print('  >> 新試驗：夾爪還夾著物體，協助者扶住後才能張開', flush=True)
+                else:
+                    print(f'  >> 新試驗 {tid}：張開夾爪、回到起點（3 秒）', flush=True)
+                    n.gripper(0.0)
+                    gripped = False
+                    n.send(rebase(q_rest, n.joints()), 3.0)
+                    t2 = time.monotonic()
+                    while time.monotonic() - t2 < 3.2:
+                        rclpy.spin_once(n, timeout_sec=0.05)
+                    q = q_rest.copy()
+                    sa = make_sa()
+                    if lab is not None:
+                        lab = LB.Labeler(sa)
+                    lab_x.clear()
+                    lab_w.clear()
+                    hist = [kin.fk(q)[:3, 3]] * (S.REACT + 1)
+                    last_state, last_hint, last_mode = None, None, 1
+                    track_n, track_hold = 0, False
+                    tevent(k, 'reset_done', tid)
+                    continue
             if a.mode == 'demo':
                 if a.assist == 'blend':
                     want, held = S.user_blend(sa, OBJECTS, a.target, hist[-1 - S.REACT], held, dec.est)
@@ -664,7 +723,14 @@ def main():
                 lab_x[lab.k] = (k * A.DT, x.copy())
                 if a.mode == 'board':
                     lab_w[lab.k] = poll.window_now()
+            h0 = getattr(sa, 'held', None)
             v = sa.step(cmd if cmd != 'rest' else None, x)
+            h1 = getattr(sa, 'held', None)
+            if h0 is None and h1 is not None:
+                tevent(k, 'grasp', h1)
+            if h0 is not None and h1 is None:            # 35.101: put down: on which shelf it stands now
+                p_ = sa.obj[h0]
+                tevent(k, 'putdown', h0, SC.shelf_of(p_, sa.shelves), f'{p_[0]:.3f} {p_[1]:.3f} {p_[2]:.3f}')
             if a.mode == 'board' and isinstance(sa, M.ModeAssist):
                 if held0 is None and sa.held is not None:
                     sa.base.prior = None                    # 35.86: the object prior is used up at the grasp
@@ -751,6 +817,9 @@ def main():
                       flush=True)
             if live and (sa.state, sa.goal) != last_state:
                 last_state = (sa.state, sa.goal)
+                if isinstance(sa, M.ModeAssist) and sa.m == 2 and sa.phase in ('pick', 'place'):
+                    tevent(k, 'lock_obj' if sa.phase == 'pick' else 'lock_shelf',
+                           sa.goal if sa.phase == 'pick' else sa.shelf)
                 print(f'\r  assist: {sa.state}' + (f', goal object {sa.goal}' if sa.goal is not None else ''), flush=True)
             if sa.state == 'done':
                 print(f'done at {k * A.DT:.1f} s: grasped object {sa.goal}' + (f' (target {a.target})' if a.mode == 'demo' else ''))
@@ -765,6 +834,7 @@ def main():
         if restore:
             restore()
         log.close()
+        tev.close()
         if labf:
             labf.close()
     t2 = time.monotonic()

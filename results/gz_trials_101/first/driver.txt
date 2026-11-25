@@ -1,0 +1,50 @@
+   6.3 s  trial 1: object 0 -> shelf 3
+   6.3 s  mode1        goal None shelf None  x=(0.580,-0.000,0.350)  phase to_obj
+  19.9 s  mode2-pick   goal 0 shelf None  x=(0.600,-0.283,0.106)  phase to_obj
+  25.4 s  mode2-out    goal None shelf None  x=(0.715,-0.289,0.101)  phase grasp
+  28.3 s  mode1        goal None shelf None  x=(0.604,-0.289,0.101)  phase out
+  35.8 s  mode2-place  goal None shelf 3  x=(0.600,-0.257,0.332)  phase carry
+  42.3 s  mode2-out    goal None shelf 3  x=(0.727,-0.256,0.301)  phase in
+  42.3 s  put down
+  45.5 s  mode1        goal None shelf None  x=(0.604,-0.256,0.301)  phase out2
+  48.9 s  trial 2: object 5 -> shelf 3
+  62.5 s  mode2-pick   goal 5 shelf None  x=(0.600,0.283,0.106)  phase to_obj
+  68.1 s  mode2-out    goal None shelf None  x=(0.715,0.289,0.101)  phase grasp
+  71.0 s  mode1        goal None shelf None  x=(0.603,0.289,0.102)  phase out
+  90.3 s  mode2-place  goal None shelf 3  x=(0.600,-0.244,0.335)  phase carry
+  97.0 s  mode2-out    goal None shelf 3  x=(0.727,-0.243,0.300)  phase in
+  97.0 s  put down
+ 100.2 s  mode1        goal None shelf None  x=(0.604,-0.243,0.300)  phase out2
+ 103.6 s  trial 3: object 2 -> shelf 4
+ 111.3 s  mode2-pick   goal 2 shelf None  x=(0.600,-0.033,0.105)  phase to_obj
+ 116.8 s  mode2-out    goal None shelf None  x=(0.714,-0.040,0.101)  phase grasp
+ 119.7 s  mode1        goal None shelf None  x=(0.603,-0.040,0.102)  phase out
+ 127.3 s  mode2-place  goal None shelf 4  x=(0.600,-0.004,0.332)  phase carry
+ 133.8 s  mode2-out    goal None shelf 4  x=(0.727,-0.004,0.300)  phase in
+ 133.8 s  put down
+ 137.0 s  mode1        goal None shelf None  x=(0.604,-0.004,0.301)  phase out2
+ 140.4 s  trial 4: object 4 -> shelf 5
+ 151.9 s  mode2-pick   goal 4 shelf None  x=(0.600,0.203,0.106)  phase to_obj
+ 157.6 s  mode2-out    goal None shelf None  x=(0.717,0.209,0.101)  phase grasp
+ 160.6 s  mode1        goal None shelf None  x=(0.602,0.209,0.101)  phase out
+ 167.9 s  mode2-place  goal None shelf 5  x=(0.600,0.245,0.328)  phase carry
+ 174.3 s  mode2-out    goal None shelf 5  x=(0.727,0.244,0.300)  phase in
+ 174.3 s  put down
+ 177.5 s  mode1        goal None shelf None  x=(0.604,0.244,0.301)  phase out2
+ 180.8 s  trial 5: object 3 -> shelf 4
+ 188.6 s  mode2-pick   goal 3 shelf None  x=(0.600,0.036,0.108)  phase to_obj
+ 194.0 s  mode2-out    goal None shelf None  x=(0.715,0.040,0.101)  phase grasp
+ 196.9 s  mode1        goal None shelf None  x=(0.604,0.040,0.102)  phase out
+ 204.2 s  mode2-place  goal None shelf 4  x=(0.600,0.008,0.332)  phase carry
+ 210.8 s  mode2-out    goal None shelf 4  x=(0.724,0.008,0.300)  phase in
+ 210.8 s  put down
+ 213.9 s  mode1        goal None shelf None  x=(0.605,0.008,0.301)  phase out2
+ 217.3 s  trial 6: object 1 -> shelf 5
+ 229.1 s  mode2-pick   goal 1 shelf None  x=(0.600,-0.203,0.105)  phase to_obj
+ 234.6 s  mode2-out    goal None shelf None  x=(0.715,-0.209,0.101)  phase grasp
+ 237.5 s  mode1        goal None shelf None  x=(0.604,-0.209,0.101)  phase out
+ 255.0 s  mode2-place  goal None shelf 5  x=(0.600,0.244,0.335)  phase carry
+ 261.6 s  mode2-out    goal None shelf 5  x=(0.727,0.243,0.300)  phase in
+ 261.6 s  put down
+ 264.8 s  mode1        goal None shelf None  x=(0.604,0.243,0.301)  phase out2
+ 265.8 s  mode2-pick   goal 1 shelf None  x=(0.604,0.243,0.301)  phase wait

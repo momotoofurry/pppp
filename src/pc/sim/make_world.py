@@ -1,10 +1,15 @@
 """writes src/pc/sim/assist_world.world: the assist demo's scene (assist_ros.py OBJECTS / SHELVES) as Gazebo Classic
 models. Shelves: static boards 20 x 16 x 2 cm (tops at the SHELVES heights). Objects: cylinders r 3 cm, h 10 cm,
 0.1 kg, high friction and soft contacts so the 2F-85 can hold them. The robot is spawned at the world origin."""
+import os
 import sys
 
-OBJ = [(0.75, 0.25, 0.10), (0.70, -0.25, 0.30), (0.77, 0.0, 0.10)]
-SHELVES = [(x, y, z - 0.05) for x, y, z in OBJ] + [(0.72, -0.25, 0.05), (0.72, 0.25, 0.25)]
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'assist'))
+import scenes as SC  # noqa: E402  (35.101: python3 make_world.py <out> [3obj | crowded | layout.json])
+
+_o, _s = SC.load(sys.argv[2] if len(sys.argv) > 2 else '3obj')
+OBJ = [tuple(map(float, p)) for p in _o]
+SHELVES = [tuple(map(float, p)) for p in _s]
 
 
 def shelf(i, x, y, top):

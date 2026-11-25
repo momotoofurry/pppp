@@ -113,7 +113,35 @@ ros2 launch kortex_bringup gen3.launch.py robot_ip:=<IP> gripper:=robotiq_2f_85 
 | 6.2 | 橋接程式：`--firmware lda --classes 9 --preset s7 --fwd-pred 1 --udp 50556`＋`report 3`；relay：`udp_tcp_relay.py --udp 50556` | assist 印出「board connected」 | ☐ |
 | 6.3 | **deadman 測試**：手臂移動時關掉橋接程式 | 0.5 s 內停，之後不會自己再動 | ☐ |
 | 6.4 | `assist_ros.py board`，**沒有物體**，只練方向和停 | 方向對、停得住 | ☐ |
-| 6.5 | 完整任務 | 依實驗設計 | ☐ |
+| 6.5 | 完整任務：見下面「6.6 試驗紀錄程式」 | 依實驗設計 | ☐ |
+
+### 6.6 試驗紀錄程式（35.101）
+
+**實驗前一天**：產生當天的試驗清單並 commit（每個物體 4 次、放置的架子平均分配、順序隨機）：
+```
+python3 src/pc/sim/kinova_trials.py make --scene <場景> --n 24 --practice 2 --seed <當天的種子> --out trials_T00_k<天>.csv
+```
+
+**實驗時**開兩個 WSL 終端機：
+1. 手臂程式（加上場景和試驗通道）：
+   ```
+   python3 src/pc/sim/assist_ros.py board --scene <場景> --lock-rule intent --level 0.6 --grip gripper --trial-port 50570 --task-events k<天>_task_events.csv --log k<天>_assist_board.csv --events k<天>_board_events.csv --limit 4000
+   ```
+2. 試驗紀錄（協助者操作）：
+   ```
+   python3 src/pc/sim/kinova_trials.py run --scene <場景> --list trials_T00_k<天>.csv --events k<天>_task_events.csv --out k<天>_trials.csv
+   ```
+
+**每個試驗**：
+1. 畫面顯示目標，例如「把【下層中架子的右邊那個】放到【上層左架子】」。
+2. 協助者把**上一個物體從上層架子拿下來、放回原位（照記號）**，6 個物體都在原位後按 Enter。這一步一定要做：軟體會把物體位置重設成起點，實物不在原位，軟體就會判斷錯（Gazebo 演練中，沒歸位的物體重疊後被撞飛）。
+3. 夾爪張開、手臂回到起點（3 秒），畫面出現「開始！」。
+4. 受試者操作。放下後，**協助者回答物體是不是真的站在目標架子上（y／n）**。軟體的「放下」不算證據：Gazebo 演練曾有物體被推走、根本沒被夾到，軟體卻記成成功。
+5. 要中止（急停、掉落）：協助者輸入 `x` 再按 Enter，輸入原因。
+
+**新的試驗前，手臂要在模式 1**：在架子裡面（模式 2）時程式會拒絕重設，請受試者先用 S 退出；夾爪還夾著物體時，協助者扶住物體再按 Enter，夾爪才會張開。
+
+**場景**：`crowded` 是模擬用的佈置（中心距 8 cm）。實機要先量 2F-85 手指，決定間距後寫成 JSON（`{"objects": [[x, y, z], ...], "shelves": [[x, y, z], ...]}`），`--scene` 填 JSON 的路徑。Gazebo 演練中，夾中心距 8 cm 的物體時，隔壁的物體被推動了約 1.9 cm。
 
 ## 7. 立刻停止的情況
 

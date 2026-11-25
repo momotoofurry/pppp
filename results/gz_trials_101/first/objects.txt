@@ -1,0 +1,24 @@
+== objects at start
+object_0: x 0.720 y -0.290 z 0.099  tilt 0.0 deg  (ok)
+object_1: x 0.720 y -0.210 z 0.099  tilt 0.0 deg  (ok)
+object_2: x 0.720 y -0.040 z 0.099  tilt 0.0 deg  (ok)
+object_3: x 0.720 y 0.040 z 0.099  tilt 0.0 deg  (ok)
+object_4: x 0.720 y 0.210 z 0.099  tilt 0.0 deg  (ok)
+object_5: x 0.720 y 0.290 z 0.099  tilt 0.0 deg  (ok)
+== objects after
+object_0: x 1.427 y -0.391 z 0.029  tilt 90.0 deg  (ok)
+object_1: x 0.735 y 0.240 z 0.299  tilt 0.0 deg  (ok)
+object_2: x 10.422 y 5.782 z 0.029  tilt 90.0 deg  (ok)
+object_3: x -1.828 y 60.421 z 0.029  tilt 90.0 deg  (ok)
+object_4: x 0.762 y 0.194 z 0.099  tilt 0.3 deg  (ok)
+object_5: x 0.732 y -0.244 z 0.299  tilt 0.0 deg  (ok)
+attached object_0 (centre 6 mm from the tool)
+released object_0 at [0.732, -0.258, 0.298]
+attached object_5 (centre 6 mm from the tool)
+released object_5 at [0.732, -0.244, 0.298]
+attached object_2 (centre 7 mm from the tool)
+released object_2 at [0.733, -0.004, 0.298]
+attached object_3 (centre 12 mm from the tool)
+released object_3 at [0.603, 0.05, 0.259]
+attached object_1 (centre 8 mm from the tool)
+released object_1 at [0.735, 0.24, 0.298]
