@@ -3,7 +3,10 @@ Per-trial results of closed_loop_fw (same seeds -> same targets per row). Design
 block score = median time (failure = 90 s), randomization test over the 2^6 orders (one-sided). Power by resampling."""
 import itertools, numpy as np, pandas as pd
 R = '/work/results/selftest_T00/'
-a = pd.read_csv(R + 'closed_loop_fw_trials99_level0.6.csv'); b = pd.read_csv(R + 'closed_loop_fw_trials99_level0.csv')
+import sys
+TAG = sys.argv[1] if len(sys.argv) > 1 else '99'
+a = pd.read_csv(R + f'closed_loop_fw_trials{TAG}_level0.6.csv'); b = pd.read_csv(R + f'closed_loop_fw_trials{TAG}_level0.csv')
+print('scene tag', TAG)
 assert len(a) == len(b)
 ta = np.where(a.ok, a.time, 90.0); tb = np.where(b.ok, b.time, 90.0)
 same_target = True
