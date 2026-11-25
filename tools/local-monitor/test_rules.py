@@ -39,6 +39,17 @@ for r in s[10:]:
     r['wall'] = str(float(r['wall']) + 1.5)
 check('1.6 s gap: loop_stall high', run([('assist', r) for r in s])[0]['severity'] == 'high')
 s = steps(30)
+for i, r in enumerate(s):                 # 35.109: wall stepped +0.8 s (time sync) while the monotonic clock is steady
+    r['mono'] = str(500 + 0.1 * i)
+    if i >= 15:
+        r['wall'] = str(float(r['wall']) + 0.8)
+check('wall-clock step with a steady mono column: no stall (35.109)', run([('assist', r) for r in s]) == [])
+for r in s[20:]:
+    r['mono'] = str(float(r['mono']) + 0.6)
+al = run([('assist', r) for r in s])
+check('a real 0.7 s stop on the mono column: one stall, marked monotonic',
+      [x['rule'] for x in al] == ['loop_stall'] and al[0]['data']['clock'] == 'monotonic')
+s = steps(30)
 s[10]['wall'] = str(float(s[9]['wall']) + 0.85)
 s[11]['wall'] = str(float(s[10]['wall']) + 1.02)
 for i, r in enumerate(s[12:], 12):

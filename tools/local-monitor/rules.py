@@ -61,6 +61,7 @@ class Detector:
 
     def __init__(self):
         self.prev_wall = None
+        self.prev_mono = None
         self.last_reset_t = None        # a new trial's 3 s move back to the start: a planned gap, not a stall
         self.stall_end = None           # one pause shows as 2-3 slow steps: one alert per episode
         self.track_n = 0
@@ -86,15 +87,22 @@ class Detector:
     def _assist(self, r):
         out = []
         wall, te = num(r.get('wall')), num(r.get('track_err'), 0.0)
-        if wall is not None:
+        mono = num(r.get('mono'))           # 35.109: the monotonic clock (logs since 35.109); the wall clock is
+        if wall is not None:                # stepped by the time sync and gave false stalls (WSL tick 5 % off)
             self.last_step_wall = wall
-            if self.prev_wall is not None and wall - self.prev_wall > STALL_S:
-                gap = wall - self.prev_wall
+            if mono is not None and self.prev_mono is not None:
+                gap = mono - self.prev_mono
+                clock = 'monotonic'
+            else:
+                gap = wall - self.prev_wall if self.prev_wall is not None else 0.0
+                clock = 'wall (no mono column: may be a clock step, report 35.109)'
+            self.prev_mono = mono
+            if self.prev_wall is not None and gap > STALL_S:
                 planned = self.last_reset_t is not None and self.prev_wall < self.last_reset_t <= wall + 0.5
                 same = self.stall_end is not None and self.prev_wall - self.stall_end < EPISODE_S
                 if not planned and not same:
                     out.append(self.alert('loop_stall', 'high' if gap > STALL_HIGH_S else 'warn', wall,
-                                          gap_s=round(gap, 2), step_t=r.get('t'), state=r.get('state')))
+                                          gap_s=round(gap, 2), step_t=r.get('t'), state=r.get('state'), clock=clock))
                 if not planned:
                     self.stall_end = wall
             self.prev_wall = wall

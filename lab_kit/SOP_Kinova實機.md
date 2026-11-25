@@ -21,7 +21,7 @@
 
 | # | 檢查 | 指令 | 通過條件 | ☐ |
 |---|---|---|---|---|
-| 1.1 | 控制電腦的時間穩定性（在 WSL 裡跑） | 先照 1.5 設好電源、`wsl --shutdown` 重開，再 `python3 src/pc/s7_test/loop_jitter.py 300` | **PASS**：300 s 內行程沒有停住超過 0.1 s，系統時鐘也沒有跳動超過 0.05 s。之前的中斷約每 30 s 一次，所以測 300 s 而不是 90 s | ☐ |
+| 1.1 | 控制電腦的時間穩定性（在 WSL 裡跑） | 先照 1.5 設好電源、`wsl --shutdown` 重開，再 `python3 src/pc/s7_test/loop_jitter.py 300` | **PASS**：300 s 內行程沒有停住超過 0.1 s、系統時鐘沒有跳動超過 0.05 s，而且**單調時鐘和硬體時鐘的速率差 < 0.1 %**、kernel tick 是 10000（35.109）。之前「每 30 s 一次的中斷」其實是 tick 被改成約 9470，單調時鐘慢 5.3 %，校時每 30 s 把牆上時鐘撥回去；程式從來沒停 | ☐ |
 | 1.2 | 程式測試 | `modes_test`、`modes_assist_test`、`labeler_test`、`lockrule_test`、`rebase_test` | 都是 ALL OK | ☐ |
 | 1.3 | 實機 launch 的假硬體測試 | `bash src/pc/s7_test/kortex_mock.sh /tmp/kortex_mock` | 介面都在；起始移動走短路；關掉控制器時出現「holding」；任務完成 | ☐ |
 | 1.4 | Gazebo 預演 | `bash src/pc/s7_test/gz_lock.sh intent /tmp/gz` | 放到目標架子，追蹤誤差最大 < 1 cm | ☐ |
@@ -46,6 +46,7 @@
   - 電源模式選「最佳效能」；
   - 實驗期間不要讓 Windows Update 重開機，也不要開其他重的程式。
 - **每次上機**：`wsl --shutdown` → 開 WSL → 1.1 的 300 s 測試 PASS → 才開手臂電源。
+- **時鐘**（35.109）：WSL 自己會從 Windows 同步時間；`systemd=true` 時 WSL 裡的 `systemd-timesyncd` 也在校時，兩者疑似互相拉扯，把 kernel 的 tick 改掉（單調時鐘慢 5 %）。建議在 WSL 裡關掉 timesyncd（一次）：`sudo systemctl disable --now systemd-timesyncd`，然後 `wsl --shutdown` 重開，再跑 1.1。
 - **實驗中**：`assist_board.csv` 的 `wall` 欄位會記下實際時間。出現 deadman 停止，但橋接程式和板子都正常，就停下來回到 1.1（第 7 節）。
 
 ### 1.6 用原生 Linux 時的架構（備用，35.93）

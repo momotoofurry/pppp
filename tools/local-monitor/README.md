@@ -35,7 +35,7 @@ python tools\local-monitor\monitor.py --dir \\wsl.localhost\Ubuntu-22.04\home\<�
 
 | 規則 | 嚴重度 | 條件 |
 |---|---|---|
-| `loop_stall` | warn／high | 兩個控制步相隔 > 0.3 s（> 1.0 s 為 high）；2 s 內的慢步算同一次；新試驗回起點（`reset_done`）的 3 s 不算 |
+| `loop_stall` | warn／high | 兩個控制步相隔 > 0.3 s（> 1.0 s 為 high），**用紀錄的 `mono` 欄（單調時鐘）**；沒有 `mono` 的舊紀錄用牆上時鐘，可能是時鐘撥動（35.109）；2 s 內的慢步算同一次；新試驗回起點（`reset_done`）的 3 s 不算 |
 | `tracking_hold` | high | 連續 5 步手臂離指令 > 4 cm（和 `assist_ros` 的追蹤保護一致） |
 | `deadman_stop` | warn | 板子心跳斷 0.5 s，手臂停下 |
 | `packets_lost` | high | `assist_ros` 或板子回報掉封包 |

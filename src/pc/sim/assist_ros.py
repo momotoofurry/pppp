@@ -661,7 +661,7 @@ def main():
     n_guard = 0
     n_track, track_n, track_hold, e_max = 0, 0, False, 0.0      # 35.92 tracking check
     # 35.89: + shelf; 35.92: + track_err, wall (unix s at the step start: loop stalls show as gaps)
-    log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z,shelf,track_err,wall\n')
+    log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z,shelf,track_err,wall,mono\n')   # 35.109: + mono
     # 35.101: task events for the trial logger (kinova_trials.py) and its reset channel
     if a.task_events is None:                           # 35.107: next to the log, not in the current folder
         a.task_events = os.path.join(os.path.dirname(os.path.abspath(a.log)), 'task_events.csv')
@@ -858,7 +858,8 @@ def main():
             code, hg = n.markers(sa.obj, P, sa, a.target if a.mode == 'demo' else -1, kin.fk(q)[:3, 3])
             hist.append(kin.fk(q)[:3, 3])
             log.write(f'{k * A.DT:.1f},{want},{cmd},{sa.state},{sa.goal},{P[0]:.3f},{P[1]:.3f},{P[2]:.3f},'
-                      f'{x[0]:.4f},{x[1]:.4f},{x[2]:.4f},{getattr(sa, "shelf", None)},{e_tr:.4f},{time.time():.3f}\n')
+                      f'{x[0]:.4f},{x[1]:.4f},{x[2]:.4f},{getattr(sa, "shelf", None)},{e_tr:.4f},{time.time():.3f},'
+                      f'{tk:.3f}\n')
             log.flush()
             if live and isinstance(sa, M.ModeAssist):
                 if (code, hg, sa.hint_zh) != last_hint:
