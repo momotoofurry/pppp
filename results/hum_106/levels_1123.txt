@@ -1,0 +1,12 @@
+T00_d1_G:
+  estimate vs 2 s coherent fundamental, per channel: median ratio on cued Rest [0.99, 1.01, 1.0, 1.01], on gestures [0.93, 1.16, 0.97, 1.43]
+  cued Rest: estimate median per channel [12.2, 14.2, 9.1, 8.9] uV, window max median 14.3 uV
+  cued gestures: window max median 5.1 uV (p90 13.2); task segments median 3.7 uV (p90 12.9)
+T00_d2_G:
+  estimate vs 2 s coherent fundamental, per channel: median ratio on cued Rest [0.98, 0.98, 0.99, 0.91], on gestures [1.02, 0.0, 0.93, 0.81]
+  cued Rest: estimate median per channel [2.8, 3.2, 1.9, 1.8] uV, window max median 3.5 uV
+  cued gestures: window max median 5.3 uV (p90 14.2); task segments median 5.2 uV (p90 12.4)
+
+T = geometric mean of the two days cued-Rest medians = sqrt(14.30 x 3.50) = 7.07 uV
+  T00_d1_G: cued Rest > T 100 %, cued gestures > T 31.7 %, task windows > T 26.5 %, all 28.2 %
+  T00_d2_G: cued Rest > T 0 %, cued gestures > T 36.4 %, task windows > T 30.7 %, all 24.8 %

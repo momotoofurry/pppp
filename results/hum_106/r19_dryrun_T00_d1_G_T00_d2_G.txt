@@ -1,0 +1,8 @@
+DEVELOPMENT DRY RUN (these days set T; NOT the decision)
+R19 (35.106): T 7.07 uV, RHO 0.5; days ['T00_d1_G', 'T00_d2_G']
+A T00_d1_G: cued Rest over T 100 % -> alert True; truth median 14.13 uV -> must alert -> right
+A T00_d2_G: cued Rest over T 0 % -> alert False; truth median 3.22 uV -> must not alert -> right
+Rule A: 2/2 judged sessions right -> PASS
+Rule B: HARMFUL windows 694 recall 93.9 %; CLEAN windows 7717 false flags 3.1 % -> PASS
+  T00_d1_G: task windows flagged 10.0 %; cued: WristExt 8 %, WristFlex 7 %, RadialDev 7 %, UlnarDev 8 %, HandOpen 2 %, Fist 12 %, Rest 100 %
+  T00_d2_G: task windows flagged 14.4 %; cued: WristExt 2 %, WristFlex 0 %, RadialDev 12 %, UlnarDev 2 %, HandOpen 2 %, Fist 13 %, Rest 0 %

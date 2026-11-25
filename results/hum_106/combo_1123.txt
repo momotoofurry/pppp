@@ -1,0 +1,5 @@
+label gate: hum > 7.07 uV AND hum > 0.5 x channel RMS, any of ch1-4 (11/23, development)
+T00_d1_G: cued windows flagged: WristExt 8 %, WristFlex 7 %, RadialDev 7 %, UlnarDev 8 %, HandOpen 2 %, Fist 12 %, Rest 100 %
+  task windows flagged 10.0 %, all 18.8 %
+T00_d2_G: cued windows flagged: WristExt 2 %, WristFlex 0 %, RadialDev 12 %, UlnarDev 2 %, HandOpen 2 %, Fist 13 %, Rest 0 %
+  task windows flagged 14.4 %, all 15.1 %
