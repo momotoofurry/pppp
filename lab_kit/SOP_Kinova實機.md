@@ -14,18 +14,41 @@
      - 原因沒有完全確定：可能是系統時鐘被校時跳動，也可能是虛擬機真的暫停；
      - 筆電待機喚醒之後就沒有再出現；
      - `assist_ros.py` 已改用 monotonic 時鐘，時鐘跳動不會再誤觸 deadman。
-   - 但 Kortex 驅動用的是系統時鐘，所以**正式實驗建議用原生 Linux**（見第 1.5 節）。
+   - Kortex 驅動用的是系統時鐘，所以有原生 Linux 比較保險。
+   - **決定（2026-11-25）：用 WSL**，一台筆電做完（見第 1.5 節）。代價是每次上機前都要過 1.1，實驗中出現不明的 deadman 停止就回到 1.1。原生 Linux 的做法留在第 1.6 節備用。
 
 ## 1. 上機前（不開手臂電源，在自己電腦就能做）
 
 | # | 檢查 | 指令 | 通過條件 | ☐ |
 |---|---|---|---|---|
-| 1.1 | 控制電腦的時間穩定性 | `python3 src/pc/s7_test/loop_jitter.py 90` | **PASS**：90 s 內行程沒有停住超過 0.1 s，系統時鐘也沒有跳動超過 0.05 s。用 WSL 的話：先 `wsl --shutdown` 重開、關掉待機，再測 | ☐ |
+| 1.1 | 控制電腦的時間穩定性（在 WSL 裡跑） | 先照 1.5 設好電源、`wsl --shutdown` 重開，再 `python3 src/pc/s7_test/loop_jitter.py 300` | **PASS**：300 s 內行程沒有停住超過 0.1 s，系統時鐘也沒有跳動超過 0.05 s。之前的中斷約每 30 s 一次，所以測 300 s 而不是 90 s | ☐ |
 | 1.2 | 程式測試 | `modes_test`、`modes_assist_test`、`labeler_test`、`lockrule_test`、`rebase_test` | 都是 ALL OK | ☐ |
 | 1.3 | 實機 launch 的假硬體測試 | `bash src/pc/s7_test/kortex_mock.sh /tmp/kortex_mock` | 介面都在；起始移動走短路；關掉控制器時出現「holding」；任務完成 | ☐ |
 | 1.4 | Gazebo 預演 | `bash src/pc/s7_test/gz_lock.sh intent /tmp/gz` | 放到目標架子，追蹤誤差最大 < 1 cm | ☐ |
 
-### 1.5 用原生 Linux 時的架構（35.93）
+### 1.5 用 WSL 的架構（採用，2026-11-25）
+
+- **一台筆電**：
+  - **Windows**：TCU、TrignoBridge、TaskScreen、ExperimentPanel、板子（USB）、`udp_tcp_relay.py --udp 50556`（預設送到本機 50560）。
+  - **WSL（Ubuntu-22.04＋ROS 2 Humble）**：Kortex 驅動、`assist_ros.py board`。這就是 Gazebo 預演和假硬體測試用的同一套環境。
+- **網路**：筆電用網路線接手臂；不要用 Wi-Fi 控制手臂。
+  - 【待確認】WSL 裡能不能連到手臂。驅動在 WSL 裡，要經過 Windows 的網路卡。第 2.1 步要在 **WSL 裡** `ping <手臂 IP>`，不是在 Windows。
+  - 連不到的話，在 `C:\Users\kirit\.wslconfig` 的 `[wsl2]` 下加 `networkingMode=mirrored`，`wsl --shutdown` 後再試。
+- **Windows 電源設定**（上機前一次）：
+  - 插電；
+  - 螢幕和睡眠都設成「永不」（插電時）。你懷疑之前的中斷和螢幕關閉有關，這個還沒驗證，所以直接避開：
+    ```powershell
+    powercfg /change monitor-timeout-ac 0
+    ```
+    ```powershell
+    powercfg /change standby-timeout-ac 0
+    ```
+  - 電源模式選「最佳效能」；
+  - 實驗期間不要讓 Windows Update 重開機，也不要開其他重的程式。
+- **每次上機**：`wsl --shutdown` → 開 WSL → 1.1 的 300 s 測試 PASS → 才開手臂電源。
+- **實驗中**：`assist_board.csv` 的 `wall` 欄位會記下實際時間。出現 deadman 停止，但橋接程式和板子都正常，就停下來回到 1.1（第 7 節）。
+
+### 1.6 用原生 Linux 時的架構（備用，35.93）
 
 - **兩台電腦**：Trigno 的 TCU 只有 Windows 版，所以不能只用 Linux，也不能用同一台筆電雙系統開機。
   - **Windows**：TCU、TrignoBridge、TaskScreen、ExperimentPanel、板子（USB）、`udp_tcp_relay.py --udp 50556 --to <Linux IP>:50560`。
@@ -43,7 +66,7 @@
 
 | # | 步驟 | 通過條件 | ☐ |
 |---|---|---|---|
-| 2.1 | 開機，用網路線連控制電腦。IP【待確認：Gen3 出廠預設常見是 192.168.1.10，以實機標籤或 Web App 為準】 | `ping` 得到 | ☐ |
+| 2.1 | 開機，用網路線連控制電腦。IP【待確認：Gen3 出廠預設常見是 192.168.1.10，以實機標籤或 Web App 為準】 | **在 WSL 裡** `ping` 得到（連不到見 1.5） | ☐ |
 | 2.2 | 用 Kinova Web App 設定安全限制【待確認：選單名稱與可設定的項目】：關節速度、末端速度上限（程式最快 0.08 m/s，限制設 0.15 m/s 左右）、保護區（桌面、架子後方） | 設定存檔、截圖 | ☐ |
 | 2.3 | 確認夾爪是 2F-85，接在手臂上 | Web App 看得到夾爪 | ☐ |
 | 2.4 | 手臂放在離起始姿勢近的位置。起始姿勢的關節角度是 [−3, 29, −2, 137, −5, −75, 92]° | 目測，周圍沒有東西 | ☐ |
