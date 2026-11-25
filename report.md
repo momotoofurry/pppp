@@ -6685,7 +6685,7 @@ PC 上，探索性。要回答口試或審稿常問的問題：為什麼用 LDA�
 - **回歸**（全部和修改前逐位元相同）：`check_rt_lda`、`check_rt_task`、`check_rt_gate`、`check_rt_s7 --range-test`（指令 125、停止 112、範圍標籤），以及開著標籤的閉迴路（`closed_loop_fw --labels on`）修改前後的試驗表。
 - **限制**：這條路徑還沒有像 35.103 那樣的自動中斷插入測試，只有程式碼推理和回歸。
 
-**20 s 緩衝少標多少**（擁擠場景，400 個試驗，同種子；labeler 的緩衝改成不設上限再跑一次，`scratchpad buf_run.py` → `results/selftest_T00/closed_loop_fw_trials104_bufinf.csv`）：
+**20 s 緩衝少標多少**（擁擠場景，400 個試驗，同種子；labeler 的緩衝改成不設上限再跑一次，`python src/assist/label_buffer_check.py 104_bufinf --dir /sd/T00 --lock-rule intent --labels off --scene crowded` → `results/selftest_T00/closed_loop_fw_trials104_bufinf.csv`）：
 
 | | 緩衝 20 s（現行） | 不設上限 |
 |---|---|---|
