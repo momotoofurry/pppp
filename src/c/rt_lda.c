@@ -48,6 +48,7 @@ static uint32_t now(void)
 }
 static float s_act[RTL_LABEL_MAX];
 /* 35.83: ring of the last classified windows for hindsight range labels */
+#define RTL_HIST_INVALID 0xFFFFFFFFu     /* 35.104: a ring slot being rewritten (seqlock) */
 static int16_t s_hist_q[RTL_HIST][FE_DIM];
 static uint32_t s_hist_w[RTL_HIST];
 static uint8_t s_hist_g[RTL_HIST];
@@ -255,9 +256,12 @@ static void on_window(void)
     }
     {                                           /* 35.83: keep the window for hindsight range labels */
         const uint32_t h = s_hist_n++ % RTL_HIST;
+        /* 35.104 seqlock (writer): invalid while the slot is rewritten, the window number last */
+        __atomic_store_n(&s_hist_w[h], RTL_HIST_INVALID, __ATOMIC_RELAXED);
+        __atomic_signal_fence(__ATOMIC_SEQ_CST);
         memcpy(s_hist_q[h], s_q, sizeof s_q);
-        s_hist_w[h] = s_cnt.windows;
         s_hist_g[h] = gated;
+        __atomic_store_n(&s_hist_w[h], s_cnt.windows, __ATOMIC_RELEASE);
     }
     /* windows for the task label: the run of agreeing accepted windows; after a command, further windows of the
      * same class are added to that command's windows until the class changes */
@@ -502,12 +506,20 @@ static void range_update(void)
         const uint32_t e = (d0 + k) % RTL_RANGE_Q;
         added[k] = 0;
         for (uint32_t i = 0; i < n; i++) {
-            const uint32_t w = s_hist_w[i];
-            if (w < s_range_first[e] || w > s_range_last[e])
+            /* 35.104 seqlock (reader): rtl_rx may overwrite slot i while this copies it (it preempts rtl_idle);
+             * keep the copy only if the slot held the same window before and after */
+            const uint32_t w = __atomic_load_n(&s_hist_w[i], __ATOMIC_ACQUIRE);
+            if (w == RTL_HIST_INVALID || w < s_range_first[e] || w > s_range_last[e])
                 continue;
-            if (s_range_cls[e] != LD_CLASSES - 1 && s_hist_g[i])
+            int16_t q[FE_DIM];
+            memcpy(q, s_hist_q[i], sizeof q);
+            const uint8_t g = s_hist_g[i];
+            __atomic_signal_fence(__ATOMIC_SEQ_CST);
+            if (__atomic_load_n(&s_hist_w[i], __ATOMIC_ACQUIRE) != w)
+                continue;                       /* overwritten meanwhile: that window is gone */
+            if (s_range_cls[e] != LD_CLASSES - 1 && g)
                 continue;
-            ld_add(s_hist_q[i], s_range_cls[e]);
+            ld_add(q, s_range_cls[e]);
             added[k]++;
         }
         total += added[k];
