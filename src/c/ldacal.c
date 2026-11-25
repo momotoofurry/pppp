@@ -9,18 +9,35 @@
 static float s_g[LD_TRI];                       /* sum of x x^T over all labelled windows */
 static float s_sum[LD_CLASSES][LD_DIM];
 static float s_n[LD_CLASSES];                   /* weight per class (a count with hard labels) */
-static float s_l[LD_TRI];                       /* work: covariance, then its Cholesky factor */
-static float s_w[LD_CLASSES][LD_DIM];
-static float s_b[LD_CLASSES];
-static float s_rho;
-static float s_x[LD_DIM];
+/* 35.103: the fitted model, twice. ld_fit writes the spare copy and publishes it with one index store, so a reader
+ * that preempts ld_fit (rtl_rx in the TIM6 interrupt / the higher-priority task) always sees a whole model: the old
+ * one until the store, the new one after it. A failed fit publishes nothing (the factor of the model in use stays
+ * intact). Single writer (ld_fit, never re-entered), readers only take the index. */
+typedef struct {
+    float l[LD_TRI];                            /* covariance, then its Cholesky factor */
+    float w[LD_CLASSES][LD_DIM];
+    float b[LD_CLASSES];
+    float m[LD_CLASSES][LD_DIM];                /* the class means the model was fitted with (ld_dist2) */
+    float rho;
+} ld_model_t;
+static ld_model_t s_mod[2];
+static volatile uint32_t s_cur;                 /* index of the published model */
+static float s_x[LD_DIM];                       /* scratch of the writer side (ld_add, ld_add_soft) only */
+#ifndef LD_TEST_HOOK
+#define LD_TEST_HOOK(point) ((void)0)
+#endif
+
+static inline const ld_model_t *published(void)
+{
+    return &s_mod[__atomic_load_n(&s_cur, __ATOMIC_ACQUIRE)];
+}
 #define LD_ALL ((1u << LD_CLASSES) - 1u)
 static uint32_t s_active = LD_ALL;
 
 unsigned ld_static_bytes(void)
 {
-    return (unsigned)(sizeof s_g + sizeof s_sum + sizeof s_n + sizeof s_l + sizeof s_w + sizeof s_b + sizeof s_rho +
-                      sizeof s_x + sizeof s_active);
+    return (unsigned)(sizeof s_g + sizeof s_sum + sizeof s_n + sizeof s_mod + sizeof s_cur + sizeof s_x +
+                      sizeof s_active);
 }
 
 void ld_set_active(uint32_t mask)
@@ -58,11 +75,14 @@ void ld_add(const int16_t *x, int label)
 
 float ld_shrinkage(void)
 {
-    return s_rho;
+    return published()->rho;
 }
 
 int ld_fit(void)
 {
+    const uint32_t nxt = 1u - s_cur;
+    ld_model_t *const md = &s_mod[nxt];         /* the spare copy: nobody reads it until it is published */
+    float *const s_l = md->l;
     float n_all = 0.0f;
     for (int c = 0; c < LD_CLASSES; c++) {
         if (!ld_is_active(c))
@@ -103,8 +123,11 @@ int ld_fit(void)
         s_l[k] *= 1.0f - rho;
     for (int i = 0; i < LD_DIM; i++)
         s_l[TRI(i, i)] += rho * mu;
+    LD_TEST_HOOK(0);
     /* Cholesky in place: C = L L^T */
-    for (int i = 0; i < LD_DIM; i++)
+    for (int i = 0; i < LD_DIM; i++) {
+        if (i % 16 == 0)
+            LD_TEST_HOOK(1);
         for (int j = 0; j <= i; j++) {
             float v = s_l[TRI(i, j)];
             for (int k = 0; k < j; k++)
@@ -117,12 +140,16 @@ int ld_fit(void)
                 s_l[TRI(i, j)] = v / s_l[TRI(j, j)];
             }
         }
+    }
     /* w_c = C^-1 m_c, b_c = -m_c.w_c / 2 */
+    LD_TEST_HOOK(2);
     for (int c = 0; c < LD_CLASSES; c++) {
         if (!ld_is_active(c))
             continue;                           /* scored -INFINITY by ld_scores */
-        float *w = s_w[c];
+        float *w = md->w[c];
         const float inv = 1.0f / s_n[c];
+        for (int i = 0; i < LD_DIM; i++)
+            md->m[c][i] = s_sum[c][i] * inv;
         for (int i = 0; i < LD_DIM; i++) {      /* L y = m */
             float v = s_sum[c][i] * inv;
             for (int k = 0; k < i; k++)
@@ -138,14 +165,18 @@ int ld_fit(void)
         float d = 0.0f;
         for (int i = 0; i < LD_DIM; i++)
             d += s_sum[c][i] * inv * w[i];
-        s_b[c] = -0.5f * d;
+        md->b[c] = -0.5f * d;
+        LD_TEST_HOOK(3);
     }
-    s_rho = rho;
+    md->rho = rho;
+    __atomic_store_n(&s_cur, nxt, __ATOMIC_RELEASE);   /* publish: one aligned 32-bit store */
+    LD_TEST_HOOK(4);
     return 0;
 }
 
 int ld_scores(const int16_t *x, float *scores)
 {
+    const ld_model_t *md = published();
     int best = -1;                              /* the first active class wins ties, as before the mask */
     for (int c = 0; c < LD_CLASSES; c++) {
         if (!ld_is_active(c)) {
@@ -154,8 +185,8 @@ int ld_scores(const int16_t *x, float *scores)
         }
         float v = 0.0f;
         for (int i = 0; i < LD_DIM; i++)
-            v += (float)x[i] * s_w[c][i];
-        scores[c] = v / LD_Q + s_b[c];
+            v += (float)x[i] * md->w[c][i];
+        scores[c] = v / LD_Q + md->b[c];
         if (best < 0 || scores[c] > scores[best])
             best = c;
     }
@@ -164,14 +195,15 @@ int ld_scores(const int16_t *x, float *scores)
 
 float ld_dist2(const int16_t *x, int c)
 {
-    const float inv = 1.0f / s_n[c];
+    const ld_model_t *md = published();
+    float z[LD_DIM];                            /* 35.103: own scratch (s_x belongs to the writer side) */
     float d = 0.0f;
-    for (int i = 0; i < LD_DIM; i++) {          /* L z = x - m_c, z kept in s_x */
-        float v = (float)x[i] / LD_Q - s_sum[c][i] * inv;
+    for (int i = 0; i < LD_DIM; i++) {          /* L z = x - m_c */
+        float v = (float)x[i] / LD_Q - md->m[c][i];
         for (int k = 0; k < i; k++)
-            v -= s_l[TRI(i, k)] * s_x[k];
-        s_x[i] = v / s_l[TRI(i, i)];
-        d += s_x[i] * s_x[i];
+            v -= md->l[TRI(i, k)] * z[k];
+        z[i] = v / md->l[TRI(i, i)];
+        d += z[i] * z[i];
     }
     return d;
 }
