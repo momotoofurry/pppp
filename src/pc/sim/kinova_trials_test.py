@@ -59,6 +59,8 @@ check('wrong locks counted (object 1, shelf 1)', r['wrong_lock_obj'] == 1 and r[
 check('reset message sent with the trial id', f.sent == ['reset,7'])
 r, _ = run(['done'], [('grasp', 3, None), ('putdown', 3, 5)])
 check('wrong shelf', r['outcome'] == 'wrong_shelf' and r['put_shelf'] == 5)
+r, _ = run(['done'], [('grasp', 3, None), ('grip_empty', 3, None), ('grasp', 3, None), ('putdown', 3, 4)])
+check('an air grasp is counted, the retry still succeeds (35.107)', r['air_grasp'] == 1 and r['outcome'] == 'success')
 r, _ = run(['done'], [('grasp', 2, None), ('putdown', 2, 4)])
 check('wrong object (and a wrong grasp counted)', r['outcome'] == 'wrong_object' and r['wrong_grasp'] == 1)
 r, _ = run(['done'], [('grasp', 3, None), ('putdown', 3, None)])

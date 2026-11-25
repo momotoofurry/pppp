@@ -29,7 +29,8 @@ sys.path.insert(0, os.path.join(HERE, '..', '..', 'assist'))
 import scenes as SC  # noqa: E402
 
 COLS = ['trial', 'practice', 'target_obj', 'target_shelf', 'outcome', 'time_s', 'put_obj', 'put_shelf',
-        'wrong_lock_obj', 'wrong_lock_shelf', 'wrong_grasp', 'start_unix_ms', 'end_unix_ms', 'helper_ok', 'note']
+        'wrong_lock_obj', 'wrong_lock_shelf', 'wrong_grasp', 'air_grasp', 'start_unix_ms', 'end_unix_ms', 'helper_ok',
+        'note']
 
 
 def make_list(scene, n, practice, seed):
@@ -144,7 +145,7 @@ class Session:
         start = self.reset(tid)
         self.say(f'\a  開始！限時 {self.limit:.0f} 秒（中止：協助者輸入 x 再按 Enter）')
         r = dict(trial=tid, practice=practice, target_obj=obj, target_shelf=shelf, outcome='', time_s='', put_obj='',
-                 put_shelf='', wrong_lock_obj=0, wrong_lock_shelf=0, wrong_grasp=0, start_unix_ms=f'{start:.0f}',
+                 put_shelf='', wrong_lock_obj=0, wrong_lock_shelf=0, wrong_grasp=0, air_grasp=0, start_unix_ms=f'{start:.0f}',
                  end_unix_ms='', helper_ok='', note='')
         while True:
             now = self.clock() * 1000
@@ -157,6 +158,8 @@ class Session:
                     r['wrong_lock_shelf'] += 1
                 elif e['ev'] == 'grasp' and e['a'] != str(obj):
                     r['wrong_grasp'] += 1
+                elif e['ev'] == 'grip_empty':             # 35.107: closed on air (assist_ros --grip-check)
+                    r['air_grasp'] += 1
                 elif e['ev'] == 'putdown':
                     po = int(e['a'])
                     ps = int(e['b']) if e['b'] != '' else None

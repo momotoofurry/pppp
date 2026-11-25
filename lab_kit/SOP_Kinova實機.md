@@ -89,7 +89,7 @@ ros2 launch kortex_bringup gen3.launch.py robot_ip:=<IP> gripper:=robotiq_2f_85 
 
 | # | 步驟 | 指令 | 通過條件 | ☐ |
 |---|---|---|---|---|
-| 4.1 | 到起始姿勢，慢速 | `python3 src/pc/sim/assist_ros.py start --start-rate 10` | 印出「最大關節變化 N° 在 T s」；沒有關節繞遠路；「measured tool … mm」< 10 mm | ☐ |
+| 4.1 | 到起始姿勢，慢速 | `python3 src/pc/sim/assist_ros.py start --start-rate 10` | 印出「最大關節變化 N° 在 T s」；沒有關節繞遠路；「measured tool … mm」< 10 mm、「largest joint difference」< 5°。沒到位時程式會印出「NOT taking control」並停止（35.107），這時**不要**重跑硬上，先查驅動和控制器 | ☐ |
 | 4.2 | 夾爪開關 | （`start` 會先開夾爪） | 夾爪打開 | ☐ |
 | 4.3 | 鍵盤控制，**沒有物體、沒有架子** | `assist_ros.py keys --limit 120` | W／S／A／D 方向對；空白鍵就停；碰到工作空間邊界會停；結束時 holds 是 0 | ☐ |
 | 4.4 | 追蹤保護 | 4.3 時用手輕推手臂（或按暫停）【待確認：實機被推時的行為】 | 出現「!! … holding」，放鬆後恢復 | ☐ |
@@ -115,7 +115,7 @@ ros2 launch kortex_bringup gen3.launch.py robot_ip:=<IP> gripper:=robotiq_2f_85 
 | 6.3 | **deadman 測試**：手臂移動時關掉橋接程式 | 0.5 s 內停，之後不會自己再動 | ☐ |
 | 6.3b | **鎖定中斷線**（35.107）：鎖定一個物體、在模式 2 用 W 前進時，拔掉板子的 USB | 0.5 s 內停；插回、橋接程式重連後，**不做新手勢就不會動**；做新手勢後照模式 2 的規則動 | ☐ |
 | 6.3c | **偏心夾取**（35.107）：故意在物體偏左或偏右約 2 cm 處夾 | 記錄：夾爪有沒有夾住、手臂有沒有進故障狀態、旁邊的物體有沒有被推動。進故障狀態就停，回報 | ☐ |
-| 6.3d | **空抓**（35.107）：沒有物體時，在原本物體的位置握拳夾取 | 記錄夾爪閉合到哪裡；現在的程式**不會發現是空抓**（還沒讀夾爪的回饋），所以要靠協助者確認 | ☐ |
+| 6.3d | **夾爪回饋**（35.107）：先夾真的物體 3 次、再在沒有物體的地方夾 3 次，`assist_ros.py` 加 `--grip-check` | 在 `task_events.csv` 的 `grip_result` 記下每次的位置（rad）：夾到物體應該明顯小於 0.70、空抓接近 0.80；空抓時印出「!! 空抓」並自動打開。**兩組的位置沒有分開，就把 `grip_check.EMPTY_POS` 改到兩組中間，記在報告裡**；分不開就不要用 `--grip-check` | ☐ |
 | 6.4 | `assist_ros.py board`，**沒有物體**，只練方向和停 | 方向對、停得住 | ☐ |
 | 6.5 | 完整任務：見下面「6.6 試驗紀錄程式」 | 依實驗設計 | ☐ |
 
@@ -129,7 +129,7 @@ python3 src/pc/sim/kinova_trials.py make --scene <場景> --n 24 --practice 2 --
 **實驗時**開兩個 WSL 終端機：
 1. 手臂程式（加上場景和試驗通道）：
    ```
-   python3 src/pc/sim/assist_ros.py board --scene <場景> --lock-rule intent --level 0.6 --grip gripper --trial-port 50570 --task-events k<天>_task_events.csv --log k<天>_assist_board.csv --events k<天>_board_events.csv --limit 4000
+   python3 src/pc/sim/assist_ros.py board --scene <場景> --lock-rule intent --level 0.6 --grip gripper --grip-check --trial-port 50570 --task-events k<天>_task_events.csv --log k<天>_assist_board.csv --events k<天>_board_events.csv --limit 4000
    ```
 2. 試驗紀錄（協助者操作）：
    ```

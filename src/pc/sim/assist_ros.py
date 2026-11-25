@@ -75,6 +75,7 @@ import modes as M
 import natural_start as NS
 import labeler as LB  # noqa: E402
 import scenes as SC  # noqa: E402
+import grip_check as GC  # noqa: E402
 
 JOINTS = [f'joint_{i}' for i in range(1, 8)]
 RD = np.array([[0, 0, 1], [-1, 0, 0], [0, -1, 0]], float)      # tool z forward (+x); tool x (the 2F-85 finger axis) horizontal, so the fingers close sideways on an upright object (35.64)
@@ -130,7 +131,20 @@ class Demo(Node):
             g = GripperCommand.Goal()
             g.command.position = 0.8 * float(closed)
             g.command.max_effort = 100.0
-            self.grip.send_goal_async(g)
+            fut = self.grip.send_goal_async(g)
+            fut.add_done_callback(lambda f, c=float(closed): self._grip_goal(f, c))
+
+    # 35.107: the result of every gripper command -> self.grip_result = (commanded 0/1, position, stalled, reached)
+    def _grip_goal(self, fut, closed):
+        gh = fut.result()
+        if gh is None or not gh.accepted:
+            self.grip_result = (closed, None, False, False)
+            return
+        gh.get_result_async().add_done_callback(lambda f, c=closed: self._grip_done(f, c))
+
+    def _grip_done(self, fut, closed):
+        r = fut.result().result
+        self.grip_result = (closed, float(r.position), bool(r.stalled), bool(r.reached_goal))
 
     def markers(self, obj, P, sa, tgt, x):
         """objects coloured by the assist phase + an arrow and a key hint (the hint text is also returned)"""
@@ -507,9 +521,15 @@ def main():
                     help='m: measured vs commanded tool point; over it for 5 steps -> hold until a relax (35.92)')
     ap.add_argument('--limit', type=float, default=None, help='s (default: demo 60, keys 300)')
     ap.add_argument('--scene', default='3obj', help='35.101: 3obj | crowded | <layout>.json (scenes.py)')
+    ap.add_argument('--grip-check', action='store_true',
+                    help='35.107 (REAL ARM ONLY): a grasp whose gripper closed to the end (on air) is undone')
     ap.add_argument('--trial-port', type=int, default=0,
                     help='35.101: UDP port on 127.0.0.1 for the trial logger (reset,<id>[,force]); 0 = off')
-    ap.add_argument('--task-events', default='task_events.csv',
+    ap.add_argument('--start-tol-deg', type=float, default=5.0,
+                    help='deg: largest joint difference after the start move; over it -> refuse to run (35.107)')
+    ap.add_argument('--start-tol', type=float, default=0.03,
+                    help='m: measured vs commanded tool point after the start move; over it -> refuse to run (35.107)')
+    ap.add_argument('--task-events', default=None,
                     help='35.101: grasp / put-down / lock / reset events for the trial logger')
     a = ap.parse_args()
     OBJECTS, SHELVES = SC.load(a.scene)
@@ -576,6 +596,20 @@ def main():
         rclpy.spin_once(n, timeout_sec=0.05)
     e_start = float(np.linalg.norm(kin.fk(n.joints())[:3, 3] - kin.fk(q)[:3, 3]))
     print(f'at the start pose: measured tool {1000 * e_start:.1f} mm from the commanded one', flush=True)
+    q_meas = n.joints()
+    dq_start = max(abs(kin.wrap(q_meas[i] - q[i])) if i in CONT else abs(q_meas[i] - q[i]) for i in range(7))
+    print(f'at the start pose: largest joint difference {np.degrees(dq_start):.1f} deg', flush=True)
+    if dq_start > np.radians(a.start_tol_deg):           # 35.107: joint 7 does not move the tool point
+        print(f'!! a joint is {np.degrees(dq_start):.0f} deg from the start pose (limit {a.start_tol_deg:.0f} deg): the start '
+              f'move did not complete. NOT taking control; check the driver and run again.', flush=True)
+        rclpy.shutdown()
+        sys.exit(2)
+    if e_start > a.start_tol:                           # 35.107: never take control from an unknown pose
+        print(f'!! the arm is {1000 * e_start:.0f} mm from the start pose (limit {1000 * a.start_tol:.0f} mm): the start '
+              f'move did not complete (controller inactive? trajectory rejected? fault?). NOT taking control; check the '
+              f'driver and run again.', flush=True)
+        rclpy.shutdown()
+        sys.exit(2)
     if a.mode == 'start':
         print('at the start pose, tool', np.round(kin.fk(n.joints())[:3, 3], 3).tolist(), ', gripper open')
         rclpy.shutdown()
@@ -629,6 +663,8 @@ def main():
     # 35.89: + shelf; 35.92: + track_err, wall (unix s at the step start: loop stalls show as gaps)
     log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z,shelf,track_err,wall\n')
     # 35.101: task events for the trial logger (kinova_trials.py) and its reset channel
+    if a.task_events is None:                           # 35.107: next to the log, not in the current folder
+        a.task_events = os.path.join(os.path.dirname(os.path.abspath(a.log)), 'task_events.csv')
     tev = open(a.task_events, 'w', encoding='utf-8')
     tev.write('unix_ms,step,event,a,b,detail\n')
 
@@ -642,6 +678,7 @@ def main():
         tsock.setblocking(False)
         print(f'trial channel: UDP 127.0.0.1:{a.trial_port}; events -> {a.task_events}', flush=True)
     tevent(0, 'ready', len(OBJECTS), len(SHELVES), a.scene)
+    grasp_from = None
     try:
         for k in range(int(a.limit / A.DT)):
             tk = time.monotonic()
@@ -724,10 +761,12 @@ def main():
                 if a.mode == 'board':
                     lab_w[lab.k] = poll.window_now()
             h0 = getattr(sa, 'held', None)
+            obj_before = sa.obj.copy() if isinstance(sa, M.ModeAssist) else None
             v = sa.step(cmd if cmd != 'rest' else None, x)
             h1 = getattr(sa, 'held', None)
             if h0 is None and h1 is not None:
                 tevent(k, 'grasp', h1)
+                grasp_from = (h1, obj_before[h1].copy())        # 35.107: where it stood, for an undo
             if h0 is not None and h1 is None:            # 35.101: put down: on which shelf it stands now
                 p_ = sa.obj[h0]
                 tevent(k, 'putdown', h0, SC.shelf_of(p_, sa.shelves), f'{p_[0]:.3f} {p_[1]:.3f} {p_[2]:.3f}')
@@ -775,6 +814,26 @@ def main():
             if bool(sa.grip) != gripped:
                 n.gripper(float(sa.grip))
                 gripped = bool(sa.grip)
+            gr = getattr(n, 'grip_result', None)                # 35.107: the gripper's own report
+            if gr is not None:
+                n.grip_result = None
+                g_cmd, g_pos, g_st, g_rg = gr
+                tevent(k, 'grip_result', '' if g_pos is None else f'{g_pos:.3f}', int(g_st),
+                       f'close={int(g_cmd)} reached={int(g_rg)} outcome={GC.outcome(g_pos, g_st, g_rg) if g_cmd > 0.5 else "-"}')
+                if (a.grip_check and g_cmd > 0.5 and isinstance(sa, M.ModeAssist) and sa.held is not None
+                        and GC.outcome(g_pos, g_st, g_rg) == 'empty'):
+                    ko = sa.held
+                    if grasp_from is not None and grasp_from[0] == ko:
+                        sa.obj[ko] = grasp_from[1]
+                    sa.held = None
+                    n.gripper(0.0)
+                    gripped = False
+                    if lab is not None:                         # nothing from the failed attempt is labelled
+                        lab = LB.Labeler(sa)
+                        lab_x.clear()
+                        lab_w.clear()
+                    tevent(k, 'grip_empty', ko, '', '' if g_pos is None else f'{g_pos:.3f}')
+                    print('  !! 空抓：夾爪閉合到底，沒有夾到物體。夾爪已打開；用 S 退出後重新對準', flush=True)
             # 35.92: tracking check: the arm must follow the commands (blocked, faulted or stopped by hand -> hold)
             e_tr = float(np.linalg.norm(kin.fk(n.joints())[:3, 3] - kin.fk(q)[:3, 3]))
             e_max = max(e_max, e_tr)
@@ -830,6 +889,10 @@ def main():
             print('time limit reached, state', sa.state)
     except KeyboardInterrupt:
         pass
+    except Exception:                                   # 35.107: SIGINT shut rclpy down before KeyboardInterrupt
+        if rclpy.ok():
+            raise
+        print('interrupted: ROS was shut down', flush=True)
     finally:
         if restore:
             restore()
@@ -838,7 +901,7 @@ def main():
         if labf:
             labf.close()
     t2 = time.monotonic()
-    while time.monotonic() - t2 < 1.0:
+    while rclpy.ok() and time.monotonic() - t2 < 1.0:
         rclpy.spin_once(n, timeout_sec=0.05)
     qs = n.joints()
     print('commanded vs simulator joints, max diff deg:', round(float(np.degrees(np.abs(qs - q)).max()), 2))
@@ -846,7 +909,8 @@ def main():
     print(f'workspace box stops: {n_guard} steps' + (f'; deadman stops: {poll.deadman_count()}' if a.mode == 'board' else '')
           + (f'; range labels sent: {n_ranges}' if a.mode == 'board' else ''))
     print('tool now (fk of simulator joints):', np.round(kin.fk(qs)[:3, 3], 3).tolist())
-    rclpy.shutdown()
+    if rclpy.ok():
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':

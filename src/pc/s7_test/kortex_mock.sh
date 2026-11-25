@@ -60,17 +60,19 @@ while time.time() - t < 40: rclpy.spin_once(n, timeout_sec=0.05)
 print('joint_7 in the first 40 s: first %.2f min %.2f max %.2f last %.2f rad' % (v[0], min(v), max(v), v[-1]))
 PY
 python3 src/pc/sim/assist_ros.py board --limit 90 --events $OUT/board_events.csv --log $OUT/assist_board.csv \
-  --labels $OUT/assist_labels.csv > $OUT/assist_stdout.txt 2>&1 &
+  --labels $OUT/assist_labels.csv --task-events $OUT/task_events.csv > $OUT/assist_stdout.txt 2>&1 &
 AR=$!
 sleep 2
 python3 $HERE/lock_driver.py $OUT/assist_board.csv $OUT/driver.txt 75 > $OUT/driver_stdout.txt 2>&1 &
 DR=$!
-sleep 30
+# 35.107: 8 s into the control loop (80 rows of assist_board.csv), whatever the start-up took
+for i in $(seq 1 180); do [ "$(wc -l < $OUT/assist_board.csv 2>/dev/null || echo 0)" -gt 80 ] && break; sleep 1; done
 echo "== fault: controller off at $(date +%T)" >> $OUT/checks.txt
-ros2 service call /controller_manager/switch_controller controller_manager_msgs/srv/SwitchController "{deactivate_controllers: [joint_trajectory_controller], strictness: 1}" | grep -o "ok=[A-Za-z]*" >> $OUT/checks.txt 2>&1
+timeout 20 ros2 service call /controller_manager/switch_controller controller_manager_msgs/srv/SwitchController "{deactivate_controllers: [joint_trajectory_controller], strictness: 1}" | grep -o "ok=[A-Za-z]*" >> $OUT/checks.txt 2>&1
 sleep 3
-ros2 service call /controller_manager/switch_controller controller_manager_msgs/srv/SwitchController "{activate_controllers: [joint_trajectory_controller], strictness: 1}" | grep -o "ok=[A-Za-z]*" >> $OUT/checks.txt 2>&1
+timeout 20 ros2 service call /controller_manager/switch_controller controller_manager_msgs/srv/SwitchController "{activate_controllers: [joint_trajectory_controller], strictness: 1}" | grep -o "ok=[A-Za-z]*" >> $OUT/checks.txt 2>&1
 echo "== controller back at $(date +%T)" >> $OUT/checks.txt
+grep -h 'at the start pose\|NOT taking control' $OUT/assist_stdout.txt >> $OUT/checks.txt
 wait $DR
 sleep 1
 kill -INT $AR 2>/dev/null
