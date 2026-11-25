@@ -1,0 +1,5 @@
+R16b (35.97): NinaPro DB6, 10 people, mean over the later sessions; B0 vs L (log RMS / WL / MAV)
+fixed   B0 37.43  L 39.07  diff +1.64 (95% CI -1.41, +4.69)  better in 7/10
+cue1    B0 56.77  L 58.02  diff +1.24 (95% CI +0.67, +1.82)  better in 9/10
+  R16b: L GENERALISES
+within  B0 77.91  L 79.84  diff +1.93 (95% CI +1.01, +2.85)  better in 10/10
