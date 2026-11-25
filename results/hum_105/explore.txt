@@ -1,0 +1,9 @@
+EXPLORATORY (35.105, after R18 failed)
+T00_d1_G: estimate vs truth (all windows) correlation 0.57; median estimate / truth 22.18
+T00_d2_G: estimate vs truth (all windows) correlation 0.53; median estimate / truth 21.93
+absolute estimate: T from day 1 153.30 uV
+  T00_d1_G: recall 61.5 %, false 5.0 %, cued Rest flagged 100 %, all windows 29.5 %
+  T00_d2_G: recall 43.8 %, false 2.5 %, cued Rest flagged 0 %, all windows 26.7 %
+R18 ratio: T from day 1 14.52
+  T00_d1_G: recall 64.2 %, false 5.0 %, cued Rest flagged 100 %, all windows 34.7 %
+  T00_d2_G: recall 47.4 %, false 2.5 %, cued Rest flagged 87 %, all windows 41.0 %

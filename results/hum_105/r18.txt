@@ -1,0 +1,12 @@
+R18 (35.105): 60 Hz gate from the MCU PSD; truth = 2 s coherent fit; HUM >= 5 uV, CLEAN <= 2 uV
+
+60 Hz band (decided): T from day 1 = 14.52
+  T00_d1_G: HUM windows 3002 recall 64.2 % | CLEAN windows 740 false flags 5.0 % | all windows flagged 34.7 %, task segments 15.6 %
+    cued windows flagged per class: WristExt 3 %, WristFlex 7 %, RadialDev 2 %, UlnarDev 0 %, HandOpen 5 %, Fist 3 %, Rest 100 %
+  T00_d2_G: HUM windows 4254 recall 47.4 % | CLEAN windows 40 false flags 2.5 % | all windows flagged 41.0 %, task segments 16.1 %
+    cued windows flagged per class: WristExt 0 %, WristFlex 18 %, RadialDev 3 %, UlnarDev 0 %, HandOpen 0 %, Fist 2 %, Rest 87 %
+  R18 decision (day 2): recall 47.4 % (>= 90), false 2.5 % (<= 5) -> FAIL
+
+60 + 120 Hz bands (reported): T from day 1 = 8.11
+  T00_d1_G: HUM windows 3002 recall 64.8 % | CLEAN windows 740 false flags 5.0 % | all windows flagged 35.4 %, task segments 16.6 %
+  T00_d2_G: HUM windows 4254 recall 49.6 % | CLEAN windows 40 false flags 2.5 % | all windows flagged 43.3 %, task segments 17.5 %
