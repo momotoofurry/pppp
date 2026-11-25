@@ -1,0 +1,9 @@
+   0.0 s  mode1        shelf None  x=(0.580,0.000,0.350)  phase to_obj
+   6.1 s  mode2-pick   shelf None  x=(0.580,0.243,0.103)  phase to_obj
+  16.2 s  mode2-out    shelf None  x=(0.743,0.249,0.101)  phase grasp
+  20.3 s  mode1        shelf None  x=(0.580,0.248,0.102)  phase out
+  24.1 s  hesitate 0.4 s in front of shelf 2 (y 0.002)
+  29.0 s  mode2-place  shelf 3  x=(0.580,-0.245,0.102)  phase carry
+  35.7 s  mode2-out    shelf 3  x=(0.727,-0.244,0.100)  phase in
+  35.7 s  put down -> mode2-out
+RESULT locks ['3'] wrong 0 time 35.7 s phase in stuck 0 send errors 0

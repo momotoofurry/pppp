@@ -1,0 +1,9 @@
+unix_ms,step,event,a,b,detail
+1795606214908.3,0,ready,3,5,3obj
+1795606214908.8,0,grip_result,0.000,0,close=0 reached=1 outcome=object
+1795606221548.6,66,lock_obj,0,,
+1795606229287.4,143,grasp,0,,
+1795606229388.3,144,grip_result,0.800,0,close=1 reached=1 outcome=empty
+1795606243769.2,270,lock_shelf,3,,
+1795606250508.2,337,putdown,0,3,0.727 -0.243 0.100
+1795606250608.2,338,grip_result,0.000,0,close=0 reached=1 outcome=object

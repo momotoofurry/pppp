@@ -1,0 +1,16 @@
+== controllers
+name='joint_trajectory_controller', state='active'
+name='twist_controller', state='inactive'
+name='robotiq_gripper_controller', state='active'
+name='joint_state_broadcaster', state='active'
+== topics / actions used by assist_ros
+/joint_states
+/joint_trajectory_controller/joint_trajectory
+/robotiq_gripper_controller/gripper_cmd
+pre-pose joint_7 = -2.90 rad
+== fault: controller off at 19:30:23
+ok=True
+ok=True
+== controller back at 19:30:27
+at the start pose: measured tool 0.0 mm from the commanded one
+at the start pose: largest joint difference 0.0 deg
