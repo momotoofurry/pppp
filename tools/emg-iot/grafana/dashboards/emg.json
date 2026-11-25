@@ -1,0 +1,114 @@
+{
+  "uid": "emg-edge",
+  "title": "EMG edge monitor",
+  "tags": ["emg"],
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": {"from": "now-15m", "to": "now"},
+  "schemaVersion": 39,
+  "templating": {
+    "list": [
+      {
+        "name": "session",
+        "label": "Session",
+        "type": "query",
+        "datasource": {"type": "postgres", "uid": "emg-ts"},
+        "query": "SELECT DISTINCT session FROM emg_window ORDER BY 1",
+        "definition": "SELECT DISTINCT session FROM emg_window ORDER BY 1",
+        "multi": true,
+        "includeAll": true,
+        "current": {"selected": true, "text": ["All"], "value": ["$__all"]},
+        "refresh": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Windows / s (last 10 s)",
+      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "postgres", "uid": "emg-ts"},
+      "targets": [{"refId": "A", "datasource": {"type": "postgres", "uid": "emg-ts"}, "editorMode": "code", "rawQuery": true, "format": "table",
+        "rawSql": "SELECT count(*) / 10.0 AS rate FROM emg_window WHERE time > now() - interval '10 seconds'"}],
+      "fieldConfig": {"defaults": {"decimals": 1, "unit": "none"}, "overrides": []}
+    },
+    {
+      "id": 2, "type": "stat", "title": "Labelled accuracy (time range)",
+      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "postgres", "uid": "emg-ts"},
+      "targets": [{"refId": "A", "datasource": {"type": "postgres", "uid": "emg-ts"}, "editorMode": "code", "rawQuery": true, "format": "table",
+        "rawSql": "SELECT 100.0 * count(*) FILTER (WHERE pred = label) / nullif(count(*), 0) AS acc FROM emg_window WHERE $__timeFilter(time) AND session IN ($session) AND phase = 'probe'"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "decimals": 1, "thresholds": {"mode": "absolute", "steps": [
+        {"color": "red", "value": null}, {"color": "orange", "value": 70}, {"color": "green", "value": 85}]}}, "overrides": []},
+      "description": "Probe windows only (not the calibration windows the model was trained on)."
+    },
+    {
+      "id": 3, "type": "stat", "title": "Rest windows with mains hum > 5 uV",
+      "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "postgres", "uid": "emg-ts"},
+      "targets": [{"refId": "A", "datasource": {"type": "postgres", "uid": "emg-ts"}, "editorMode": "code", "rawQuery": true, "format": "table",
+        "rawSql": "SELECT count(*) AS n FROM rest_hum_alert WHERE $__timeFilter(time) AND session IN ($session)"}],
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [
+        {"color": "green", "value": null}, {"color": "orange", "value": 1}, {"color": "red", "value": 20}]}}, "overrides": []},
+      "description": "Data-quality rule from report 35.97: hum during cued rest makes the Rest class a model of the hum."
+    },
+    {
+      "id": 4, "type": "stat", "title": "Rejected / sequence gaps",
+      "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+      "datasource": {"type": "postgres", "uid": "emg-ts"},
+      "targets": [
+        {"refId": "A", "datasource": {"type": "postgres", "uid": "emg-ts"}, "editorMode": "code", "rawQuery": true, "format": "table",
+          "rawSql": "SELECT count(*) AS rejected FROM emg_reject WHERE $__timeFilter(time)"},
+        {"refId": "B", "datasource": {"type": "postgres", "uid": "emg-ts"}, "editorMode": "code", "rawQuery": true, "format": "table",
+          "rawSql": "SELECT count(*) AS gaps FROM ingest_gap WHERE $__timeFilter(time)"}],
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []}
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "RMS per channel (uV)",
+      "gridPos": {"x": 0, "y": 4, "w": 12, "h": 9},
+      "datasource": {"type": "postgres", "uid": "emg-ts"},
+      "targets": [{"refId": "A", "datasource": {"type": "postgres", "uid": "emg-ts"}, "editorMode": "code", "rawQuery": true, "format": "time_series",
+        "rawSql": "SELECT time, rms1 AS ch1, rms2 AS ch2, rms3 AS ch3, rms4 AS ch4 FROM emg_window WHERE $__timeFilter(time) AND session IN ($session) ORDER BY time"}],
+      "fieldConfig": {"defaults": {"unit": "none", "custom": {"lineWidth": 1, "showPoints": "never", "scaleDistribution": {"type": "log", "log": 10}}}, "overrides": []}
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Mains hum per channel (uV, threshold 5)",
+      "gridPos": {"x": 12, "y": 4, "w": 12, "h": 9},
+      "datasource": {"type": "postgres", "uid": "emg-ts"},
+      "targets": [{"refId": "A", "datasource": {"type": "postgres", "uid": "emg-ts"}, "editorMode": "code", "rawQuery": true, "format": "time_series",
+        "rawSql": "SELECT time, hum1 AS ch1, hum2 AS ch2, hum3 AS ch3, hum4 AS ch4 FROM emg_window WHERE $__timeFilter(time) AND session IN ($session) ORDER BY time"}],
+      "fieldConfig": {"defaults": {"custom": {"lineWidth": 1, "showPoints": "never", "thresholdsStyle": {"mode": "dashed"}},
+        "thresholds": {"mode": "absolute", "steps": [{"color": "transparent", "value": null}, {"color": "red", "value": 5}]}}, "overrides": []}
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Accuracy on labelled windows, 10 s buckets (%)",
+      "gridPos": {"x": 0, "y": 13, "w": 12, "h": 8},
+      "datasource": {"type": "postgres", "uid": "emg-ts"},
+      "targets": [{"refId": "A", "datasource": {"type": "postgres", "uid": "emg-ts"}, "editorMode": "code", "rawQuery": true, "format": "time_series",
+        "rawSql": "SELECT bucket AS time, 100.0 * sum(correct) / nullif(sum(labelled), 0) AS accuracy FROM emg_10s WHERE $__timeFilter(bucket) AND session IN ($session) GROUP BY bucket HAVING sum(labelled) > 0 ORDER BY bucket"}],
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100, "custom": {"drawStyle": "points", "pointSize": 6}}, "overrides": []},
+      "description": "Includes the calibration windows (trained on) and the probe windows; the stat above shows probes only."
+    },
+    {
+      "id": 8, "type": "table", "title": "Drift from the first session: change of mean log RMS per class (cued windows)",
+      "gridPos": {"x": 12, "y": 13, "w": 12, "h": 8},
+      "datasource": {"type": "postgres", "uid": "emg-ts"},
+      "targets": [{"refId": "A", "datasource": {"type": "postgres", "uid": "emg-ts"}, "editorMode": "code", "rawQuery": true, "format": "table",
+        "rawSql": "SELECT session, CASE label WHEN 0 THEN 'Ext' WHEN 1 THEN 'Flex' WHEN 2 THEN 'Rad' WHEN 3 THEN 'Uln' WHEN 6 THEN 'Open' WHEN 7 THEN 'Fist' WHEN 8 THEN 'Rest' END AS class, ch1, ch2, ch3, ch4 FROM class_drift ORDER BY session, label"}],
+      "fieldConfig": {"defaults": {"decimals": 2, "custom": {"cellOptions": {"type": "color-background"}},
+        "thresholds": {"mode": "absolute", "steps": [{"color": "blue", "value": null}, {"color": "transparent", "value": -0.5}, {"color": "orange", "value": 0.5}]}},
+        "overrides": [{"matcher": {"id": "byName", "options": "session"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "auto"}}]},
+                      {"matcher": {"id": "byName", "options": "class"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "auto"}}]}]},
+      "description": "log ratio: +0.69 = twice the first session's amplitude, -0.69 = half. Colour beyond +-0.5."
+    },
+    {
+      "id": 9, "type": "table", "title": "Alert log (Grafana alerts received by the alert-log service)",
+      "gridPos": {"x": 0, "y": 21, "w": 24, "h": 7},
+      "datasource": {"type": "postgres", "uid": "emg-ts"},
+      "targets": [{"refId": "A", "datasource": {"type": "postgres", "uid": "emg-ts"}, "editorMode": "code", "rawQuery": true, "format": "table",
+        "rawSql": "SELECT time, status, alertname, severity, summary FROM alert_log WHERE $__timeFilter(time) ORDER BY time DESC LIMIT 50"}],
+      "fieldConfig": {"defaults": {}, "overrides": [{"matcher": {"id": "byName", "options": "status"}, "properties": [
+        {"id": "custom.cellOptions", "value": {"type": "color-text"}},
+        {"id": "mappings", "value": [{"type": "value", "options": {"firing": {"color": "red", "index": 0}, "resolved": {"color": "green", "index": 1}}}]}]}]}
+    }
+  ]
+}

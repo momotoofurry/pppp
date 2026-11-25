@@ -1,0 +1,15 @@
+apiVersion: 1
+datasources:
+  - name: EMG-Timescale
+    uid: emg-ts
+    type: postgres
+    url: db:5432
+    user: emg
+    isDefault: true
+    jsonData:
+      database: emg
+      sslmode: disable
+      timescaledb: true
+      postgresVersion: 1600
+    secureJsonData:
+      password: $DB_PASSWORD

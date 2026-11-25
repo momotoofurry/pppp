@@ -1,46 +1,21 @@
-# 專案：在 STM32H7 上實現有記憶體預算、不需要標籤的自我校正 RF 肌電手勢控制（碩士論文前置研究）
+# 專案：MCU 上每次配戴自我校正的肌電介面＋輔助機械臂（碩士論文）
 
-使用者是碩士生，用**繁體中文**溝通。每完成一個階段先停下來報告；長時間的步驟要先說大概要多久。
+用**繁體中文**溝通。先讀 `docs/接手指南.md`、`README.md`、`ARCHITECTURE.md`；研究紀錄的正本是 `report.md`（第 35 節是現在的主線，`docs/report索引.md` 依主題分類）。
 
-## 位置
-- 主要 repo：WSL 的 `~/model`（Windows：`\\wsl.localhost\Ubuntu-22.04\home\momo1234\model`）。舊的 `C:\Users\kirit\Downloads\model` 只保留、不再使用。
-- 上游程式與資料：`external/self-calibrating-rf`（Jiang et al.，commit 48ea4d1，git-ignored，1.7 GB）。
-- 簡報檔：`/mnt/c/Users/kirit/Downloads/碩論題目討論_MOMO_v*.pptx`；產生腳本在 `slides/`（見 `slides/README.md`）。
-- 詳細結果與說明：`report.md`（總報告）、`results/stage*_summary.md`、`results/platform_check.md`、`results/advisor_summary.md`。
+## 執行環境
+- 分析和模擬在 WSL2 的 Docker 裡跑：映像 `rf-emg`（`docker/run.sh build`）。
+  單次指令：`docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp --shm-size=2g -v "$PWD":/work -w /work rf-emg python ...`
+  資料夾用 `-v` 掛進去（路徑見各程式開頭和 `docs/資料.md`）。
+- 輔助控制的單元測試只要 numpy：`src/assist/*_test.py`、`src/pc/sim/kinova_trials_test.py`。
+- ROS 2 Humble、Gazebo 在同一個 WSL；韌體在 Windows 用 STM32 的工具建置（`firmware/README.md`）。
+- repo 放在 WSL 的檔案系統（`~/`），不要放 `/mnt/c`。
 
-## 執行環境（一律在 Docker 裡跑）
-- image `rf-emg`：`docker/run.sh build`；步驟見 `docker/run_all.sh`、`README.md`。
-- 單次指令：`docker run --rm --user "$(id -u):$(id -g)" -e HOME=/tmp --shm-size=2g -v "$PWD":/work -w /work rf-emg python ...`
-- 機器 20 核；`src/selfcal_sweep.py` 用 joblib 20 個 worker，t-SNE 版約每 60 個 task 15 分鐘，沒有 t-SNE 快很多。
-- 平行的大實驗不要同時跑（會互搶 CPU）；量時間的實驗要在 CPU 空閒時跑。
-
-## 規則（使用者明確要求或這次學到的）
-1. **所有數字都要來自實際執行的結果**；跑不出來就說跑不出來，估算值一定要標「估算」。MCU 上的 cycle／時間沒有板子就不報。
-2. **同一個比較只用同一個平台的數字**：report 第 1–5 節大多是 Windows 上的結果；Docker（Linux）上的自我校正結果不會逐位元相同（例：完整模型 84.66% vs Windows 84.43%）。新實驗都在 Docker 跑，對照組也要在 Docker 重跑。
-3. 自我校正對執行緒數敏感：比對 commit 的結果時要單執行緒（`src/verify_platform.py` 已處理）。
-4. **改簡報前先比對 md5，確認使用者有沒有手動改過上一版**；改過就以使用者的版本為底稿，另存新版本號，不覆寫舊檔。
-5. 上游程式碼不改；新功能用選項加在 `src/selfcal_sweep.py`，預設值必須重現舊結果（用 `docker/run.sh verify` 確認）。
-6. 每個階段完成就 commit（作者 kirit / kirito520530@gmail.com，訊息結尾加 Co-Authored-By 行）。
-7. C 裡每棵樹的亂數種子要先打散（splitmix32），不能直接用同一條 xorshift 序列的連續輸出：xorshift 是線性的，樹會高度相關（report 7.1）。
-8. 量 stack 時，由中斷或函式指標呼叫的路徑不在呼叫圖裡，要另外算再加上去（`build_arm_selfcal.py` 的 rt 版本）。
-
-## 目前的結論（推薦設定：100 棵、深度 10、int16 門檻，Flash 88.1 KB，推論 RAM 實測 552 B）
-- PC 重現：自我校正 84.63%（論文 84.6%）。完整模型的偽標籤 ablation 也重現了（84.66 / 80.89 / 82.16 vs 論文 84.6 / 81.0 / 82.7）。
-- 拿掉 t-SNE（只用 K-Means／不分群）增益從 +4.30 掉到 +1.35／+1.96。
-- 不必拿掉 t-SNE：int16 buffer 無損失；buffer 375 筆 ＋ 新樹 max_leaf_nodes 32 → 83.44%、增益 +3.76、RAM 估算 219 KB（< 256 KB），和基準無顯著差異；250 筆開始明顯變差。
-- 下一個瓶頸：t-SNE 運算時間（PC 單執行緒 375 筆 2.1 s，每次都跑滿 1000 次迭代），MCU 上未量。
-- t-SNE 迭代減到 500 次（`--tsne-iter`）：83.27%、增益 +3.59，vs 1000 次 −0.17 不顯著（p = 0.14），PC 時間 1.96 → 1.01 s；400 次以下顯著變差（report 3.7）。
-- 降低 perplexity（`--tsne-perplexity` 3/5/7）：PC 上不省時間（時間在 octree 排斥力，不在近鄰項），只省近鄰表 RAM，準確率較低 → 維持 perplexity 10（report 3.8）。
-- **上板前的 C 實作都完成了（report 第 6 節）**：`src/c/` 的 tsne.c、kmeans.c、rf_train.c、selfcal.c、features.c，全部靜態記憶體。
-  PC 端到端 83.04%（sklearn 83.27%，p = 0.20），各段都無顯著差異；Cortex-M7 linker 實測 RAM 自我校正約 223.6 KB、完整管線約 245.0 KB。
-  `src/c/main_selfcal.c` 已包好 DWT cycle 計數，板子到了直接燒錄量時間。selfcal_sweep 新選項：`--tsne-impl c`、`--kmeans-impl c`、
-  `--train-impl c`、`--features-dir`、`--dataset demo`（預設值都重現舊結果）。
-- **韌體（report 第 7 節、`results/firmware_report.md`，2026-10-23）**：板子改成 NUCLEO-H753ZI（還沒到）。one-shot 校正已搬上 MCU（`oneshot.c`，
-  剪枝和 Python 逐節點相同）；指令決策 `decision.c`（τ、k）；路線 B 序列協定 `protocol.c`＋即時迴圈 `rt.c`＋PC 工具 `src/pc/`；
-  正式韌體 `main_rt.c` linker 實測 RAM 約 248.7 KB、Flash 115.6 KB。韌體邏輯修正樹種子後 83.22%（sklearn 83.27%）。
-
-## 建議的下一步
-1. ~~減少 t-SNE 迭代次數~~（完成，report 3.7）、~~降低 perplexity~~（完成，沒用，report 3.8）。
-2. ~~C 版 t-SNE、K-Means、建樹、自我校正迴圈、特徵擷取~~（完成，report 第 6 節）。
-3. 等 NUCLEO-H753ZI：硬體層 `board_h7.c`（時脈、cache、UART、Flash），燒錄 `main_selfcal.c` 量 cycle 數、確認板上預測和 PC 相同；
-   再燒 `main_rt.c` 走路線 B（`src/pc/trigno_bridge.py` 要先在實驗室電腦上對 TCU 驗證）。待決定的事見 `results/firmware_report.md`。
+## 規則
+1. **所有數字都要來自實際執行的結果**；估算一定標「估算」。沒有板子就不報 MCU 上的時間。
+2. **要下結論的實驗，判準先寫好並 commit，再跑**；沒通過也照實寫進 report（新的一節：為什麼、怎麼做、數字、結果檔、限制）。
+3. **凍結的東西不改**：板子韌體 `rtl_task_s7f`（git tag）、S7 判準（report 35.86）。要改就是新版本，重新登錄。
+4. C 程式改了，要用 `src/check_*.py` 和 PC 參考逐位元比對；改了 `rt_lda.c`、`decision.c`，要重跑閉迴路模擬（`src/assist/closed_loop_fw.py`）確認預設值重現舊結果。
+5. `src/assist/modes.py`、`src/pc/ExperimentPanel.cs`、`src/pc/sim/make_world.py` 是 CRLF 換行，修改時保留原本的換行。
+6. 大小一律 1 KB = 1024 bytes。
+7. 每完成一個階段就 commit；個人的 EMG 錄音不要放進 repo（公開）。
+8. 實機一定要有人顧急停；作者以外的受試者要先有 IRB 和指導教授同意。

@@ -1,0 +1,82 @@
+apiVersion: 1
+
+# Where alerts go: the alert-log service (app/alerts.py) stores them in alert_log and republishes them on MQTT
+contactPoints:
+  - orgId: 1
+    name: emg-alert-log
+    receivers:
+      - uid: emg-webhook
+        type: webhook
+        settings:
+          url: http://alerts:8080/grafana
+          httpMethod: POST
+
+policies:
+  - orgId: 1
+    receiver: emg-alert-log
+    group_by: ['alertname']
+    group_wait: 5s
+    group_interval: 30s
+    repeat_interval: 1h
+
+groups:
+  - orgId: 1
+    name: emg-quality
+    folder: EMG
+    interval: 10s
+    rules:
+      # report 35.97: mains hum while the user is cued to rest turns the Rest class into a model of the hum
+      - uid: emg-rest-hum
+        title: Mains hum during rest
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: {severity: warning, area: signal-quality}
+        annotations:
+          summary: 'Mains hum above 5 uV in rest windows ({{ $values.B.Value }} in the last minute)'
+          description: 'Move the arm away from power cables / a charging laptop before calibrating Rest (report 35.97).'
+        data:
+          - refId: A
+            relativeTimeRange: {from: 60, to: 0}
+            datasourceUid: emg-ts
+            model:
+              refId: A
+              editorMode: code
+              rawQuery: true
+              format: table
+              rawSql: "SELECT count(*)::float AS n FROM rest_hum_alert WHERE time > now() - interval '60 seconds'"
+          - refId: B
+            datasourceUid: __expr__
+            model: {refId: B, type: reduce, expression: A, reducer: last}
+          - refId: C
+            datasourceUid: __expr__
+            model: {refId: C, type: threshold, expression: B, conditions: [{evaluator: {type: gt, params: [4]}}]}
+
+      # pipeline health: rejected messages or sequence gaps in the last minute
+      - uid: emg-pipeline
+        title: Pipeline rejects or gaps
+        condition: C
+        for: 0s
+        noDataState: OK
+        execErrState: Error
+        labels: {severity: critical, area: pipeline}
+        annotations:
+          summary: '{{ $values.B.Value }} rejected messages or sequence gaps in the last minute'
+          description: 'See emg_reject (reason) and ingest_gap (lost or reordered windows).'
+        data:
+          - refId: A
+            relativeTimeRange: {from: 60, to: 0}
+            datasourceUid: emg-ts
+            model:
+              refId: A
+              editorMode: code
+              rawQuery: true
+              format: table
+              rawSql: "SELECT ((SELECT count(*) FROM emg_reject WHERE time > now() - interval '60 seconds') + (SELECT count(*) FROM ingest_gap WHERE time > now() - interval '60 seconds'))::float AS n"
+          - refId: B
+            datasourceUid: __expr__
+            model: {refId: B, type: reduce, expression: A, reducer: last}
+          - refId: C
+            datasourceUid: __expr__
+            model: {refId: C, type: threshold, expression: B, conditions: [{evaluator: {type: gt, params: [0]}}]}

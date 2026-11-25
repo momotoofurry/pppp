@@ -3,3 +3,7 @@ external/
 __pycache__/
 *.pyc
 build/
+firmware/stm32h753/build/
+firmware/stm32h753/emg/
+out_fw/
+out_s7f/

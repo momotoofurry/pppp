@@ -1,0 +1,79 @@
+# EMG edge-to-dashboard pipeline: edge replay -> MQTT -> ingest (validation) -> TimescaleDB -> Grafana
+# All ports are bound to 127.0.0.1 (local only).
+services:
+  mqtt:
+    image: eclipse-mosquitto:2.0.18
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports: ["127.0.0.1:1883:1883"]
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-t", "$$SYS/broker/uptime", "-C", "1", "-W", "3"]
+      interval: 5s
+      retries: 10
+
+  db:
+    image: timescale/timescaledb:2.14.2-pg16
+    environment:
+      POSTGRES_USER: emg
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-emg-local}
+      POSTGRES_DB: emg
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/10-init.sql:ro
+      - dbdata:/var/lib/postgresql/data
+    ports: ["127.0.0.1:5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U emg -d emg"]
+      interval: 5s
+      retries: 20
+
+  ingest:
+    build: ./app
+    command: python ingest.py
+    environment:
+      MQTT_HOST: mqtt
+      DB_DSN: postgresql://emg:${DB_PASSWORD:-emg-local}@db:5432/emg
+    depends_on:
+      mqtt: {condition: service_healthy}
+      db: {condition: service_healthy}
+    restart: unless-stopped
+
+  alerts:
+    build: ./app
+    command: python alerts.py
+    environment:
+      MQTT_HOST: mqtt
+      DB_DSN: postgresql://emg:${DB_PASSWORD:-emg-local}@db:5432/emg
+    depends_on:
+      mqtt: {condition: service_healthy}
+      db: {condition: service_healthy}
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin-local}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/emg.json
+      DB_PASSWORD: ${DB_PASSWORD:-emg-local}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on:
+      db: {condition: service_healthy}
+
+  # edge node replay, run on demand:  docker compose run --rm publisher --session T00_d1_G --speed 20
+  publisher:
+    build: ./app
+    entrypoint: ["python", "publish.py"]
+    environment:
+      MQTT_HOST: mqtt
+    volumes:
+      - ./data:/data:ro
+    depends_on:
+      mqtt: {condition: service_healthy}
+    profiles: ["replay"]
+
+volumes:
+  dbdata:
