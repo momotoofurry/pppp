@@ -58,6 +58,7 @@ NAME = {0: 'up', 1: 'down', 2: 'left', 3: 'right', 6: 'grip_open', 7: 'grip_clos
 CLS = {'up': 0, 'down': 1, 'left': 2, 'right': 3, 'rest': 8, 'grip_open': 6, 'grip_close': 7}
 GRIP_CMDS = False
 LOCK_DWELL = 'none'
+LEVEL = 0.6                        # 35.99: steering assist level (0 = off), as assist_ros.py --level
 LOCK_RULE = 'none'
 DUMP = None                  # 35.94: per-step rows (list) when --dump-steps is given
 CONF = None                  # 35.94: (s_min, m_full) of the EMG-confidence speed, or None (off)
@@ -272,7 +273,7 @@ def prior_vec(rng, n, target):
 
 def trial(board, player, rng, labels_on, st, prng=None):
     ma = M.ModeAssist(MS.OBJ, MS.SHELVES, rule='mix', grip_cmds=GRIP_CMDS, lock_dwell=LOCK_DWELL,
-                      lock_rule=LOCK_RULE)
+                      lock_rule=LOCK_RULE, level=LEVEL)
     lab = LB.Labeler(ma)
     t_obj = int(rng.integers(3))
     free = [k for k in range(len(MS.SHELVES))
@@ -417,6 +418,7 @@ def main():
     ap.add_argument('--scene', default='3obj', choices=['3obj', 'crowded'])
     ap.add_argument('--lock-dwell', default='none', choices=['none', 'context', 'place', 'all'])
     ap.add_argument('--lock-rule', default='none', choices=['none', 'room', 'intent'])
+    ap.add_argument('--level', type=float, default=0.6, help='35.99: steering assist level, 0 = off')
     ap.add_argument('--dump-steps', default=None, help='35.94: per-step CSV (want, command, PRED) for the EMG confidence')
     ap.add_argument('--conf-speed', default=None, help='35.94: S_MIN,M_FULL: direction speed x decoder confidence')
     ap.add_argument('--conf-infer', type=float, default=None, help='35.94c: M_FULL: goal inference weighted by confidence')
@@ -426,6 +428,8 @@ def main():
     LOCK_DWELL = a.lock_dwell
     global LOCK_RULE
     LOCK_RULE = a.lock_rule
+    global LEVEL
+    LEVEL = a.level
     global DUMP, CONF
     if a.dump_steps:
         DUMP = []
@@ -450,7 +454,7 @@ def main():
     p(f'closed loop with rt_lda.c (S7, gate 0.5, k 5, stop k 2) and hindsight range labels ({a.label_classes}); '
       f'{a.sessions} sessions x {a.trials} trials; first half pool A, second half pool B (held out); grip commands '
       f'{a.grip_cmds}; goal prior ' + ('off' if a.prior is None else f'P {a.prior} mass {a.prior_mass}')
-      + f'; scene {a.scene} ({len(MS.OBJ)} objects, {len(MS.SHELVES)} shelves); lock dwell {a.lock_dwell}; lock rule {a.lock_rule}')
+      + f'; scene {a.scene} ({len(MS.OBJ)} objects, {len(MS.SHELVES)} shelves); lock dwell {a.lock_dwell}; lock rule {a.lock_rule}; assist level {a.level}')
     p('  donning  labels  half   success   time median s   wrong locks/trial   wrong-direction steps   '
       'ranges/trial   windows added/trial   label error (vs intent)')
     allres = []
