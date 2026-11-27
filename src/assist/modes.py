@@ -106,6 +106,7 @@ class ModeAssist:
         self.ss = np.zeros(len(shelves))            # 35.89: shelf goal scores while carrying
         self.n_no_room = 0                          # 35.89: stops at a full shelf (refused locks)
         self.conf = 1.0                             # 35.94c: weight of this step's command in the goal scores
+        self.speed_scale = 1.0                      # proportional speed factor (0.25..1.0, default 1.0)
         self.n_grip_ok = self.n_grip_refused = 0
         self._prev_cmd = None                       # 35.86: a held Fist / HandOpen counts once
         self.shelf_prior = None                     # 35.86: prior over the shelves (None: off); objects: self.base.prior
@@ -307,6 +308,8 @@ class ModeAssist:
     def step(self, cmd, x):
         m0 = self.m
         v = self._step(cmd, x)
+        if self.lowering is None and self.speed_scale != 1.0:
+            v = v * float(np.clip(self.speed_scale, 0.25, 1.0))
         self._prev_cmd = cmd
         if self.m != m0:
             self.switches += 1
@@ -476,13 +479,13 @@ class ModeAssist:
             if self.armed:
                 self._lock(x)
             return np.zeros(3)
-        if self.phase == 'pick' and self.armed and np.linalg.norm(self.obj[self.goal] - x) < GRASP_TOL:
+        if not self.grip_cmds and self.phase == 'pick' and self.armed and np.linalg.norm(self.obj[self.goal] - x) < GRASP_TOL:
             self.rest_n += 1
             if self.rest_n >= CONFIRM_STEPS:
                 self.held, self.phase, self.lift_from, self.rest_n, self.armed = self.goal, 'out', x[2], 0, False
                 self.goal = None
             return np.zeros(3)
-        if self.phase == 'place' and self.armed and self.inside(x):
+        if not self.grip_cmds and self.phase == 'place' and self.armed and self.inside(x):
             self.rest_n += 1
             if self.rest_n >= CONFIRM_STEPS:
                 self.rest_n = 0
@@ -529,11 +532,15 @@ class ModeAssist:
                 return 'lead', f'MODE 1  {g}?', f'模式 1：系統猜是物體 {g}，在它前面停下就切到模式 2', g
             return 'free1', 'MODE 1', '模式 1：自由控制（W／S／A／D 上下左右）', None
         if self.phase == 'pick':
-            if np.linalg.norm(self.obj[self.goal] - x) < GRASP_TOL:   # same as the grasp rule (a relax here grasps)
+            if np.linalg.norm(self.obj[self.goal] - x) < GRASP_TOL:
+                if self.grip_cmds:
+                    return 'grasp', 'MODE 2  FIST: grasp', f'模式 2：到了物體 {self.goal}，握拳夾起（放鬆僅停止）', self.goal
                 return 'grasp', 'MODE 2  SPACE 1s: grasp', f'模式 2：到了物體 {self.goal}，空白鍵放鬆 1 秒夾起', self.goal
             return 'pick', 'MODE 2  W: in / S: out', f'模式 2：鎖定物體 {self.goal}，W 接近、S 退出', self.goal
         if self.phase == 'place':
             if self.inside(x):
+                if self.grip_cmds:
+                    return 'place', 'MODE 2  OPEN: put down', '模式 2：W／S 調整深度，張開放下（放鬆僅停止）', self.held
                 return 'place', 'MODE 2  SPACE 1s: put down', '模式 2：W／S 調整深度，空白鍵放鬆 1 秒放下', self.held
             return 'place_in', 'MODE 2  W: in / S: out', f'模式 2：放到架子 {self.shelf}，W 放進去、S 退出', self.held
         if self.phase == 'out':

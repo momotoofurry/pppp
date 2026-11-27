@@ -72,6 +72,7 @@ import assist as A  # noqa: E402
 import assist_sim as S  # noqa: E402
 import kin  # noqa: E402
 import modes as M
+import manual as MAN
 import natural_start as NS
 import labeler as LB  # noqa: E402
 import scenes as SC  # noqa: E402
@@ -129,7 +130,8 @@ class Demo(Node):
     def gripper(self, closed):
         if self.grip.wait_for_server(timeout_sec=2.0):
             g = GripperCommand.Goal()
-            g.command.position = 0.8 * float(closed)
+            open_pos = getattr(self, 'grip_open_pos', 0.0)
+            g.command.position = 0.8 if float(closed) > 0.5 else float(open_pos)
             g.command.max_effort = 100.0
             fut = self.grip.send_goal_async(g)
             fut.add_done_callback(lambda f, c=float(closed): self._grip_goal(f, c))
@@ -520,7 +522,11 @@ def main():
     ap.add_argument('--track-max', type=float, default=0.04,
                     help='m: measured vs commanded tool point; over it for 5 steps -> hold until a relax (35.92)')
     ap.add_argument('--limit', type=float, default=None, help='s (default: demo 60, keys 300)')
-    ap.add_argument('--scene', default='3obj', help='35.101: 3obj | crowded | <layout>.json (scenes.py)')
+    ap.add_argument('--scene', default='3obj', help='35.101: 3obj | crowded | crowded12 | <layout>.json (scenes.py)')
+    ap.add_argument('--control', default='assist', choices=['assist', 'manual'],
+                    help='assist = ModeAssist (default); manual = ManualControl baseline (E switches mode)')
+    ap.add_argument('--grip-open-pos', type=float, default=0.0,
+                    help='2F-85 open position (0.0 = full 85 mm; e.g. 0.25 = partial open for crowded shelves)')
     ap.add_argument('--grip-check', action='store_true',
                     help='35.107 (REAL ARM ONLY): a grasp whose gripper closed to the end (on air) is undone')
     ap.add_argument('--trial-port', type=int, default=0,
@@ -535,6 +541,7 @@ def main():
     OBJECTS, SHELVES = SC.load(a.scene)
     rclpy.init()
     n = Demo()
+    n.grip_open_pos = a.grip_open_pos
     if a.mode == 'scene':
         print('publishing the scene on /assist_scene (Ctrl-C to stop)')
         idle = A.Assist(OBJECTS)
@@ -615,7 +622,11 @@ def main():
         rclpy.shutdown()
         return
     live = a.mode in ('keys', 'board')                 # 35.82: the board drives the same control as the keys
-    if live and a.modes:
+    if live and a.control == 'manual':
+        def make_sa():
+            return MAN.ManualControl(OBJECTS.copy(), SHELVES)
+        sa = make_sa()
+    elif live and a.modes:
         def make_sa():                              # 35.101: a fresh assist (objects back at the start) per trial
             return M.ModeAssist(OBJECTS.copy(), SHELVES, level=a.level, zone=(a.zone if a.zone > 0 else None),
                                 rule=a.rule, grip_cmds=(a.mode == 'board' and a.grip == 'gripper'),

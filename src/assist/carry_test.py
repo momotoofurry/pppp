@@ -1,8 +1,8 @@
 """offline check of the blend mode with keep=True and the W / S lock (35.62), no ROS:
 lock object 2 by stopping in front of it, cancel with S; lock object 0, W in, grasp; relax in the air (keeps holding);
 carry it to the empty right-low shelf, put it down; lock object 2 again, W in, grasp."""
-import sys
-sys.path.insert(0, '/work/src/assist')
+import os, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import numpy as np
 import assist as A
 
@@ -48,7 +48,7 @@ check('lift', run('up', lambda: x[2] >= 0.18))
 run(None, lambda: False, limit=20)
 check('relaxed in the air 2 s: still holding', sa.state == 'grasped')
 check('carried right', run('right', lambda: x[1] <= -0.25))
-check('down over the empty shelf', run('down', lambda: sa.place_ok(x) is not None))
+check('down over the empty shelf', run('down', lambda: sa.place_ok(x)))
 check('relaxed: put down', run(None, lambda: sa.state == 'steer'))
 check(f'object 0 on the shelf at {np.round(sa.obj[0], 3).tolist()}', abs(sa.obj[0][2] - 0.10) < 1e-9 and sa.grip == 0.0)
 check('left until in front of object 2', run('left', lambda: x[1] >= -0.01))

@@ -16,6 +16,10 @@ SHELVES_3 = np.vstack([OBJ_3 - [0, 0, 0.05], [[0.72, -0.25, 0.05], [0.72, 0.25, 
 CROWD_LOWER = [(0.72, y, 0.05) for y in (-0.25, 0.0, 0.25)]
 SHELVES_C = np.array(CROWD_LOWER + [(0.72, y, 0.25) for y in (-0.25, 0.0, 0.25)])
 OBJ_C = np.array([(x, y + dy, z + 0.05) for (x, y, z) in CROWD_LOWER for dy in (-0.04, 0.04)])
+# 12 cm centre spacing (6 cm clear gap between 6 cm cylinders) for 2F-85 finger clearance
+CROWD12_LOWER = [(0.72, y, 0.05) for y in (-0.28, 0.0, 0.28)]
+SHELVES_C12 = np.array(CROWD12_LOWER + [(0.72, y, 0.25) for y in (-0.28, 0.0, 0.28)])
+OBJ_C12 = np.array([(x, y + dy, z + 0.05) for (x, y, z) in CROWD12_LOWER for dy in (-0.06, 0.06)])
 
 OBJ_H = 0.10
 
@@ -26,6 +30,8 @@ def load(name):
         return OBJ_3.copy(), SHELVES_3.copy()
     if name == 'crowded':
         return OBJ_C.copy(), SHELVES_C.copy()
+    if name == 'crowded12':
+        return OBJ_C12.copy(), SHELVES_C12.copy()
     with open(name, encoding='utf-8') as f:
         d = json.load(f)
     o, s = np.array(d['objects'], float), np.array(d['shelves'], float)
