@@ -316,7 +316,8 @@ def keyreader():
     tty.setcbreak(fd)
     state = {'cmd': 'rest'}
     keys = {b'w': 'up', b's': 'down', b'a': 'left', b'd': 'right', b' ': 'rest',
-            b'W': 'up', b'S': 'down', b'A': 'left', b'D': 'right'}
+            b'W': 'up', b'S': 'down', b'A': 'left', b'D': 'right',
+            b'c': 'grip_close', b'C': 'grip_close', b'o': 'grip_open', b'O': 'grip_open'}
 
     def poll():
         while select.select([fd], [], [], 0)[0]:
@@ -629,7 +630,7 @@ def main():
     elif live and a.modes:
         def make_sa():                              # 35.101: a fresh assist (objects back at the start) per trial
             return M.ModeAssist(OBJECTS.copy(), SHELVES, level=a.level, zone=(a.zone if a.zone > 0 else None),
-                                rule=a.rule, grip_cmds=(a.mode == 'board' and a.grip == 'gripper'),
+                                rule=a.rule, grip_cmds=(a.grip == 'gripper'),
                                 lock_rule=a.lock_rule)
         sa = make_sa()
     else:
