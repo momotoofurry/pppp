@@ -10,8 +10,10 @@
 # blink.elf / blink.map / blink.bin (the flash image, objcopy -O binary) and its md5 to the output directory.
 #
 # presets
-#   s7   (default) the real-time LDA loop with 9 classes as on the board for the S7 self-test:
-#        -DEMG_APP_RT=ON, -DLD_CLASSES=9 -DDC_CLASSES=9 -DRTL_LABEL_MAX=810, Release (-Os -g)
+#   s7     (default) the real-time LDA loop with 9 classes as on the board for the S7 self-test:
+#          -DEMG_APP_RT=ON, -DLD_CLASSES=9 -DDC_CLASSES=9 -DRTL_LABEL_MAX=810, Release (-Os -g)
+#   s7_4ch native 4-channel (40-dim) build of the same loop (-DFE_CH=4 -DLD_DIM=40; PK_CH stays 8 so
+#          TrignoBridge and recorded 8-col streams work unchanged, using ch0..3 only)
 #
 # The frozen board firmware rtl_task_s7f is the git tag rtl_task_s7f (commit 37ac42a); its image md5 is
 # 4d60a4f38b54c83d341f5f33c355bd9e (26056 bytes). To rebuild it exactly:
@@ -21,7 +23,7 @@ set -e
 SRC=$1
 OUT=$2
 PRESET=${3:-s7}
-[ -d "$SRC" ] && [ -n "$OUT" ] || { echo "usage: bash firmware/build_fw.sh <src/c directory> <output directory> [s7]"; exit 1; }
+[ -d "$SRC" ] && [ -n "$OUT" ] || { echo "usage: bash firmware/build_fw.sh <src/c directory> <output directory> [s7|s7_4ch]"; exit 1; }
 HERE=$(cd "$(dirname "$0")" && pwd)
 B=${STM32_BUNDLES:-/c/Users/$USERNAME/AppData/Local/stm32cube/bundles}
 GCC=$(ls -d "$B"/gnu-tools-for-stm32/*/bin 2>/dev/null | sort | tail -1)
@@ -36,6 +38,7 @@ FILES="app_rt.h app_rt_lda.c bench.h board.h board_hal.c decision.c decision.h f
 protocol.c protocol.h rt_lda.c rt_lda.h"
 case $PRESET in
   s7) FLAGS="-DRTL_LABEL_MAX=810 -DLD_CLASSES=9 -DDC_CLASSES=9" ;;
+  s7_4ch) FLAGS="-DFE_CH=4 -DLD_DIM=40 -DRTL_LABEL_MAX=810 -DLD_CLASSES=9 -DDC_CLASSES=9" ;;
   *) echo "unknown preset $PRESET"; exit 1 ;;
 esac
 

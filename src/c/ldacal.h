@@ -16,7 +16,9 @@
 #pragma once
 #include <stdint.h>
 
+#ifndef LD_DIM
 #define LD_DIM 80
+#endif
 #ifndef LD_CLASSES
 #define LD_CLASSES 6            /* -DLD_CLASSES=9 for the 9 directional gestures (2026-11-17); Rest is the last class */
 #endif

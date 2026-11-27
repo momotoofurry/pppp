@@ -24,7 +24,9 @@
 #define PK_HEADER 7                     /* sync, type, seq, len */
 #define PK_OVERHEAD 9                   /* header + crc */
 #define PK_MAX_PAYLOAD 512
+#ifndef PK_CH
 #define PK_CH 8
+#endif
 #define PK_LSB_VOLT 2.5e-7f
 
 enum { PK_SAMPLES = 0x01, PK_CONTROL = 0x02, PK_COMMAND = 0x81, PK_PRED = 0x83, PK_STATUS = 0x82 };

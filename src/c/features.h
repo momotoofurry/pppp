@@ -13,7 +13,9 @@
 #pragma once
 #include <stdint.h>
 
+#ifndef FE_CH
 #define FE_CH 8
+#endif
 #define FE_WIN 400
 #define FE_STEP 200
 #define FE_NFFT 512
