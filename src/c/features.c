@@ -142,14 +142,19 @@ static void channel_features(int ch, float *feat)
             kmed = k;
         }
     }
-    float mnf = sm1 / sm0;
+    float skw = (m2 > 0.0f) ? (m3 / (m2 * sqrtf(m2))) : 0.0f;
+    float mnf = (sm0 > 0.0f) ? (sm1 / sm0) : 0.0f;
+    float vcf = (sm0 > 0.0f) ? (sm2 / sm0 - mnf * mnf) : 0.0f;
+    if (!isfinite(skw)) skw = 0.0f;
+    if (!isfinite(mnf)) mnf = 0.0f;
+    if (!isfinite(vcf)) vcf = 0.0f;
     feat[0 * FE_CH + ch] = sqrtf(s2 / FE_WIN);
     feat[1 * FE_CH + ch] = wl;
     feat[2 * FE_CH + ch] = (float)ssc;
     feat[3 * FE_CH + ch] = (float)zc;
     feat[4 * FE_CH + ch] = sa / FE_WIN;
-    feat[5 * FE_CH + ch] = m3 / (m2 * sqrtf(m2));
-    feat[6 * FE_CH + ch] = sm2 / sm0 - mnf * mnf;
+    feat[5 * FE_CH + ch] = skw;
+    feat[6 * FE_CH + ch] = vcf;
     feat[7 * FE_CH + ch] = kmed * df;
     feat[8 * FE_CH + ch] = mnf;
     feat[9 * FE_CH + ch] = kmax * df;
