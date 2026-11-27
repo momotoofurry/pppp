@@ -92,20 +92,32 @@ def posture_rate(q, q_rest=None):
     return z
 
 
-def ik_step(q, v, Rd, dt, k_rot=2.0, damp=0.02, qdot_max=1.0, posture=False, q_rest=None):
-    """one velocity step: tool linear velocity v (m/s) and orientation pulled toward Rd -> new joint angles"""
+def min_sv(q):
+    """smallest singular value of the 6x7 Jacobian at joint angles q (singularity margin)"""
+    return float(np.linalg.svd(jacobian(q), compute_uv=False)[-1])
+
+
+def ik_step(q, v, Rd, dt, k_rot=2.0, damp=0.02, qdot_max=1.0, posture=False, q_rest=None, sigma_min=0.05):
+    """one velocity step: tool linear velocity v (m/s) and orientation pulled toward Rd -> new joint angles.
+    Uses SVD selective adaptive damping near singularities and smoothly attenuates the null-space posture task."""
     q = np.asarray(q, float)
     T = fk(q)
     w = k_rot * rot_err(T[:3, :3], Rd)
     J = jacobian(q)
     x = np.concatenate([v, w])
-    Jp = J.T @ np.linalg.inv(J @ J.T + damp ** 2 * np.eye(6))
-    qd = Jp @ x
+    U, s, Vt = np.linalg.svd(J, full_matrices=False)
+    # Selective adaptive damping: minimal damping far from singularities, smooth ramp when s_i < sigma_min
+    lam2 = np.where(s >= sigma_min, damp ** 2,
+                    damp ** 2 + (0.08 ** 2) * (1.0 - np.clip(s / sigma_min, 0.0, 1.0) ** 2))
+    s_inv = s / (s ** 2 + lam2)
+    qd = Vt.T @ (s_inv * (U.T @ x))
     if posture:
-        # exact null-space projector (undamped pseudo-inverse): the posture task must not move the tool. With the damped
-        # Jp the projector leaked: about 11 mm of tool drift in 10 s standing still (35.63, drift_check.py)
-        N = np.eye(7) - np.linalg.pinv(J, rcond=1e-4) @ J
-        qd = qd + N @ posture_rate(q, q_rest)
+        # Exact null-space projector from SVD, attenuated smoothly near singularities to prevent wrist jumps
+        valid = s > 1e-4
+        V_ok = Vt[valid]
+        N = np.eye(7) - V_ok.T @ V_ok
+        w_null = float(np.clip((s[-1] - 0.01) / max(sigma_min - 0.01, 1e-6), 0.0, 1.0))
+        qd = qd + w_null * (N @ posture_rate(q, q_rest))
     s = np.abs(qd).max() / qdot_max
     if s > 1:
         qd = qd / s

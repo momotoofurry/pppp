@@ -63,7 +63,7 @@ from rclpy.action import ActionClient
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from geometry_msgs.msg import Point
+from geometry_msgs.msg import Point, PoseArray
 from visualization_msgs.msg import Marker, MarkerArray
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -73,6 +73,7 @@ import assist_sim as S  # noqa: E402
 import kin  # noqa: E402
 import modes as M
 import manual as MAN
+import smoother as SM
 import natural_start as NS
 import labeler as LB  # noqa: E402
 import scenes as SC  # noqa: E402
@@ -109,11 +110,26 @@ class Demo(Node):
     def __init__(self):
         super().__init__('assist_demo')
         self.q = {}
-        self.create_subscription(JointState, '/joint_states', lambda m: self.q.update(dict(zip(m.name, m.position))), 10)
+        self.eff = {}
+        self.world_objs = None
+        self.create_subscription(JointState, '/joint_states', self._on_js, 10)
+        self.create_subscription(PoseArray, '/assist_world/objects', self._on_world_objs, 10)
         self.traj = self.create_publisher(JointTrajectory, '/joint_trajectory_controller/joint_trajectory', 10)
         self.mk = self.create_publisher(MarkerArray, '/assist_objects', 10)
         self.sc = self.create_publisher(MarkerArray, '/assist_scene', 10)
         self.grip = ActionClient(self, GripperCommand, '/robotiq_gripper_controller/gripper_cmd')
+
+    def _on_js(self, m):
+        self.q.update(dict(zip(m.name, m.position)))
+        if m.effort:
+            self.eff.update(dict(zip(m.name, m.effort)))
+
+    def _on_world_objs(self, m):
+        if m.poses:
+            self.world_objs = np.array([[p.position.x, p.position.y, p.position.z] for p in m.poses], float)
+
+    def max_effort(self):
+        return max((abs(self.eff[j]) for j in JOINTS if j in self.eff), default=0.0)
 
     def joints(self):
         return np.array([self.q[j] for j in JOINTS])
@@ -528,6 +544,14 @@ def main():
                     help='assist = ModeAssist (default); manual = ManualControl baseline (E switches mode)')
     ap.add_argument('--grip-open-pos', type=float, default=0.0,
                     help='2F-85 open position (0.0 = full 85 mm; e.g. 0.25 = partial open for crowded shelves)')
+    ap.add_argument('--ctrl-hz', type=int, default=50,
+                    help='trajectory sub-step rate Hz (50 = 20 ms smooth ramp; 10 = legacy 100 ms steps)')
+    ap.add_argument('--acc-max', type=float, default=0.25,
+                    help='m/s^2: Cartesian acceleration limit (0 = off)')
+    ap.add_argument('--stop-dec', type=float, default=0.60,
+                    help='m/s^2: Cartesian deceleration limit when stopping')
+    ap.add_argument('--effort-limit', type=float, default=0.0,
+                    help='Nm: joint torque contact-stop threshold (0 = off; e.g. 25 on real Kinova)')
     ap.add_argument('--grip-check', action='store_true',
                     help='35.107 (REAL ARM ONLY): a grasp whose gripper closed to the end (on air) is undone')
     ap.add_argument('--trial-port', type=int, default=0,
@@ -672,6 +696,9 @@ def main():
     n_ranges = 0
     n_guard = 0
     n_track, track_n, track_hold, e_max = 0, 0, False, 0.0      # 35.92 tracking check
+    smoother = SM.VelocitySmoother(acc_max=a.acc_max, stop_dec=a.stop_dec)
+    n_sub = max(1, int(round(A.DT * a.ctrl_hz)))
+    sub_dt = A.DT / n_sub
     # 35.89: + shelf; 35.92: + track_err, wall (unix s at the step start: loop stalls show as gaps)
     log.write('t,wanted,command,state,goal,p0,p1,p2,x,y,z,shelf,track_err,wall,mono\n')   # 35.109: + mono
     # 35.101: task events for the trial logger (kinova_trials.py) and its reset channel
@@ -727,8 +754,15 @@ def main():
                     hist = [kin.fk(q)[:3, 3]] * (S.REACT + 1)
                     last_state, last_hint, last_mode = None, None, 1
                     track_n, track_hold = 0, False
+                    smoother.reset()
                     tevent(k, 'reset_done', tid)
                     continue
+            # Optional dynamic object poses from /assist_world/objects (e.g. AprilTag node)
+            if n.world_objs is not None and len(n.world_objs) == len(sa.obj):
+                held_idx = getattr(sa, 'held', None)
+                for oi in range(len(sa.obj)):
+                    if oi != held_idx:
+                        sa.obj[oi] = n.world_objs[oi]
             if a.mode == 'demo':
                 if a.assist == 'blend':
                     want, held = S.user_blend(sa, OBJECTS, a.target, hist[-1 - S.REACT], held, dec.est)
@@ -854,18 +888,31 @@ def main():
                 track_hold, n_track = True, n_track + 1
                 q = n.joints().copy()                   # resync the command model to where the arm really is
                 print(f'  !! the arm is {100 * e_tr:.1f} cm from where it was sent: holding; relax to go on', flush=True)
+            # Optional joint-effort contact-stop on real arm
+            if a.effort_limit > 0.0 and not track_hold and n.max_effort() > a.effort_limit:
+                track_hold, n_track = True, n_track + 1
+                smoother.reset()
+                q = n.joints().copy()
+                print(f'  !! 關節力矩達 {n.max_effort():.1f} Nm (上限 {a.effort_limit:.1f})：觸碰保護暫停，放鬆後繼續', flush=True)
             if track_hold:
                 if cmd in ('rest', None):
                     track_hold, track_n = False, 0
+                smoother.reset()
                 v = np.zeros(3)
-            v, hit = guard(v, kin.fk(q)[:3, 3], A.DT)           # 35.85: workspace box on everything sent to the arm
-            if hit:
-                n_guard += 1
-            q_prev = q.copy()
-            q = kin.ik_step(q, v, RD, A.DT, posture=True, q_rest=q_rest)
-            qd = (q - q_prev) / A.DT if a.vel else None
-            n.send(rebase(q, n.joints()), A.DT * a.seg, qd)     # 35.92: continuous joints the short way
-            q_prev = q.copy()
+            # Sub-stepped smooth velocity ramp (e.g. 50 Hz) -> IK -> JointTrajectory
+            for si in range(n_sub):
+                vs = smoother.step(v, sub_dt)
+                vs, hit = guard(vs, kin.fk(q)[:3, 3], sub_dt)
+                if hit and si == 0:
+                    n_guard += 1
+                q_prev = q.copy()
+                q = kin.ik_step(q, vs, RD, sub_dt, posture=True, q_rest=q_rest)
+                qd = (q - q_prev) / sub_dt if a.vel else None
+                n.send(rebase(q, n.joints()), sub_dt * a.seg, qd)
+                if si + 1 < n_sub:
+                    t_next = tk + (si + 1) * sub_dt
+                    while time.monotonic() < t_next:
+                        rclpy.spin_once(n, timeout_sec=0.005)
             P = sa.probs()
             code, hg = n.markers(sa.obj, P, sa, a.target if a.mode == 'demo' else -1, kin.fk(q)[:3, 3])
             hist.append(kin.fk(q)[:3, 3])
