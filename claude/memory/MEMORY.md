@@ -18,3 +18,4 @@
 - [Patch scripts keep EOL](patch-scripts-keep-eol.md) — edit WSL repo via python patches preserving CRLF; no bash inside PowerShell strings; docker -d for >10 min
 - [Kinova control on WSL](kinova-control-on-wsl.md) — WSL on one laptop (2026-11-25); "WSL pauses" were a kernel tick fault (monotonic 5.3 % slow), check loop_jitter rate+tick
 - [S7 recording: pending analyses](s7-recording-pending-analyses.md) — after T00_d1_S/d2_S run P1/P2 + R16 (log) + R19 (60 Hz gate); then next firmware
+- [Phase 1 assist upgrades & 4ch firmware](assist-phase1-and-4ch-2026-11-28.md) — 4ch s7_4ch (191.2 KB RAM), NaN guard, manual baseline, grip_cmds fix, 50 Hz smoother, SVD IK, /assist_world/objects
