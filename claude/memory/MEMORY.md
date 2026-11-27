@@ -1,0 +1,20 @@
+- [Keep only latest slide builder](slides-keep-latest-builder.md) — delete the previous buildNN.py when a new deck version is made
+- [Deck rules: one file per deck, edited in place](slides-edit-v17-in-place.md) — v17 (old), proposal (2026-11-13), progress report now 進度報告_2026-12_MOMO_新版.pptx (md5 f712e571, 2026-11-17 rebuild); direction deck 研究方向與證據_2026-11-18.pptx (md5 41c070a8); check md5 before overwrite
+- [Docker call without login shell](docker-call-no-login-shell.md) — bash -lc mounts a stale repo; use plain wsl -- docker run with absolute path
+- [Thesis writing rules](thesis-writing-rules.md) — only given sources, (作者，年份), 【此處需補文獻】/【待填】, no numbers from me
+- [Robot application plan](robot-application-plan.md) — VLA/voice Gen3 idea is a side project / future work only (2026-11-10); main line first
+- [KB = 1024 bytes](kb-is-1024.md) — all RAM/Flash sizes in report, proposal, deck, thesis use ÷1024
+- [Thesis direction: edge AI + robotics](thesis-direction-edge-ai-robotics.md) — user wants industry-relevant thesis (2026-11-12); prefer energy/RTOS/NN baseline/ROS 2 over algorithm variants
+- [Advisor working style](advisor-working-style.md) — finish one experiment first, then discuss; direction is free (2026-11-15)
+- [Wants work that helps people](user-wants-to-help-people.md) — core motivation; thesis = assistive arm (user decided 2026-11-16), shared autonomy leaning
+- [Gesture redesign after self-test](gesture-redesign-after-selftest.md) — self-test keeps 6 gestures; then 7-class directional control for Kinova (2026-11-16)
+- [Self-test with 4 sensors](selftest-4-sensors.md) — IM sensors don't stream; 4 Avanti on EDC/FDS/radial/FCU, slots 16:15:11:5 repeated (2026-11-17)
+- [Career goal: fab IT](career-goal-fab-it.md) — wants tech-manufacturer IT / smart manufacturing; frame thesis as edge AI + integration
+- [Edge claim scope](edge-claim-scope.md) — "on MCU" = decoding + calibration learning; EMG relayed via PC (limitation)
+- [Real-robot validation is must-have](real-robot-validation-must-have.md) — Kinova closed loop with self = must-have (2026-11-19); multi-participant study = bonus after IRB
+- [Focus on the user, not peers](focus-on-user-not-peers.md) — judge thesis choices on their own merits; no classmate-overlap reasoning unless asked (2026-11-20)
+- [Self-test day 1+2 recorded](selftest-day1-2026-11-23.md) — 11/23 two donnings same evening (pen outlines); S7 82.6% best, R2 GO, R3 NO-GO; slots 16:11:15:5; NOT MASTER fix
+- [Board runs rtl_task_s7f](board-firmware-s7b.md) — S7+gate+k5/stop k2+stop events+range labels+stop on reset; arm needs --fwd-pred 1/report 3 (deadman); commits f0b4ce0, 4d215fc, 37ac42a, 87bce2c; S7 rules frozen 2026-11-24 (80 %, <= 2/min)
+- [Patch scripts keep EOL](patch-scripts-keep-eol.md) — edit WSL repo via python patches preserving CRLF; no bash inside PowerShell strings; docker -d for >10 min
+- [Kinova control on WSL](kinova-control-on-wsl.md) — WSL on one laptop (2026-11-25); "WSL pauses" were a kernel tick fault (monotonic 5.3 % slow), check loop_jitter rate+tick
+- [S7 recording: pending analyses](s7-recording-pending-analyses.md) — after T00_d1_S/d2_S run P1/P2 + R16 (log) + R19 (60 Hz gate); then next firmware

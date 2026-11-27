@@ -5,6 +5,8 @@
 **一句話**：sEMG 手勢介面每天重新戴上就會變不準。這個專案讓 STM32H753 上的分類器每次只做幾秒的校正，把歷次配戴累積起來，並在操作輔助機械臂（Kinova Gen3）時，用任務完成後確認的標籤持續更新模型。
 
 > 第一次來？先讀 [`docs/接手指南.md`](docs/接手指南.md)：研究做到哪裡、先跑什麼、哪些試過沒用、哪些坑要避開。
+>
+> 作者自己換電腦或換帳號：[`docs/接續工作指南.md`](docs/接續工作指南.md)（環境、資料、目前進度、Claude 的工作記憶 `claude/memory/`）。
 
 ```mermaid
 flowchart LR
@@ -72,7 +74,8 @@ flowchart LR
 | `lab_kit/` | 實驗室用的操作程序：`SOP_自我測試.md`、`SOP_Kinova實機.md`、`實驗設計_Kinova實機.md` |
 | `tools/emg-iot/` | 副專案：MQTT → TimescaleDB → Grafana 的訊號品質監控 |
 | `tools/local-monitor/` | 本地 AI 監看：規則偵測異常，本機 LLM（Ollama）寫成中文說明；只讀紀錄、不送指令 |
-| `docs/` | 接手指南、論文初稿、計畫書、設計筆記、文獻、資料取得方式、report 索引、早期路線的文件 |
+| `docs/` | 接手指南、接續工作指南、論文初稿、計畫書與簡報、設計筆記、文獻與讀書筆記、IRB 草稿、資料取得方式、report 索引、早期路線的文件 |
+| `claude/memory/` | Claude Code 的工作記憶：作者的偏好、規則、決定、進行中的工作 |
 | `report.md` | **研究紀錄的正本**：每個實驗的做法、判準、數字、結果檔，依時間排列（第 35 節是現在的主線） |
 | `results/` | 每個 report 節次的輸出（CSV、文字報告） |
 | `docker/` | 分析用的 Docker 環境（Python 3.12.3 和固定版本的套件、gcc、arm-none-eabi-gcc） |
