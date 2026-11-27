@@ -6,7 +6,8 @@
 1. `claude/memory/MEMORY.md` 和它列出的檔案：作者的偏好、規則、做過的決定、進行中的工作。資料夾名稱是 claude，但內容給任何助手用。
 2. `docs/接續工作指南.md` 第 3 節：目前進度和下一步。
 3. `README.md`、`ARCHITECTURE.md`、`docs/接手指南.md`。
-4. 研究紀錄的正本是 `report.md`：第 35 節是現在的主線，`docs/report索引.md` 依主題分類。數字一律以 report 和 `results/` 為準。
+4. 給 AI 的提示範本在 `docs/AI提示範本.md`。
+5. 研究紀錄的正本是 `report.md`：第 35 節是現在的主線，`docs/report索引.md` 依主題分類。數字一律以 report 和 `results/` 為準。
 
 ## 溝通
 - 用**繁體中文**。
