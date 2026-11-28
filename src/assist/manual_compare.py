@@ -62,9 +62,12 @@ def run_modeassist(obj0, sh, t_obj, t_shelf, e, seed):
     dec = S.Decoder(S.SET5, e, rng)
     x = X0.copy()
     hist = [x.copy()] * (S.REACT + 1)
+    sw_steps = 0
     for t in range(T_MAX):
         want = user_modeassist(ma, hist[-1 - S.REACT], t_obj, t_shelf, dec.est, sh)
         cmd = dec(want)
+        if ma.wait_release:
+            sw_steps += 1
         xp = x.copy()
         v = ma.step(cmd if cmd != 'rest' else None, x)
         if ('邊緣' in ma.msg or '太靠近' in ma.msg) and ma.armed is False:
@@ -78,8 +81,8 @@ def run_modeassist(obj0, sh, t_obj, t_shelf, e, seed):
               and abs(ma.obj[t_obj][0] - sh[t_shelf][0]) <= M.SHELF_HX - M.EDGE + 1e-4
               and abs(ma.obj[t_obj][1] - sh[t_shelf][1]) <= M.SHELF_HY - M.EDGE + 1e-4)
         if on:
-            return True, (t + 1) * M.DT, col.n, ma.switches
-    return False, T_MAX * M.DT, col.n, ma.switches
+            return True, (t + 1) * M.DT, col.n, ma.switches, 100.0 * sw_steps / (t + 1)
+    return False, T_MAX * M.DT, col.n, ma.switches, 100.0 * sw_steps / T_MAX
 
 
 def run_manual(obj0, sh, t_obj, t_shelf, e, seed):
@@ -90,9 +93,13 @@ def run_manual(obj0, sh, t_obj, t_shelf, e, seed):
     dec = S.Decoder(SET6, e, rng)
     x = X0.copy()
     hist = [x.copy()] * (S.REACT + 1)
+    sw_steps = 0
     for t in range(T_MAX):
         want = MAN.manual_user(mc, hist[-1 - S.REACT], t_obj, t_shelf, dec.est, LEAD)
         cmd = dec(want)
+        # Herlant (2016) mode-switching overhead: steps commanding/executing a switch or waiting for post-switch release
+        if want == 'switch' or cmd == 'switch' or mc.wait_release:
+            sw_steps += 1
         xp = x.copy()
         v = mc.step(cmd if cmd != 'rest' else None, x)
         x = x + v * M.DT
@@ -103,8 +110,8 @@ def run_manual(obj0, sh, t_obj, t_shelf, e, seed):
               and abs(mc.obj[t_obj][0] - sh[t_shelf][0]) <= M.SHELF_HX - M.EDGE + 1e-4
               and abs(mc.obj[t_obj][1] - sh[t_shelf][1]) <= M.SHELF_HY - M.EDGE + 1e-4)
         if on:
-            return True, (t + 1) * M.DT, col.n, mc.switches
-    return False, T_MAX * M.DT, col.n, mc.switches
+            return True, (t + 1) * M.DT, col.n, mc.switches, 100.0 * sw_steps / (t + 1)
+    return False, T_MAX * M.DT, col.n, mc.switches, 100.0 * sw_steps / T_MAX
 
 
 def power_paired_diff(diffs, n_pairs, n_mc=2000, rng=None):
@@ -123,7 +130,7 @@ def power_paired_diff(diffs, n_pairs, n_mc=2000, rng=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--trials', type=int, default=200)
-    ap.add_argument('--scene', default='crowded', choices=['3obj', 'crowded'])
+    ap.add_argument('--scene', default='crowded', choices=['3obj', 'crowded', 'crowded12'])
     a = ap.parse_args()
     obj0, sh = SC.load(a.scene)
     free = SC.free_shelves(obj0, sh)
@@ -145,14 +152,16 @@ def main():
         man_col = np.mean([r[2] > 0 for r in res_man]) * 100
         ma_sw = np.mean([r[3] for r in res_ma])
         man_sw = np.mean([r[3] for r in res_man])
+        ma_swp = np.mean([r[4] for r in res_ma])
+        man_swp = np.mean([r[4] for r in res_man])
         diff_all = man_t - ma_t
         pwr12 = power_paired_diff(diff_all, 12) * 100
         pwr24 = power_paired_diff(diff_all, 24) * 100
         print(f'e={e:.3f}:')
         print(f'  ModeAssist: ok={ma_ok:5.1f}%  time={ma_t.mean():5.1f}s (med {np.median(ma_t):4.1f}s)  '
-              f'col_trials={ma_col:4.1f}%  switches={ma_sw:4.1f}')
+              f'col_trials={ma_col:4.1f}%  switches={ma_sw:4.1f}  sw_time={ma_swp:4.1f}%')
         print(f'  Manual:     ok={man_ok:5.1f}%  time={man_t.mean():5.1f}s (med {np.median(man_t):4.1f}s)  '
-              f'col_trials={man_col:4.1f}%  switches={man_sw:4.1f}')
+              f'col_trials={man_col:4.1f}%  switches={man_sw:4.1f}  sw_time={man_swp:4.1f}%')
         if both:
             db = man_t[both] - ma_t[both]
             print(f'  Paired diff (Manual - ModeAssist): all={diff_all.mean():+5.1f}s '

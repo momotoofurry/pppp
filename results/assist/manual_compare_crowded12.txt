@@ -1,0 +1,17 @@
+=== Scene: crowded12 (6 objects, 3 free shelves), 200 paired trials ===
+e=0.000:
+  ModeAssist: ok=100.0%  time= 38.8s (med 37.8s)  col_trials= 0.0%  switches= 4.0  sw_time= 0.8%
+  Manual:     ok=100.0%  time= 37.7s (med 36.5s)  col_trials= 0.0%  switches= 4.0  sw_time= 5.7%
+  Paired diff (Manual - ModeAssist): all= -1.1s (both-ok n=200:  -1.1s, med  -1.1s) | power @12=0% @24=0%
+e=0.100:
+  ModeAssist: ok=100.0%  time= 39.9s (med 38.5s)  col_trials= 0.0%  switches= 4.0  sw_time= 0.9%
+  Manual:     ok=100.0%  time= 41.0s (med 39.6s)  col_trials=23.5%  switches= 4.6  sw_time= 7.5%
+  Paired diff (Manual - ModeAssist): all= +1.1s (both-ok n=200:  +1.1s, med  +0.8s) | power @12=61% @24=89%
+e=0.174:
+  ModeAssist: ok=100.0%  time= 40.8s (med 39.8s)  col_trials= 0.0%  switches= 4.0  sw_time= 1.1%
+  Manual:     ok= 96.5%  time= 46.5s (med 44.0s)  col_trials=33.5%  switches= 5.5  sw_time= 9.9%
+  Paired diff (Manual - ModeAssist): all= +5.7s (both-ok n=193:  +4.1s, med  +3.2s) | power @12=90% @24=100%
+e=0.250:
+  ModeAssist: ok=100.0%  time= 42.3s (med 40.9s)  col_trials= 0.0%  switches= 4.0  sw_time= 1.3%
+  Manual:     ok= 94.0%  time= 53.2s (med 50.1s)  col_trials=41.5%  switches= 5.9  sw_time=11.9%
+  Paired diff (Manual - ModeAssist): all=+10.8s (both-ok n=188:  +8.5s, med  +7.1s) | power @12=100% @24=100%
