@@ -11,7 +11,8 @@ metadata:
 When the S7 self-test is recorded (planned the week after 2026-11-25, two different days, slots 16:11:15:5), run:
 1. the frozen decision: selftest_quality.py, selftest_s7_prereg.py (P1 >= 80 %, P2 <= 2/min), selftest9_analysis.py --sets S7;
 2. R16 confirmation of the log front end (report 35.97): `src/structure_r16.py --days T00_d1_S T00_d2_S` (both days > 0, mean >= +2);
-3. R19 60 Hz gate (report 35.106, results/hum_106/PREREG_R19.md): `src/hum_gate_r19.py --dir /sd/T00 --days T00_d1_S T00_d2_S --out results/hum_106` (no --dev).
+3. R19 60 Hz gate (report 35.106, results/hum_106/PREREG_R19.md): `src/hum_gate_r19.py --dir /sd/T00 --days T00_d1_S T00_d2_S --out results/hum_106` (no --dev);
+4. R20 4x4 Riemannian tangent space (report 35.110, results/riemann_110/PREREG_R20.md): `src/riemann_r20.py --dir /sd/T00 --days T00_d1_S T00_d2_S --out results/riemann_110` (no --dev).
 
 **Why:** both R16 and R19 were pre-registered on the 11/23 data and may only be judged on new recordings.
 
